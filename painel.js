@@ -2558,14 +2558,16 @@
     const caixa = limpar($('historico'));
     $('limparHistorico').hidden = !(historico || []).length;
     if (!(historico || []).length) {
-      caixa.appendChild(vazioSimples('Ninguém ganhou nesta sessão ainda. A lista zera quando a aba da Jamble recarrega.'));
+      caixa.appendChild(vazioSimples('Ninguém ganhou sorteio neste canal ainda. A lista fica guardada até você limpar.'));
       return;
     }
     // o histórico guarda o id da gema; quem lê quer o nome
     const nomes = nomesDasGemas();
-    historico.slice(0, 20).forEach((h) => {
+    const hoje = soDia(Date.now());
+    historico.forEach((h) => {
       const l = el('div', 'hl');
-      l.appendChild(el('span', 'hora', horaCurta(h.t)));
+      // a lista fica guardada: de outro dia, mostra a data junto
+      l.appendChild(el('span', 'hora', soDia(h.t) === hoje ? horaCurta(h.t) : quando(h.t)));
       l.appendChild(el('span', 'quem', '@' + h.usuario));
       const motivo = MOTIVOS[h.motivo];
       if (motivo) l.appendChild(el('span', 'motivo ' + motivo.cor, motivo.rot));
@@ -2574,8 +2576,29 @@
         + (h.escopo === 'vendedor' ? ' · todas as lives' : '')
         + (h.filtro ? ' · só ' + (nomes.get(h.filtro) || h.filtro) : '');
       l.appendChild(el('span', 'como', como));
+      // × tira a pessoa da lista: ela volta para a urna
+      const x = el('button', 'hl-remover', '×');
+      x.type = 'button';
+      x.title = 'Tirar @' + h.usuario + ' da lista (volta para a urna)';
+      x.setAttribute('aria-label', x.title);
+      x.onclick = () => removerGanhador(h);
+      l.appendChild(x);
       caixa.appendChild(l);
     });
+  }
+
+  // A aba é dona da lista; aqui ela já some da tela e da urna, sem esperar o
+  // próximo pacote.
+  function removerGanhador(h) {
+    historico = historico.filter((x) => !(x.t === h.t && x.id === h.id));
+    motivosMarcados.delete(h.t + ':' + h.id);
+    if (dados) {
+      const ids = (tipo) => [...new Set(historico.filter((x) => (x.tipo || 'gemas') === tipo).map((x) => x.id))];
+      dados.jaGanharam = ids('gemas');
+      dados.jaGanharamCompradores = ids('compradores');
+    }
+    mandar('remover-ganhador', { t: h.t, id: h.id });
+    desenharSorteio();
   }
 
   // ====================================================== TELA LIVES DO VENDEDOR

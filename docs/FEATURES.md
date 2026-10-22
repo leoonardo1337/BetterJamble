@@ -403,3 +403,14 @@ cada `.sel-linha` em `display:contents`). Largo, as três opções (checkboxes)
 ficam numa linha embaixo dos seletores e o botão Sortear ocupa a coluna da
 direita inteira, de cima a baixo; empilhado (bloco com menos de 860 px), as
 opções ficam uma embaixo da outra, logo acima do botão. Os textos dos cards e das opções começam com maiúscula, sem ponto final.
+
+## Lista de quem já ganhou: guardada e editável (3.11.0)
+
+A lista "Já ganharam neste canal" (o histórico do sorteio) fica no
+`localStorage` da Jamble, **por canal** (`jamble:gems:sorteio:v1`, chave = @ do
+vendedor), e sobrevive à recarga da aba; guarda até 200 sorteios. Quem está
+nela é o que as opções de não repetir usam (`jaGanharam` é recalculado a
+partir dela). Cada linha tem um **×** que tira a pessoa da lista
+(`removerGanhador`, mensagem `remover-ganhador`): ela volta para a urna. "limpar
+lista" continua zerando tudo do canal. Ganhadores de outros dias mostram a
+data junto da hora.
