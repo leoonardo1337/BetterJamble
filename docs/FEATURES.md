@@ -12,7 +12,7 @@ Onde os arquivos rodam:
 | `live.js` | MAIN | badge de total vendido + lista de compradores da live |
 | `gems-core.js` | MAIN | **camada de dados**: captura, estado, agregação, sorteio |
 | `gems-transporte.js` | MAIN | protocolo de mensagens com o painel |
-| `gems-bar.js` | MAIN | o retângulo baixo na página, com o botão "Abrir Painel" |
+| `gems-bar.js` | MAIN | o botão redondo ao lado do diamante, que abre o painel |
 | `bridge.js` | ISOLATED | ponte para `chrome.*` (a página não enxerga `chrome.*`) |
 | `background.js` | service worker | abre/foca a janela do painel e roteia as mensagens |
 | `painel.html` / `painel.js` | página da extensão | o painel (hoje só o esqueleto) |
@@ -302,20 +302,23 @@ resquício da página de histórico de vendas **que foi removida e não deve vol
 
 ---
 
-## 12. A barra na página (novidade da 3.2.2)
+## 12. O botão na página (novidade da 3.7.0)
 
-**O que faz.** Substitui o card grande que existia dentro da página. É um
-retângulo de 46 px de altura, na largura da coluna dos anúncios, com a marca, um
-resumo de uma linha (gemas / pessoas / envios **desta live**) e o botão
-**Abrir Painel**.
+**O que faz.** Substitui a barra de 46 px que ficava embaixo da coluna dos
+anúncios. É um botão redondo com o ícone da extensão, logo à direita do
+diamante (`button[aria-label="Recompensa por assistir"]`), do mesmo tamanho e
+com o mesmo fundo dele. O resumo (gemas / pessoas / envios **desta live**) vai
+na dica do mouse; o clique abre o painel.
 
-**Onde vive.** `gems-bar.js`. A geometria é medida no grid do site
-(`areaDaColuna`, `gems-bar.js:73-94`) e o card de anúncios é encolhido em
-`46 + 14 px` para a barra caber embaixo (`posicionar`, `gems-bar.js:96-113`).
+**Onde vive.** `gems-bar.js`. O botão é `position:fixed` no `<body>`; o bloco do
+campo de comentário ganha `margin-left` para abrir espaço, e a margem original
+volta quando o botão sai (`posicionar` / `devolverCampo`). O ícone é
+`icons/48.png` embutido em base64, para não precisar de `web_accessible_resources`.
 
-**Estado.** Nenhum. Só lê `BetterJamble.totais('live')`.
+**Extensão recarregada.** Com a aba aberta, o botão ganha um ↻ e o clique
+recarrega a página.
 
-**Limite conhecido.** Se o grid do site não for encontrado, a barra cai para o
+**Limite conhecido.** Se o diamante não for encontrado, o botão cai para o
 canto inferior direito (classe `bj-solta`) em vez de sumir.
 
 ---

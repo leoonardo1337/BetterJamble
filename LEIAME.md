@@ -28,9 +28,10 @@ Como ele evita demora e chamadas repetidas:
 
 ## 3. Gemas: painel de ranking, feed e sorteio
 
-Nas lives aparece uma **barra baixa** no fim da coluna dos anúncios (o card de
-anúncios encolhe 60 px para ela caber), com um resumo de uma linha e o botão
-**Abrir Painel**. O painel abre numa **janela separada**, com espaço de verdade:
+Nas lives aparece um **botão redondo com o ícone da extensão** ao lado do diamante
+(o botão de recompensa, à esquerda do campo de comentário), com o mesmo fundo dele.
+Passando o mouse, mostra o resumo da live; clicando, abre o painel numa
+**janela separada**, com espaço de verdade:
 
 - **Ao vivo** — dois cards lado a lado: à esquerda um card com menu próprio
   (Ranking · Sorteio · Insights) e à direita o feed de envios estilo console

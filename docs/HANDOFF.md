@@ -414,31 +414,30 @@ Números com `toLocaleString('pt-BR')`; dinheiro com
 
 ---
 
-## 7. A barra na página — especificação
+## 7. O botão na página — especificação
 
-Implementada em `gems-bar.js`. Mexa aqui só se precisar.
+Implementado em `gems-bar.js`. Mexa aqui só se precisar.
 
 ```
-┌────────────────────────────────────────────────────────┐  ← largura da coluna
-│ 💎 BetterJamble   30.918 gemas · 6 pessoas · 60 envios  │     dos anúncios
-│                                        [ Abrir Painel ] │  46px de altura
-└────────────────────────────────────────────────────────┘
+ (💎)  (BJ)  [ Adicione um comentário...            ➤ ]
+ 15:19
 ```
 
-- **Altura 46 px**, borda `#2e2e2e`, raio 14, fundo `#0d0d0d`, sombra.
-- **Botão** `#f2f2f2` com texto `#0d0d0d` (jamais branco).
-- **Resumo** sempre da **live aberta e sem filtro**: ele sai de
+- **Redondo**, com o diâmetro e o fundo copiados do diamante
+  (`button[aria-label="Recompensa por assistir"]`, o mesmo que o `resgate.js`
+  usa). Ícone `icons/48.png` embutido em base64 (sem `web_accessible_resources`).
+- **Posição:** logo à direita do diamante; o bloco do campo de comentário ganha
+  `margin-left` para o botão caber, e a margem original é devolvida ao sair.
+- **Dica (title)** sempre da **live aberta e sem filtro**: sai de
   `livesDoVendedor().find(l => l.atual)`, justamente para **não** seguir o escopo
-  nem o filtro de gema que o usuário escolheu dentro do painel (a barra mudar
-  sozinha quando se mexe no painel era confuso). Sem gema:
+  nem o filtro de gema que o usuário escolheu dentro do painel. Sem gema:
   *"nenhuma gema ainda nesta live"*.
-- **Posição:** medida no grid do site. O card de anúncios é encolhido em
-  `46 + 14 = 60 px` e a barra ocupa a faixa de baixo da coluna.
-- **Fallback:** sem grid reconhecível, ganha a classe `bj-solta` e vai para o
-  canto inferior direito (300 px de largura). Ela nunca simplesmente some.
+- **Fallback:** sem diamante, ganha a classe `bj-solta` e vai para o canto
+  inferior direito (44 px). Ele nunca simplesmente some.
+- **Extensão recarregada:** ganha um ↻ e o clique recarrega a página.
 - **Montar/desmontar:** some **na hora** em que o usuário sai da live
-  (`pushState`/`replaceState`/`popstate`), e a altura original do card de
-  anúncios é devolvida. Um `setInterval` de 1500 ms é a rede de segurança.
+  (`pushState`/`replaceState`/`popstate`), e a margem do campo é devolvida. Um
+  `setInterval` de 1500 ms é a rede de segurança.
 
 ---
 
