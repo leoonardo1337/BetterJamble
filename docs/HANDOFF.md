@@ -423,9 +423,11 @@ Implementado em `gems-bar.js`. Mexa aqui só se precisar.
  15:19
 ```
 
-- **Redondo**, com o diâmetro e o fundo copiados do diamante
-  (`button[aria-label="Recompensa por assistir"]`, o mesmo que o `resgate.js`
-  usa). Ícone `icons/48.png` embutido em base64 (sem `web_accessible_resources`).
+- **Redondo e dourado** (`#cf8a03` → `#e3a80f`, o dourado do ícone), com o
+  diâmetro copiado do diamante (`button[aria-label="Recompensa por assistir"]`,
+  o mesmo que o `resgate.js` usa). As letras "BJ" são `icons/bj-letras.png`
+  (recortadas do ícone, fundo transparente) embutidas em base64 (sem
+  `web_accessible_resources`).
 - **Posição:** logo à direita do diamante; o bloco do campo de comentário ganha
   `margin-left` para o botão caber, e a margem original é devolvida ao sair.
 - **Dica (title)** sempre da **live aberta e sem filtro**: sai de
