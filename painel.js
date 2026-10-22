@@ -1570,7 +1570,7 @@
     const urna = base ? calcularUrna(base) : null;
 
     const fora = urna ? urna.fora.length : 0;
-    $('rotSemRepetir').textContent = 'Não repetir quem já ganhou'
+    $('rotSemRepetir').textContent = 'Não repetir quem já ganhou neste sorteio'
       + (sorteio.semRepetir && fora ? ' (' + nf(fora) + ' ' + plural(fora, 'fora', 'fora') + ')' : '');
     $('semRepetir').checked = sorteio.semRepetir;
     $('exigirPresenca').checked = sorteio.presenca;
@@ -1663,14 +1663,14 @@
     if (!urna.lista.length) {
       caixa.appendChild(vazioSimples(comp
         ? (sorteio.semRepetir && urna.fora.length
-          ? 'Todo mundo que comprou já ganhou. Desmarque “Não repetir quem já ganhou” ou limpe a lista.'
+          ? 'Todo mundo que comprou já ganhou. Desmarque “Não repetir quem já ganhou neste sorteio” ou limpe a lista.'
           : sorteio.escopo === 'vendedor'
             ? 'Nenhuma compra salva ainda. A extensão guarda os compradores de cada live daqui em diante.'
             : 'Ninguém comprou nesta live ainda. O sorteio abre quando sair a primeira venda.')
         : dados.filtro
           ? 'Ninguém mandou ' + (dados.nomeDoFiltro || dados.filtro) + ' nesse escopo ainda — não há ninguém para sortear.'
           : sorteio.semRepetir && urna.fora.length
-            ? 'Todo mundo que mandou gema já ganhou. Desmarque “Não repetir quem já ganhou” ou limpe a lista.'
+            ? 'Todo mundo que mandou gema já ganhou. Desmarque “Não repetir quem já ganhou neste sorteio” ou limpe a lista.'
             : 'Ninguém mandou gema ainda. O sorteio abre sozinho quando a primeira gema chegar.'));
       return;
     }
@@ -1726,7 +1726,7 @@
       girando = false;
       $('btnSortear').classList.remove('girando');
       const alvo = limpar($('resultado'));
-      alvo.appendChild(vazioSimples('Ninguém elegível com essas opções. Confira o filtro de gema e a opção “Não repetir quem já ganhou”.'));
+      alvo.appendChild(vazioSimples('Ninguém elegível com essas opções. Confira o filtro de gema e a opção “Não repetir quem já ganhou neste sorteio”.'));
       desenharSorteio();
       return;
     }

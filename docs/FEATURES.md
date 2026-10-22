@@ -179,7 +179,7 @@ olhos independentes, e o Ranking só obedece ao dele.
   `bilhetes = max(1, gemas)`. Quem mandou mais, ganha mais chance.
 - **Por pessoa** (`modo: 'pessoa'`): todo mundo com 1 chance.
 
-Mais a opção **Não repetir quem já ganhou**, que tira da urna quem está em
+Mais a opção **Não repetir quem já ganhou neste sorteio**, que tira da urna quem está em
 `jaGanharam`, e um histórico dos últimos vencedores.
 
 **Não repetir ganhadores entre gemas e compradores** (terceira opção, ao lado
