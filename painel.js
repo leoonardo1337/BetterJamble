@@ -682,7 +682,7 @@
   // até agora" (Kaplan–Meier). Sem isso o número sairia curto demais, porque
   // só quem já foi embora teria tempo fechado.
   function tempoParaPrender(eventos, pessoas) {
-    const ativos = new Set(pessoas.filter((p) => p.ativo).map((p) => p.id));
+    const porId = new Map(pessoas.map((p) => [p.id, p]));
     const abertos = new Map();
     const amostras = [];   // [duração, saiu?]
     eventos.slice().sort((x, y) => x.t - y.t).forEach((e) => {
@@ -693,7 +693,16 @@
       }
     });
     const agora = Date.now();
-    abertos.forEach((t0, id) => { if (ativos.has(id)) amostras.push([agora - t0, false]); });
+    // Entrou e não saiu: ficou pelo menos até agora (se ainda está na lista) ou
+    // até a última vez em que foi visto (lista sem consulta recente — página
+    // recarregada, painel fechado). Antes, sem consulta recente essas pessoas
+    // eram descartadas e a janela de retenção zerava depois de recarregar.
+    abertos.forEach((t0, id) => {
+      const p = porId.get(id);
+      if (!p) return;
+      const ate = p.ativo ? agora : (p.visto || 0);
+      if (ate > t0) amostras.push([ate - t0, false]);
+    });
     if (amostras.length < 5) return null;
 
     amostras.sort((x, y) => x[0] - y[0]);

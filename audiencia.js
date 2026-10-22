@@ -311,6 +311,10 @@
     // uma enxurrada de "entrou", vira uma linha só
     const silencioso = !jaConsultouNestaAba;
     jaConsultouNestaAba = true;
+    // gravado junto com a live: depois de recarregar a página o resumo ainda
+    // sabe que a lista estava em dia (antes isso vivia só na memória da aba,
+    // e até a próxima consulta todo mundo parecia ter saído)
+    sh.ultimaConsulta = t;
     const agora = new Set();
     lista.forEach((x) => {
       agora.add(x.id);
@@ -344,12 +348,14 @@
     if (!sh) return { showId: id, status: consulta.status };
     const agora = Date.now();
     // Sem consulta recente não dá para dizer quem continua: a sessão aberta
-    // conta só até a última vez em que a pessoa foi vista.
-    const fresca = consulta.status === 'ok' && agora - consulta.ultima < 90000;
+    // conta só até a última vez em que a pessoa foi vista. A última consulta
+    // boa vem da memória ou do que ficou gravado (página recarregada).
+    const ultimaOk = Math.max(consulta.ultima || 0, sh.ultimaConsulta || 0);
+    const fresca = consulta.status !== 'pausado' && agora - ultimaOk < 90000;
     const pessoas = Object.entries(sh.pessoas).map(([pid, p]) => {
       const ms = p.s.reduce((a, [ini, fim]) => a + ((fim === null ? (fresca ? agora : p.v) : fim) - ini), 0);
       const ativo = fresca && !!(p.s.length && p.s[p.s.length - 1][1] === null);
-      return { id: pid, usuario: p.u, avatar: p.a, papel: p.r, ms, ativo, chat: p.c, gemas: p.g, entrou: p.s.length ? p.s[0][0] : 0 };
+      return { id: pid, usuario: p.u, avatar: p.a, papel: p.r, ms, ativo, visto: p.v, chat: p.c, gemas: p.g, entrou: p.s.length ? p.s[0][0] : 0 };
     }).filter((p) => p.papel !== 'host');
     const min = Object.entries(sh.min).map(([k, v]) => [Number(k), v[0], v[1], v[2], v[3]]).sort((a, b) => a[0] - b[0]);
     return {
@@ -359,9 +365,10 @@
       minutos: min,
       pessoas,
       eventos: (sh.eventos || []).slice(-250),
-      status: consulta.status,
+      // logo depois de recarregar a aba ainda não consultou, mas os dados gravados estão em dia
+      status: fresca && (consulta.status === 'aguardando' || consulta.status === 'sem-token') ? 'ok' : consulta.status,
       motivo: consulta.motivo,
-      ultimaConsulta: consulta.ultima,
+      ultimaConsulta: ultimaOk,
     };
   }
 
