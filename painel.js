@@ -116,7 +116,7 @@
   let rkTipo = lerLS('bj-rk-tipo', ['gemas', 'compradores'], 'gemas');
   let rkMetrica = lerLS('bj-rk-metrica', ['valor', 'compras'], 'valor');
   let rkOculto = lerLS('bj-rk-oculto', ['1', '0'], '0') === '1';
-  const METRICAS = { valor: 'Valor total', compras: 'Compras totais' };
+  const METRICAS = { valor: 'Valor total', compras: 'Quantidade de compras' };
   let rkCompradoresCanal = null;   // compradores de todas as lives (pedidos à aba)
   let rkCanalVelho = true;
   let rkCanalPedidoEm = 0;
@@ -2786,7 +2786,7 @@
     redesenharRanking();
   };
 
-  // menu "Valor total / Compras totais", no mesmo formato do filtro de gema
+  // menu "Valor total / Quantidade de compras", no mesmo formato do filtro de gema
   const menuMetrica = $('menuRkMetrica');
   document.body.appendChild(menuMetrica);
   function fecharMenuMetrica() {
@@ -2800,9 +2800,7 @@
       o.type = 'button';
       o.setAttribute('role', 'option');
       o.setAttribute('aria-selected', rkMetrica === k ? 'true' : 'false');
-      o.appendChild(el('span', 'emj', k === 'valor' ? 'R$' : '🛍'));
-      o.appendChild(el('span', 'nome-g', nome));
-      o.appendChild(el('span', 'info-g', k === 'valor' ? 'Soma do que cada um pagou' : 'Quantas compras cada um fez'));
+      o.appendChild(el('span', 'nome-g', nome));   // só o nome, sem ícone nem descrição
       o.onclick = (e) => {
         e.stopPropagation();
         fecharMenuMetrica();
@@ -2815,7 +2813,7 @@
       menuMetrica.appendChild(o);
     });
     const r = $('rkMetrica').getBoundingClientRect();
-    const larg = Math.max(r.width, 260);
+    const larg = Math.max(r.width, 190);   // só os nomes: a largura do botão basta
     menuMetrica.style.width = larg + 'px';
     menuMetrica.style.left = Math.min(r.left, window.innerWidth - larg - 8) + 'px';
     menuMetrica.hidden = false;
