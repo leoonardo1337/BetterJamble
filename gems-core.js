@@ -41,8 +41,13 @@
   let ultimaLive = null;      // showId da última navegação observada
   let catalogoDaLive = null;  // showId para o qual já buscamos /api/live/emojis
 
+  // Quem já ganhou sorteio, por canal (vendedor), guardado no localStorage:
+  // sobrevive à recarga da aba. `jaGanharam` sai sempre do histórico.
+  const LS_SORTEIO = 'jamble:gems:sorteio:v1';
+  const MAX_HISTORICO = 200;
   const jaGanharam = new Set();
-  let historico = [];         // [{t, id, usuario, modo, escopo}] — volátil
+  let historico = [];         // [{t, id, usuario, tipo, modo, escopo, filtro, motivo?}] do canal aberto
+  let canalDoHistorico = null;
 
   const inscritos = new Set();
 
@@ -688,6 +693,7 @@
   }
 
   function participantes(op) {
+    garantirHistorico();
     const o = op || {};
     const modo = o.modo === 'pessoa' ? 'pessoa' : 'peso';
     const tipo = o.tipo === 'compradores' ? 'compradores' : 'gemas';
@@ -707,7 +713,7 @@
 
   function sortear(op) {
     const o = op || {};
-    const lista = participantes(o);
+    const lista = participantes(o);   // já garante o histórico do canal
     const bilhetes = lista.reduce((a, r) => a + r.bilhetes, 0);
     if (!lista.length) return { vencedor: null, participantes: lista, bilhetes: 0, historico: historico.slice() };
     let n = Math.random() * bilhetes;
@@ -722,24 +728,66 @@
       escopo: o.escopo || (tipo === 'compradores' ? 'live' : escopo),
       filtro: tipo === 'compradores' ? '' : (filtro || ''),
     });
-    historico = historico.slice(0, 20);
+    historico = historico.slice(0, MAX_HISTORICO);
+    recalcularGanhadores();
+    salvarHistorico();
     avisar('sorteio');
     return { vencedor, participantes: lista, bilhetes, historico: historico.slice() };
+  }
+
+  function lerSorteios() {
+    try { return JSON.parse(localStorage.getItem(LS_SORTEIO) || '{}') || {}; } catch { return {}; }
+  }
+  function recalcularGanhadores() {
+    jaGanharam.clear();
+    historico.forEach((h) => jaGanharam.add(chaveGanhou(h.tipo || 'gemas', h.id)));
+  }
+  // Troca o histórico quando muda o canal aberto (chamado antes de qualquer uso).
+  function garantirHistorico() {
+    const h = live();
+    const canal = h ? h.sellerSlug : '';
+    if (!canal || canal === canalDoHistorico) return;
+    canalDoHistorico = canal;
+    const tudo = lerSorteios();
+    historico = Array.isArray(tudo[canal]) ? tudo[canal] : [];
+    recalcularGanhadores();
+  }
+  function salvarHistorico() {
+    if (!canalDoHistorico) return;
+    const tudo = lerSorteios();
+    if (historico.length) tudo[canalDoHistorico] = historico;
+    else delete tudo[canalDoHistorico];
+    try { localStorage.setItem(LS_SORTEIO, JSON.stringify(tudo)); } catch {}
+  }
+
+  // Tira uma pessoa da lista de quem já ganhou: ela volta para a urna.
+  function removerGanhador(t, id) {
+    garantirHistorico();
+    const antes = historico.length;
+    historico = historico.filter((x) => !(x.t === t && x.id === id));
+    if (historico.length === antes) return;
+    recalcularGanhadores();
+    salvarHistorico();
+    avisar('sorteio');
   }
 
   // Quem conduz o sorteio marca o vencedor que não respondeu: 'ja-sorteado'
   // (outra conta de quem já ganhou) ou 'ausente'. '' desmarca.
   function marcarMotivo(t, id, motivo) {
+    garantirHistorico();
     const h = historico.find((x) => x.t === t && x.id === id);
     if (!h) return;
     if (motivo === 'ja-sorteado' || motivo === 'ausente') h.motivo = motivo;
     else delete h.motivo;
+    salvarHistorico();
     avisar('sorteio');
   }
 
   function limparHistorico() {
+    garantirHistorico();
     historico = [];
     jaGanharam.clear();
+    salvarHistorico();
     avisar('sorteio');
   }
 
@@ -764,6 +812,7 @@
   }
 
   function estado(op) {
+    garantirHistorico();
     const o = op || {};
     const h = live();
     const base = {
@@ -870,8 +919,9 @@
     // sorteio
     participantes,              // ({modo,semRepetir,escopo}) -> [{...ranking, bilhetes}]
     sortear,                    // ({modo,semRepetir,escopo}) -> {vencedor,participantes,bilhetes,historico}
-    historico: () => historico.slice(),
+    historico: () => { garantirHistorico(); return historico.slice(); },
     marcarMotivo,               // (t, id, 'ja-sorteado'|'ausente'|'') -> marca a entrada do histórico
+    removerGanhador,            // (t, id) -> tira a entrada do histórico; a pessoa volta para a urna
     limparHistorico,
 
     // fotos

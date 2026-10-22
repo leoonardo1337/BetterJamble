@@ -136,6 +136,9 @@
       case 'motivo-sorteio':
         if (api) api.marcarMotivo(p.t, p.id, p.motivo || '');
         break;
+      case 'remover-ganhador':
+        if (api && api.removerGanhador) api.removerGanhador(p.t, p.id);
+        break;
       case 'limpar-historico':
         if (api) api.limparHistorico();
         break;

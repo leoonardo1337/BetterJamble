@@ -832,7 +832,11 @@
   .resultado .trofeu{font-size:19px;flex:none}
   .girando-nome{color:var(--bj-texto2)}
 
-  .hist{margin-top:9px}
+  .hist{margin-top:9px;max-height:300px;overflow-y:auto}
+  .hl-remover{flex:none;width:22px;height:22px;display:grid;place-items:center;margin-left:auto;padding:0;border:0;border-radius:6px;
+    background:none;color:var(--bj-texto3);font:600 16px/1 var(--bj-ui);cursor:pointer;opacity:.55;transition:opacity .15s,color .15s,background .15s}
+  .hl:hover .hl-remover{opacity:1}
+  .hl-remover:hover,.hl-remover:focus-visible{color:#ff5252;background:rgba(255,82,82,.14);opacity:1;outline:none}
   .hl{display:flex;align-items:center;gap:10px;padding:4px 5px;border-radius:8px;font-size:11.5px;min-width:0}
   .hl:hover{background:var(--bj-fundo3)}
   .hl .hora{flex:none;color:var(--bj-texto3);font-family:var(--bj-mono);font-size:11px}
@@ -1137,9 +1141,9 @@
                 </div>
                 <!-- coluna da direita, primeira linha: as duas opções empilhadas em cards -->
                 <div class="sel-toggles">
-                  <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span id="rotSemRepetir">Não repetir quem já ganhou</span></label>
+                  <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span id="rotSemRepetir">Não repetir quem já ganhou neste sorteio</span></label>
                   <label class="sel-toggle"><input type="checkbox" id="exigirPresenca"><span>Confirmar presença no chat</span></label>
-                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span>Não repetir entre gemas e compras</span></label>
+                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span>Não repetir ganhadores entre gemas e compradores</span></label>
                 </div>
               </div>
 
@@ -1202,7 +1206,7 @@
             <div class="pos-palco">
 
             <div class="regua"></div>
-            <h2>Já ganharam nesta sessão</h2>
+            <h2>Já ganharam neste canal</h2>
             <div class="hist" id="historico"></div>
             <button class="btn btn-fantasma mais" id="limparHistorico" type="button" hidden>limpar lista</button>
 
