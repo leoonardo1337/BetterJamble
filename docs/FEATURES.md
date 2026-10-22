@@ -172,7 +172,7 @@ outra conta de quem já ganhou costuma escrever). O painel guarda os motivos que
 marcou (`motivosMarcados`) e os reaplica em cada histórico que chega da aba,
 para um pacote antigo não apagar o badge.
 
-O card "Quem mandou/comprou em qualquer live" diz desde quando há registro:
+O card "Todas as lives" diz desde quando há registro:
 "Todas as lives do canal desde dd/mm/aaaa", com o início da live mais antiga
 guardada deste canal (com compras, no sorteio de compradores).
 
