@@ -1365,18 +1365,25 @@
   // e ao desligar cada texto volta ao valor original (ou ao mais novo, se
   // ele mudou nesse meio tempo).
   //
-  // São duas áreas, cada uma com seu olho: A = o card inteiro (o olho do
-  // menu), menos a parte de "Audiência" dos Insights para baixo, que é a B
-  // (olho no título dela). A aba Ranking fica fora das duas: ela tem o olho
-  // dela (btnRkOlho), e o do menu nem aparece enquanto ela está aberta.
+  // Cada área tem o seu estado e só o seu olho mexe nela:
+  //   - Sorteio: o olho do menu, com a aba Sorteio aberta — ali ele não borra
+  //     nem troca números: esconde a configuração e deixa só o palco;
+  //   - Insights (topo, indicadores): o olho do menu, com a aba Insights aberta;
+  //   - Insights (Audiência para baixo, "B"): o olho no título dela.
+  // O olho do menu é um botão só, mas guarda um estado por aba e mostra o da
+  // aba aberta. A aba Ranking tem o olho dela (btnRkOlho) e o do menu some.
   const NUMERO = /\d[\d.,:%]*/g;
   const textosOriginais = new WeakMap();   // nó de texto -> {orig, masc}
   const lerLigado = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
-  let privado = lerLigado('bj-privado');      // área A
-  let privadoB = lerLigado('bj-privado-b');   // área B
+  const CHAVE_PRIVADO = { sorteio: 'bj-privado-sorteio', insights: 'bj-privado' };
+  const privadoAba = { sorteio: lerLigado(CHAVE_PRIVADO.sorteio), insights: lerLigado(CHAVE_PRIVADO.insights) };
+  let privadoB = lerLigado('bj-privado-b');   // Insights, da Audiência para baixo
   const naAreaB = (n) => $('secaoAudiencia').contains(n);
-  const naAreaA = (n) => $('cardRanking').contains(n) && !$('menuCard').contains(n) && !naAreaB(n) && !$('pane-ranking').contains(n);
-  const escondido = (n) => (privado && naAreaA(n)) || (privadoB && naAreaB(n));
+  const noTopoInsights = (n) => $('pane-insights').contains(n) && !naAreaB(n);
+  // números trocados por *** (o Sorteio não entra: lá o olho só esconde a configuração)
+  const escondido = (n) => (privadoAba.insights && noTopoInsights(n))
+    || (privadoB && naAreaB(n));
+  const algumPrivado = () => privadoAba.sorteio || privadoAba.insights || privadoB;
 
   function mascararTexto(n) {
     const t = n.nodeValue;
@@ -1393,7 +1400,7 @@
   }
 
   const observadorPrivado = new MutationObserver((muts) => {
-    if (!privado && !privadoB) return;
+    if (!algumPrivado()) return;
     const talvez = (n) => { if (escondido(n)) mascararTexto(n); };
     muts.forEach((m) => {
       if (m.type === 'characterData') talvez(m.target);
@@ -1401,14 +1408,23 @@
     });
   });
 
+  // O olho do menu mostra o estado da aba aberta (chamado também ao trocar de aba).
+  function atualizarOlhoDoMenu() {
+    const on = !!privadoAba[paneAtivo];
+    $('btnPrivado').setAttribute('aria-pressed', on ? 'true' : 'false');
+    $('btnPrivado').title = paneAtivo === 'sorteio'
+      ? (on ? 'Mostrar a configuração do sorteio' : 'Esconder a configuração do sorteio (fica só o palco)')
+      : (on ? 'Mostrar números desta aba' : 'Esconder números desta aba (modo privado)');
+  }
+
   function aplicarPrivado() {
     const card = $('cardRanking');
-    card.classList.toggle('privado', privado);
+    $('pane-sorteio').classList.toggle('privado', privadoAba.sorteio);
+    $('pane-insights').classList.toggle('privado', privadoAba.insights);
     $('secaoAudiencia').classList.toggle('privado', privadoB);
-    [['btnPrivado', privado], ['btnPrivadoB', privadoB]].forEach(([id, on]) => {
-      $(id).setAttribute('aria-pressed', on ? 'true' : 'false');
-      $(id).title = on ? 'Mostrar números' : 'Esconder números (modo privado)';
-    });
+    atualizarOlhoDoMenu();
+    $('btnPrivadoB').setAttribute('aria-pressed', privadoB ? 'true' : 'false');
+    $('btnPrivadoB').title = privadoB ? 'Mostrar números' : 'Esconder números (modo privado)';
     if (privadoB) esconderDica();   // a dica do gráfico fica na área B
     // mascara o que está escondido e devolve o que não está mais
     percorrerTextos(card, (n) => {
@@ -1417,13 +1433,15 @@
       if (o && n.nodeValue === o.masc) n.nodeValue = o.orig;
       textosOriginais.delete(n);
     });
-    if (privado || privadoB) observadorPrivado.observe(card, { subtree: true, childList: true, characterData: true });
+    if (algumPrivado()) observadorPrivado.observe(card, { subtree: true, childList: true, characterData: true });
     else observadorPrivado.disconnect();
   }
 
   $('btnPrivado').onclick = () => {
-    privado = !privado;
-    try { localStorage.setItem('bj-privado', privado ? '1' : '0'); } catch {}
+    const aba = paneAtivo;
+    if (!(aba in privadoAba)) return;
+    privadoAba[aba] = !privadoAba[aba];
+    try { localStorage.setItem(CHAVE_PRIVADO[aba], privadoAba[aba] ? '1' : '0'); } catch {}
     aplicarPrivado();
   };
   $('btnPrivadoB').onclick = () => {
@@ -1431,7 +1449,8 @@
     try { localStorage.setItem('bj-privado-b', privadoB ? '1' : '0'); } catch {}
     aplicarPrivado();
   };
-  if (privado || privadoB) aplicarPrivado();
+  // depois do carregamento: aplicarPrivado lê paneAtivo, que é declarado mais abaixo
+  setTimeout(() => { if (algumPrivado()) aplicarPrivado(); }, 0);
   $('btnPrivado').hidden = true;   // o painel abre na aba Ranking, que tem o olho dela
 
   // ------------------------------------------------- feed de espectadores
@@ -2475,25 +2494,36 @@
     }
     if (presenca.confirmado) {
       st.classList.add('ok');
-      st.appendChild(el('span', 'presenca-ok', '✓'));
-      st.appendChild(document.createTextNode(' Presença confirmada'));
+      const linha = el('span', 'presenca-confirmada');
+      linha.appendChild(el('span', 'presenca-ok', '✓'));
+      linha.appendChild(document.createTextNode(' Presença confirmada'));
+      st.appendChild(linha);
+      // já dá para seguir para o próximo prêmio sem voltar à configuração
+      // (funciona mesmo com ela escondida pelo olho)
+      st.appendChild(botaoSortearDeNovo('Sortear mais uma pessoa', 'M12 5v14M5 12h14'));
       return;
     }
     st.classList.remove('ok');
     if (presenca.motivo) {
-      const b = el('button', 'sortear-de-novo');
-      b.type = 'button';
-      b.appendChild(svgEl('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }));
-      b.firstChild.appendChild(svgEl('path', { d: 'M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7' }));
-      b.appendChild(document.createTextNode('Sortear novamente'));
-      b.onclick = () => $('btnSortear').click();
-      st.appendChild(b);
+      st.appendChild(botaoSortearDeNovo('Sortear novamente', 'M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7'));
       return;
     }
     st.appendChild(document.createTextNode('Aguardando presença no chat'));
     const pontos = el('span', 'onda');
     for (let i = 0; i < 3; i++) pontos.appendChild(el('i', null, '.'));
     st.appendChild(pontos);
+  }
+
+  // Link do palco que dispara outro sorteio com as opções atuais (o mesmo
+  // clique do botão Sortear, que pode estar escondido pelo olho).
+  function botaoSortearDeNovo(texto, desenhoIcone) {
+    const b = el('button', 'sortear-de-novo');
+    b.type = 'button';
+    b.appendChild(svgEl('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }));
+    b.firstChild.appendChild(svgEl('path', { d: desenhoIcone }));
+    b.appendChild(document.createTextNode(texto));
+    b.onclick = () => $('btnSortear').click();
+    return b;
   }
 
   // Guarda o motivo na entrada do histórico (na aba, que é dona dele) e já
@@ -2689,6 +2719,7 @@
       if (p) p.hidden = n !== nome;
     });
     $('btnPrivado').hidden = nome === 'ranking';
+    atualizarOlhoDoMenu();   // cada aba tem o seu estado de modo privado
     moverFundoDoMenu(true);
     // O sorteio precisa de largura (palco, urna, dois grupos de opções lado a
     // lado); o feed cede espaço enquanto essa aba estiver aberta.

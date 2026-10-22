@@ -513,17 +513,17 @@
   .navc-olho .olho-fechado,.navc-olho[aria-pressed="true"] .olho-aberto{display:none}
   .navc-olho[aria-pressed="true"] .olho-fechado{display:block}
   .navc-olho[aria-pressed="true"]{color:var(--bj-claro);border-color:var(--bj-borda3)}
-  /* card privado: tudo menos o menu fica borrado (o menu precisa continuar
-     legível para desligar o modo e trocar de aba) */
-  .card.privado > :not(.navc){filter:blur(7px);transition:filter .2s ease}
-  .card > :not(.navc){transition:filter .2s ease}
+  /* Modo privado por aba: o olho do menu vale só para a aba aberta, e cada
+     aba guarda o seu (ligar no Sorteio não esconde os Insights). O menu nunca
+     borra, para dar para desligar e trocar de aba. O Ranking tem o olho dele. */
+  .card > .pane{transition:filter .2s ease}
+  /* no Sorteio o olho não borra: some com toda a configuração (seletores,
+     opções e o botão), deixando só o palco; outro clique traz de volta */
+  #pane-sorteio.privado > .sorteio-conf{display:none}
   /* Nos Insights são duas áreas: o olho do menu cuida dos indicadores do
      topo e a parte de "Audiência" para baixo tem o próprio olho. Por isso,
      ali, o borrão vai nos filhos do painel, e não no painel inteiro. */
-  .card.privado > #pane-insights{filter:none}
-  /* o Ranking tem o próprio olho (só o ranking na tela): o do menu não mexe nele */
-  .card.privado > #pane-ranking{filter:none}
-  .card.privado > #pane-insights > :not(.secao-priv){filter:blur(7px)}
+  #pane-insights.privado > :not(.secao-priv){filter:blur(7px)}
   #pane-insights > *, .secao-priv > *{transition:filter .2s ease}
   .secao-priv{display:flex;flex-direction:column;min-height:0}
   .secao-priv.privado > :not(.cab-priv){filter:blur(7px)}
@@ -787,7 +787,8 @@
   .resultado-coluna{display:flex;flex-direction:column;align-items:center;gap:26px;max-width:100%}
   .presenca{display:flex;flex-direction:column;align-items:center;gap:10px;width:min(420px,100%)}
   .presenca-status{font-size:13px;color:var(--bj-texto2);font-weight:600;display:flex;align-items:center}
-  .presenca-status.ok{color:#f3d273}
+  .presenca-status.ok{color:#f3d273;flex-direction:column;gap:8px}
+  .presenca-confirmada{display:flex;align-items:center}
   .presenca-ok{display:inline-grid;place-items:center;width:18px;height:18px;margin-right:7px;border-radius:50%;
     background:#f3d273;color:#2b1d03;font-size:11px;font-weight:900}
   /* vencedor que não respondeu: "Já sorteado" (amarelo) e "Ausente"
