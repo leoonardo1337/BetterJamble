@@ -94,9 +94,12 @@
   // do histórico, mas um pacote que saiu dela antes de o motivo chegar não
   // pode apagar o badge: cada histórico recebido passa por aplicarMotivos.
   const motivosMarcados = new Map();
+  // Presenças confirmadas aqui, pelo mesmo motivo (a aba pode demorar a saber).
+  const confirmadosMarcados = new Set();
   function aplicarMotivos(lista) {
     (lista || []).forEach((h) => {
       const k = h.t + ':' + h.id;
+      if (confirmadosMarcados.has(k)) h.confirmado = true;
       if (!motivosMarcados.has(k)) return;
       const m = motivosMarcados.get(k);
       if (m) h.motivo = m; else delete h.motivo;
@@ -1707,8 +1710,28 @@
   }
 
   function desenharResultadoVazio() {
+    // A lista é guardada: depois de recarregar, o palco volta com o último
+    // ganhador (e, se ainda não se resolveu, a espera pela presença).
+    const h = (historico || [])[0];
+    if (h && !girando && !esperandoSorteio) { restaurarUltimo(h); return; }
     const alvo = limpar($('resultado'));
-    alvo.appendChild(vazioSimples('Nenhum sorteio nesta sessão. A urna ao lado mostra quem está dentro e com que chance.'));
+    alvo.appendChild(vazioSimples('Nenhum sorteio ainda neste canal. A urna ao lado mostra quem está dentro e com que chance.'));
+  }
+
+  function restaurarUltimo(h) {
+    const d = dados || {};
+    // a foto vem da urna/ranking/compradores, se a pessoa ainda estiver lá
+    const achado = [].concat(d.ranking || [], d.compradores || [], (urnaRemota && urnaRemota.lista) || [])
+      .find((x) => x.id === h.id);
+    const vencedor = { id: h.id, usuario: h.usuario, avatar: (achado && achado.avatar) || '' };
+    ultimoResultado = { vencedor, chance: 0, participantes: 0, bilhetes: 0, restaurado: true };
+    presenca = sorteio.presenca && h.t
+      ? {
+        userId: h.id, usuario: String(h.usuario || '').toLowerCase(), t: h.t,
+        msgs: [], confirmado: !!h.confirmado, revelado: false, motivo: h.motivo || '',
+      }
+      : null;
+    pintarResultado(ultimoResultado);
   }
 
   function mostrarSorteio(r) {
@@ -2485,6 +2508,16 @@
     desenharSorteio();   // a urna e o histórico mudam junto
   }
 
+  // Presença confirmada: o vencedor ganha o badge "Ganhador" na lista (e fica
+  // guardado na aba, junto com o histórico).
+  function confirmarGanhador() {
+    if (!presenca || !presenca.t) return;
+    confirmadosMarcados.add(presenca.t + ':' + presenca.userId);
+    aplicarMotivos(historico);
+    mandar('confirmar-ganhador', { t: presenca.t, id: presenca.userId });
+    desenharHistorico();
+  }
+
   function receberChat(lista) {
     if (!presenca || !Array.isArray(lista)) return;
     for (const m of lista) {
@@ -2508,6 +2541,7 @@
     if (!presenca.confirmado && !presenca.motivo) {
       presenca.confirmado = true;
       pintarStatusPresenca();
+      confirmarGanhador();
     }
     // igual ao chat da Jamble: foto, @ em cinza e o texto embaixo
     const linha = el('div', 'presenca-msg');
@@ -2564,6 +2598,7 @@
       l.appendChild(el('span', 'quem', '@' + h.usuario));
       const motivo = MOTIVOS[h.motivo];
       if (motivo) l.appendChild(el('span', 'motivo ' + motivo.cor, motivo.rot));
+      else if (h.confirmado) l.appendChild(el('span', 'motivo verde', 'Ganhador'));
       const como = (h.tipo === 'compradores' ? 'compradores · ' : '')
         + (h.modo === 'pessoa' ? '1 por pessoa' : 'por quantidade')
         + (h.escopo === 'vendedor' ? ' · todas as lives' : '')
@@ -2915,7 +2950,7 @@
   };
   $('limparFiltroSorteio').onclick = () => trocarFiltro('');
   $('maisRanking').onclick = () => { limiteRanking += PASSO_RANKING; desenharRanking(); };
-  $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); ultimoResultado = null; mandar('limpar-historico'); desenharSorteio(); };
+  $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); confirmadosMarcados.clear(); ultimoResultado = null; presenca = null; mandar('limpar-historico'); desenharSorteio(); };
 
   $('btnSortear').onclick = () => {
     if (girando) return;

@@ -415,6 +415,13 @@ partir dela). Cada linha tem um **×** que tira a pessoa da lista
 lista" continua zerando tudo do canal. Ganhadores de outros dias mostram a
 data junto da hora.
 
+Quando o vencedor confirma presença no chat, a entrada dele ganha um badge
+verde **Ganhador** (`confirmado: true`, via `marcarConfirmado` / mensagem
+`confirmar-ganhador`), guardado junto com a lista. Depois de recarregar a aba
+ou reabrir o painel, o palco volta mostrando o último ganhador da lista; se a
+presença dele ainda não tinha se resolvido (sem confirmação nem motivo), a
+espera recomeça com os badges "Já sorteado" e "Ausente".
+
 ## Tela "Resumo das Lives" (3.11.1)
 
 A antiga aba **Lives do vendedor** virou **Resumo das Lives** e, por enquanto,
