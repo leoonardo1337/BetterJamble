@@ -133,6 +133,9 @@
           enviar('painel-urna', { escopo: esc, tipo, lista: api.participantes({ modo: 'peso', escopo: esc, tipo }) });
         }
         break;
+      case 'motivo-sorteio':
+        if (api) api.marcarMotivo(p.t, p.id, p.motivo || '');
+        break;
       case 'limpar-historico':
         if (api) api.limparHistorico();
         break;

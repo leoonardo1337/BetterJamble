@@ -729,13 +729,30 @@
   .resultado.card-ouro .nome{color:#3a2603;text-shadow:0 1px 0 rgba(255,244,200,.65)}
   /* confirmação de presença: status com pontos em onda e até 3 mensagens do
      vencedor entrando por baixo, embaixo do card */
-  .palco.com-presenca{height:380px}
+  .palco.com-presenca{height:420px}
   .resultado-coluna{display:flex;flex-direction:column;align-items:center;gap:26px;max-width:100%}
   .presenca{display:flex;flex-direction:column;align-items:center;gap:10px;width:min(420px,100%)}
   .presenca-status{font-size:13px;color:var(--bj-texto2);font-weight:600;display:flex;align-items:center}
   .presenca-status.ok{color:#f3d273}
   .presenca-ok{display:inline-grid;place-items:center;width:18px;height:18px;margin-right:7px;border-radius:50%;
     background:#f3d273;color:#2b1d03;font-size:11px;font-weight:900}
+  /* vencedor que não respondeu: "Já sorteado" (amarelo) e "Ausente"
+     (vermelho). Só contorno e texto; no hover ganha um fundo claro da mesma
+     cor e cresce um pouco; marcado, fica sólido. */
+  .presenca-acoes{display:flex;justify-content:center;gap:10px}
+  .presenca-acoes[hidden]{display:none}
+  .bj-badge{--c:#f5c518;--c-fundo:rgba(245,197,24,.16);
+    padding:5px 13px;border:1.5px solid var(--c);border-radius:999px;background:transparent;color:var(--c);
+    font:inherit;font-size:12px;font-weight:700;line-height:1.2;cursor:pointer;
+    transition:background-color .2s ease-in-out,color .2s ease-in-out,transform .2s ease-in-out}
+  .bj-badge.vermelho{--c:#ff5252;--c-fundo:rgba(255,82,82,.16)}
+  .bj-badge:hover{background:var(--c-fundo);transform:scale(1.07)}
+  .bj-badge.ativo{background:var(--c);color:#0d0d0d}
+  .bj-badge:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+  .sortear-de-novo{display:inline-flex;align-items:center;gap:7px;padding:2px 4px;border:0;background:none;
+    color:var(--bj-texto);font:inherit;font-weight:700;cursor:pointer}
+  .sortear-de-novo:hover{text-decoration:underline}
+  .sortear-de-novo svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
   .onda{display:inline-flex;margin-left:1px}
   .onda i{font-style:normal;display:inline-block;animation:onda 1.2s ease-in-out infinite}
   .onda i:nth-child(2){animation-delay:.15s}
@@ -766,6 +783,9 @@
   .hl:hover{background:var(--bj-fundo3)}
   .hl .hora{flex:none;color:var(--bj-texto3);font-family:var(--bj-mono);font-size:11px}
   .hl .quem{font-weight:600;flex:none;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hl .motivo{flex:none;padding:1px 7px;border:1px solid #f5c518;border-radius:999px;color:#f5c518;
+    font-size:10.5px;font-weight:700;line-height:1.4}
+  .hl .motivo.vermelho{border-color:#ff5252;color:#ff5252}
   .hl .como{flex:1;min-width:0;color:var(--bj-texto3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* -------------------------------------------------------------- tela lives */
@@ -882,6 +902,8 @@
   .onda i:nth-child(3){animation-delay:.3s !important}
   .presenca-msg{animation:entrarMsg .45s cubic-bezier(.2,.75,.3,1) both !important}
   .presenca-msg.saindo{animation:none !important}
+  /* e o hover dos badges do vencedor, pedido junto com eles */
+  .bj-badge{transition:background-color .2s ease-in-out,color .2s ease-in-out,transform .2s ease-in-out !important}
 </style>
 </head>
 <body>

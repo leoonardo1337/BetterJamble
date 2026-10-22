@@ -158,6 +158,15 @@ extensão não guarda histórico de vendas de vendedores.
 Mais a opção **não repetir quem já ganhou**, que tira da urna quem está em
 `jaGanharam`, e um histórico dos últimos vencedores.
 
+**Confirmação de presença.** Com "exigir presença" ligado, o palco mostra
+"Aguardando presença no chat…" embaixo do vencedor e, em cima disso, dois
+badges: **Já sorteado** (amarelo — a pessoa já ganhou com outra conta) e
+**Ausente** (vermelho). Marcar um deles troca o texto por **Sortear novamente**
+(sorteia com as mesmas opções) e grava o motivo na entrada do histórico
+(`marcarMotivo`, mensagem `motivo-sorteio`), que aparece como badge ao lado do
+nome. Clicar no badge marcado desmarca. Se o vencedor escrever no chat, a
+presença é confirmada, os badges somem e o motivo é apagado.
+
 **De onde vêm os dados.** Do próprio ranking: `participantes()`
 (`gems-core.js:463-470`) e `sortear()` (`gems-core.js:472-490`). O filtro de tipo
 de gema **vale para o sorteio** — sortear com "Coroa" selecionado sorteia só

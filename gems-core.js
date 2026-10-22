@@ -712,6 +712,16 @@
     return { vencedor, participantes: lista, bilhetes, historico: historico.slice() };
   }
 
+  // Quem conduz o sorteio marca o vencedor que não respondeu: 'ja-sorteado'
+  // (outra conta de quem já ganhou) ou 'ausente'. '' desmarca.
+  function marcarMotivo(t, id, motivo) {
+    const h = historico.find((x) => x.t === t && x.id === id);
+    if (!h) return;
+    if (motivo === 'ja-sorteado' || motivo === 'ausente') h.motivo = motivo;
+    else delete h.motivo;
+    avisar('sorteio');
+  }
+
   function limparHistorico() {
     historico = [];
     jaGanharam.clear();
@@ -828,6 +838,7 @@
     participantes,              // ({modo,semRepetir,escopo}) -> [{...ranking, bilhetes}]
     sortear,                    // ({modo,semRepetir,escopo}) -> {vencedor,participantes,bilhetes,historico}
     historico: () => historico.slice(),
+    marcarMotivo,               // (t, id, 'ja-sorteado'|'ausente'|'') -> marca a entrada do histórico
     limparHistorico,
 
     // fotos
