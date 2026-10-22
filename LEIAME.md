@@ -28,8 +28,8 @@ Como ele evita demora e chamadas repetidas:
 
 ## 3. Gemas: painel de ranking, feed e sorteio
 
-Nas lives aparece um **botão redondo dourado com o "BJ"** ao lado do diamante
-(o botão de recompensa, à esquerda do campo de comentário), do mesmo tamanho dele.
+Nas lives aparece o **ícone da extensão** ao lado do diamante (o botão de
+recompensa, à esquerda do campo de comentário), da altura do círculo dele.
 Passando o mouse, mostra o resumo da live; clicando, abre o painel numa
 **janela separada**, com espaço de verdade:
 
