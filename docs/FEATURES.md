@@ -305,15 +305,15 @@ resquício da página de histórico de vendas **que foi removida e não deve vol
 ## 12. O botão na página (novidade da 3.7.0)
 
 **O que faz.** Substitui a barra de 46 px que ficava embaixo da coluna dos
-anúncios. É um botão redondo com o ícone da extensão, logo à direita do
-diamante (`button[aria-label="Recompensa por assistir"]`), do mesmo tamanho e
-com o mesmo fundo dele. O resumo (gemas / pessoas / envios **desta live**) vai
+anúncios. É um botão redondo dourado (o dourado do ícone) com o "BJ" do ícone,
+logo à direita do diamante (`button[aria-label="Recompensa por assistir"]`) e do
+mesmo tamanho dele. O resumo (gemas / pessoas / envios **desta live**) vai
 na dica do mouse; o clique abre o painel.
 
 **Onde vive.** `gems-bar.js`. O botão é `position:fixed` no `<body>`; o bloco do
 campo de comentário ganha `margin-left` para abrir espaço, e a margem original
-volta quando o botão sai (`posicionar` / `devolverCampo`). O ícone é
-`icons/48.png` embutido em base64, para não precisar de `web_accessible_resources`.
+volta quando o botão sai (`posicionar` / `devolverCampo`). As letras são
+`icons/bj-letras.png` embutido em base64, para não precisar de `web_accessible_resources`.
 
 **Extensão recarregada.** Com a aba aberta, o botão ganha um ↻ e o clique
 recarrega a página.
