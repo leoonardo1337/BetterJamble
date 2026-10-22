@@ -179,11 +179,11 @@ olhos independentes, e o Ranking só obedece ao dele.
   `bilhetes = max(1, gemas)`. Quem mandou mais, ganha mais chance.
 - **Por pessoa** (`modo: 'pessoa'`): todo mundo com 1 chance.
 
-Mais a opção **não repetir quem já ganhou**, que tira da urna quem está em
+Mais a opção **Não repetir quem já ganhou**, que tira da urna quem está em
 `jaGanharam`, e um histórico dos últimos vencedores.
 
-**Não repetir entre gemas e compras** (terceira opção, embaixo de "confirmar
-presença"): quem ganhou no sorteio de gemas fica fora do de compradores, e
+**Não repetir entre gemas e compras** (terceira opção, embaixo de "Confirmar
+presença no chat"): quem ganhou no sorteio de gemas fica fora do de compradores, e
 vice-versa — independente de "não repetir quem já ganhou", que vale dentro do
 mesmo tipo. A comparação é pelo id e também pelo @, porque o id de quem manda
 gema e o de quem compra vêm de respostas diferentes da Jamble
@@ -395,3 +395,11 @@ que seja o escopo ("Todas as lives") ou o filtro escolhido no Ranking/Sorteio.
 O snapshot traz um bloco `vivo` (`totais`, `ranking`, `catalogo` e os
 horários do feed, calculados com escopo `live` e filtro desligado) só para
 eles. Ranking, Sorteio e o feed de envios continuam seguindo escopo e filtro.
+
+## Opções do sorteio no layout empilhado (3.10.1)
+
+As duas linhas de seletores do sorteio ficam num grid só (`.sel-grade`, com
+cada `.sel-linha` em `display:contents`). Largo, as três opções (checkboxes)
+ficam numa linha embaixo dos seletores e o botão Sortear ocupa a coluna da
+direita inteira, de cima a baixo; empilhado (bloco com menos de 860 px), as
+opções ficam uma embaixo da outra, logo acima do botão. Os textos dos cards e das opções começam com maiúscula, sem ponto final.
