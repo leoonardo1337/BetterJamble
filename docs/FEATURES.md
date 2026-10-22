@@ -164,6 +164,10 @@ valores e quantidades por `***`; no de gemas os números continuam. Tipo,
 métrica e olho ficam salvos no navegador (`bj-rk-tipo`, `bj-rk-metrica`,
 `bj-rk-oculto`).
 
+O olho do menu do card (modo privado, que borra e troca números por `***`)
+**não vale para a aba Ranking** e some enquanto ela está aberta: são dois
+olhos independentes, e o Ranking só obedece ao dele.
+
 ## 5. Sorteio
 
 **O que faz.** Sorteia entre quem mandou gema. Dois modos:

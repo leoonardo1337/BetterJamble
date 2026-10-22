@@ -1371,14 +1371,15 @@
   //
   // São duas áreas, cada uma com seu olho: A = o card inteiro (o olho do
   // menu), menos a parte de "Audiência" dos Insights para baixo, que é a B
-  // (olho no título dela).
+  // (olho no título dela). A aba Ranking fica fora das duas: ela tem o olho
+  // dela (btnRkOlho), e o do menu nem aparece enquanto ela está aberta.
   const NUMERO = /\d[\d.,:%]*/g;
   const textosOriginais = new WeakMap();   // nó de texto -> {orig, masc}
   const lerLigado = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
   let privado = lerLigado('bj-privado');      // área A
   let privadoB = lerLigado('bj-privado-b');   // área B
   const naAreaB = (n) => $('secaoAudiencia').contains(n);
-  const naAreaA = (n) => $('cardRanking').contains(n) && !$('menuCard').contains(n) && !naAreaB(n);
+  const naAreaA = (n) => $('cardRanking').contains(n) && !$('menuCard').contains(n) && !naAreaB(n) && !$('pane-ranking').contains(n);
   const escondido = (n) => (privado && naAreaA(n)) || (privadoB && naAreaB(n));
 
   function mascararTexto(n) {
@@ -1435,6 +1436,7 @@
     aplicarPrivado();
   };
   if (privado || privadoB) aplicarPrivado();
+  $('btnPrivado').hidden = true;   // o painel abre na aba Ranking, que tem o olho dela
 
   // ------------------------------------------------- feed de espectadores
   // Nos Insights o card do feed troca de assunto: em vez dos envios de gema,
@@ -2691,6 +2693,7 @@
       const p = $('pane-' + n);
       if (p) p.hidden = n !== nome;
     });
+    $('btnPrivado').hidden = nome === 'ranking';
     moverFundoDoMenu(true);
     // O sorteio precisa de largura (palco, urna, dois grupos de opções lado a
     // lado); o feed cede espaço enquanto essa aba estiver aberta.

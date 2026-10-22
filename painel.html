@@ -525,6 +525,8 @@
      topo e a parte de "Audiência" para baixo tem o próprio olho. Por isso,
      ali, o borrão vai nos filhos do painel, e não no painel inteiro. */
   .card.privado > #pane-insights{filter:none}
+  /* o Ranking tem o próprio olho (só o ranking na tela): o do menu não mexe nele */
+  .card.privado > #pane-ranking{filter:none}
   .card.privado > #pane-insights > :not(.secao-priv){filter:blur(7px)}
   #pane-insights > *, .secao-priv > *{transition:filter .2s ease}
   .secao-priv{display:flex;flex-direction:column;min-height:0}
