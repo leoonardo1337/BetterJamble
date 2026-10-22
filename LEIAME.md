@@ -45,7 +45,9 @@ Dentro do card da esquerda:
 - **Sorteio** — sorteia entre quem mandou gema, em dois modos: **por quantidade
   de gemas** (mais gemas, mais chances) ou **1 por pessoa**; com a opção de não
   repetir quem já ganhou, a urna visível antes de clicar e histórico dos últimos
-  vencedores;
+  vencedores; com a presença exigida, o vencedor que não aparece pode ser marcado
+  como **Já sorteado** ou **Ausente** (o motivo fica no histórico) e há um atalho
+  para **Sortear novamente**;
 - **Insights** — os quatro indicadores (gemas, pessoas, envios, vendido),
   leituras calculadas em cima do que já foi capturado (concentração do topo,
   média por pessoa, gema que mais rendeu, ritmo de envios, quantos compradores

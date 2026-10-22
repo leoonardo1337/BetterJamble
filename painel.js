@@ -80,9 +80,12 @@
   }
   // Confirmação de presença: depois de revelado, o vencedor precisa escrever
   // no chat. Só contam mensagens dele que chegaram depois do sorteio.
-  // {userId, usuario, desde, msgs: [{id, texto}], confirmado}
+  // {userId, usuario, t, msgs: [{id, texto}], confirmado, motivo}
+  // `t` é a hora da entrada no histórico, para marcar o motivo nela.
   let presenca = null;
   const MAX_MSGS_PRESENCA = 3;
+  // Vencedor que não confirmou: quem conduz marca o motivo e sorteia de novo.
+  const MOTIVOS = { 'ja-sorteado': { rot: 'Já sorteado', cor: 'amarelo' }, ausente: { rot: 'Ausente', cor: 'vermelho' } };
   function lerAnim() {
     try { return localStorage.getItem('bj-anim-sorteio') === 'feixes' ? 'feixes' : 'subida'; } catch { return 'subida'; }
   }
@@ -1608,8 +1611,13 @@
     // A presença vale a partir daqui (hora de chegada no painel, não a do
     // servidor da Jamble: assim relógio adiantado ou atrasado não importa).
     // O que o vencedor escrever durante a animação já conta.
+    const entrada = (r.historico || [])[0];
     presenca = sorteio.presenca
-      ? { userId: r.vencedor.id, usuario: String(r.vencedor.usuario || '').toLowerCase(), msgs: [], confirmado: false, revelado: false }
+      ? {
+        userId: r.vencedor.id, usuario: String(r.vencedor.usuario || '').toLowerCase(),
+        t: entrada && entrada.id === r.vencedor.id ? entrada.t : 0,
+        msgs: [], confirmado: false, revelado: false, motivo: '',
+      }
       : null;
     $('palco').classList.remove('com-presenca');
     preCarregarFotos([r.vencedor].concat(r.participantes || []));
@@ -2283,6 +2291,7 @@
     coluna.appendChild(bloco);
     const area = el('div', 'presenca');
     area.id = 'presenca';
+    area.appendChild(el('div', 'presenca-acoes'));
     area.appendChild(el('div', 'presenca-status'));
     area.appendChild(el('div', 'presenca-msgs'));
     coluna.appendChild(area);
@@ -2295,11 +2304,27 @@
   }
 
   // "Aguardando presença no chat..." com os pontos em onda, até a primeira
-  // mensagem do vencedor; depois, "Presença confirmada".
+  // mensagem do vencedor; depois, "Presença confirmada". Enquanto aguarda,
+  // os badges "Já sorteado" e "Ausente" ficam em cima; marcado um deles, o
+  // status vira "Sortear novamente".
   function pintarStatusPresenca() {
     const st = document.querySelector('#presenca .presenca-status');
+    const acoes = document.querySelector('#presenca .presenca-acoes');
     if (!st || !presenca) return;
     limpar(st);
+    if (acoes) {
+      limpar(acoes);
+      acoes.hidden = presenca.confirmado;
+      if (!presenca.confirmado) {
+        Object.entries(MOTIVOS).forEach(([k, m]) => {
+          const b = el('button', 'bj-badge ' + m.cor + (presenca.motivo === k ? ' ativo' : ''), m.rot);
+          b.type = 'button';
+          b.setAttribute('aria-pressed', presenca.motivo === k ? 'true' : 'false');
+          b.onclick = () => marcarMotivo(presenca.motivo === k ? '' : k);
+          acoes.appendChild(b);
+        });
+      }
+    }
     if (presenca.confirmado) {
       st.classList.add('ok');
       st.appendChild(el('span', 'presenca-ok', '✓'));
@@ -2307,10 +2332,32 @@
       return;
     }
     st.classList.remove('ok');
+    if (presenca.motivo) {
+      const b = el('button', 'sortear-de-novo');
+      b.type = 'button';
+      b.appendChild(svgEl('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }));
+      b.firstChild.appendChild(svgEl('path', { d: 'M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7' }));
+      b.appendChild(document.createTextNode('Sortear novamente'));
+      b.onclick = () => $('btnSortear').click();
+      st.appendChild(b);
+      return;
+    }
     st.appendChild(document.createTextNode('Aguardando presença no chat'));
     const pontos = el('span', 'onda');
     for (let i = 0; i < 3; i++) pontos.appendChild(el('i', null, '.'));
     st.appendChild(pontos);
+  }
+
+  // Guarda o motivo na entrada do histórico (na aba, que é dona dele) e já
+  // mostra aqui, sem esperar o próximo pacote.
+  function marcarMotivo(motivo) {
+    if (!presenca) return;
+    presenca.motivo = motivo;
+    const h = historico.find((x) => x.t === presenca.t && x.id === presenca.userId);
+    if (h) { if (motivo) h.motivo = motivo; else delete h.motivo; }
+    if (presenca.t) mandar('motivo-sorteio', { t: presenca.t, id: presenca.userId, motivo });
+    pintarStatusPresenca();
+    desenharHistorico();
   }
 
   function receberChat(lista) {
@@ -2330,7 +2377,12 @@
   function entrarMsgPresenca(m) {
     const caixa = document.querySelector('#presenca .presenca-msgs');
     if (!caixa || !presenca) return;
-    if (!presenca.confirmado) { presenca.confirmado = true; pintarStatusPresenca(); }
+    if (!presenca.confirmado) {
+      presenca.confirmado = true;
+      // apareceu depois de marcado: o motivo deixa de valer
+      if (presenca.motivo) marcarMotivo('');
+      else pintarStatusPresenca();
+    }
     // igual ao chat da Jamble: foto, @ em cinza e o texto embaixo
     const linha = el('div', 'presenca-msg');
     linha.appendChild(avatar(m.avatar, m.usuario, m.userId, 'av-chat'));
@@ -2382,6 +2434,8 @@
       const l = el('div', 'hl');
       l.appendChild(el('span', 'hora', horaCurta(h.t)));
       l.appendChild(el('span', 'quem', '@' + h.usuario));
+      const motivo = MOTIVOS[h.motivo];
+      if (motivo) l.appendChild(el('span', 'motivo ' + motivo.cor, motivo.rot));
       const como = (h.tipo === 'compradores' ? 'compradores · ' : '')
         + (h.modo === 'pessoa' ? '1 por pessoa' : 'por quantidade')
         + (h.escopo === 'vendedor' ? ' · todas as lives' : '')
