@@ -164,8 +164,17 @@ badges: **Já sorteado** (amarelo — a pessoa já ganhou com outra conta) e
 **Ausente** (vermelho). Marcar um deles troca o texto por **Sortear novamente**
 (sorteia com as mesmas opções) e grava o motivo na entrada do histórico
 (`marcarMotivo`, mensagem `motivo-sorteio`), que aparece como badge ao lado do
-nome. Clicar no badge marcado desmarca. Se o vencedor escrever no chat, a
-presença é confirmada, os badges somem e o motivo é apagado.
+nome. Clicar no badge marcado desmarca. Quem está marcado **sai da urna**
+(mesmo sem "não repetir"), no painel e no `participantes()` da aba. Se o
+vencedor escrever no chat antes de ser marcado, a presença é confirmada e os
+badges somem; depois de marcado, a mensagem aparece mas o motivo continua (a
+outra conta de quem já ganhou costuma escrever). O painel guarda os motivos que
+marcou (`motivosMarcados`) e os reaplica em cada histórico que chega da aba,
+para um pacote antigo não apagar o badge.
+
+O card "Quem mandou/comprou em qualquer live" diz desde quando há registro:
+"Todas as lives do canal desde dd/mm/aaaa", com o início da live mais antiga
+guardada deste canal (com compras, no sorteio de compradores).
 
 **De onde vêm os dados.** Do próprio ranking: `participantes()`
 (`gems-core.js:463-470`) e `sortear()` (`gems-core.js:472-490`). O filtro de tipo

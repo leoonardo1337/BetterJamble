@@ -86,6 +86,19 @@
   const MAX_MSGS_PRESENCA = 3;
   // Vencedor que não confirmou: quem conduz marca o motivo e sorteia de novo.
   const MOTIVOS = { 'ja-sorteado': { rot: 'Já sorteado', cor: 'amarelo' }, ausente: { rot: 'Ausente', cor: 'vermelho' } };
+  // Os motivos marcados aqui, por entrada do histórico ("t:id"). A aba é dona
+  // do histórico, mas um pacote que saiu dela antes de o motivo chegar não
+  // pode apagar o badge: cada histórico recebido passa por aplicarMotivos.
+  const motivosMarcados = new Map();
+  function aplicarMotivos(lista) {
+    (lista || []).forEach((h) => {
+      const k = h.t + ':' + h.id;
+      if (!motivosMarcados.has(k)) return;
+      const m = motivosMarcados.get(k);
+      if (m) h.motivo = m; else delete h.motivo;
+    });
+    return lista;
+  }
   function lerAnim() {
     try { return localStorage.getItem('bj-anim-sorteio') === 'feixes' ? 'feixes' : 'subida'; } catch { return 'subida'; }
   }
@@ -188,12 +201,12 @@
       reconstruirFeed = true;
       urnaRemota = null;
       limiteRanking = PASSO_RANKING;
-      historico = p.historico || [];
+      historico = aplicarMotivos(p.historico || []);
       return;
     }
     const feed = dados.feed.concat(p.feedNovos || []);
     dados = Object.assign({}, dados, p, { feed: feed.slice(Math.max(0, feed.length - 250)) });
-    historico = dados.historico || historico;
+    historico = aplicarMotivos(dados.historico || historico);
   }
 
   // -------------------------------------------------------------- conexão
@@ -1438,7 +1451,7 @@
     const d = dados;
 
     // Compradores de outras lives existem só a partir de quando a extensão
-    // passou a gravá-los (3.5): o texto do card avisa.
+    // passou a gravá-los (3.5): o texto do card diz desde quando há registro.
     const comp = deCompradores();
     document.querySelectorAll('[data-tipo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.tipo === sorteio.tipo ? 'true' : 'false'));
     document.querySelectorAll('[data-sesc]').forEach((b) => b.setAttribute('aria-checked', b.dataset.sesc === sorteio.escopo ? 'true' : 'false'));
@@ -1449,7 +1462,8 @@
       : 'Sortear entre quem mandou gema';
     $('rotSorteioLive').textContent = comp ? 'Quem comprou nesta live' : 'Quem mandou nesta live';
     $('rotSorteioVendedor').textContent = comp ? 'Quem comprou em qualquer live' : 'Quem mandou em qualquer live';
-    $('subSorteioVendedor').textContent = comp ? 'Todas as lives do canal · compras salvas daqui em diante' : 'Todas as lives do canal';
+    const desde = registroMaisAntigo(comp);
+    $('subSorteioVendedor').textContent = 'Todas as lives do canal' + (desde ? ' desde ' + dataLonga(desde) : '');
     $('rotModoPeso').textContent = comp ? 'Por quantidade de compras' : 'Por quantidade de gemas';
     $('subModoPeso').textContent = comp ? 'cada compra vale uma chance' : 'cada gema vale uma chance';
 
@@ -1477,6 +1491,17 @@
     if (!ultimoResultado) desenharResultadoVazio();
   }
 
+  // Início da live mais antiga deste canal que a extensão guardou (com compras,
+  // no sorteio de compradores; com gemas, no de gemas).
+  function registroMaisAntigo(comp) {
+    const ts = ((dados && dados.livesDoVendedor) || [])
+      .filter((l) => (comp ? l.compradores : l.pessoas) > 0)
+      .map((l) => l.inicio || l.fim)
+      .filter((t) => t > 0);
+    return ts.length ? Math.min(...ts) : 0;
+  }
+  const dataLonga = (t) => new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
   // O escopo do sorteio é independente do escopo do ranking. Quando são iguais
   // o ranking do snapshot já serve; quando são diferentes, pedimos a lista
   // daquele escopo (mensagem `participantes` -> `painel-urna`).
@@ -1501,6 +1526,9 @@
   function calcularUrna(base) {
     const comp = deCompradores();
     const ganhadores = new Set(sorteio.semRepetir ? ((comp ? dados.jaGanharamCompradores : dados.jaGanharam) || []) : []);
+    // marcado como "já sorteado" ou "ausente" sai sempre (a aba faz o mesmo)
+    const tipo = comp ? 'compradores' : 'gemas';
+    (historico || []).forEach((h) => { if (h.motivo && (h.tipo || 'gemas') === tipo) ganhadores.add(h.id); });
     const dentro = [];
     const fora = [];
     base.forEach((r) => (ganhadores.has(r.id) ? fora : dentro).push(r));
@@ -1570,7 +1598,7 @@
     if (urna.fora.length) {
       caixa.appendChild(el('div', 'regua'));
       const r = el('div', 'vazio vazio-p');
-      r.appendChild(el('div', 'txt', 'Fora desta vez (já ganharam): '
+      r.appendChild(el('div', 'txt', 'Fora desta vez (já ganharam ou foram marcados): '
         + urna.fora.map((x) => '@' + x.usuario).join(', ')));
       caixa.appendChild(r);
     }
@@ -1594,7 +1622,7 @@
   function mostrarSorteio(r) {
     if (!r) return;
     esperandoSorteio = false;
-    historico = r.historico || historico;
+    historico = aplicarMotivos(r.historico || historico);
     if (!r.vencedor) {
       girando = false;
       $('btnSortear').classList.remove('girando');
@@ -2353,11 +2381,11 @@
   function marcarMotivo(motivo) {
     if (!presenca) return;
     presenca.motivo = motivo;
-    const h = historico.find((x) => x.t === presenca.t && x.id === presenca.userId);
-    if (h) { if (motivo) h.motivo = motivo; else delete h.motivo; }
+    motivosMarcados.set(presenca.t + ':' + presenca.userId, motivo);
+    aplicarMotivos(historico);
     if (presenca.t) mandar('motivo-sorteio', { t: presenca.t, id: presenca.userId, motivo });
     pintarStatusPresenca();
-    desenharHistorico();
+    desenharSorteio();   // a urna e o histórico mudam junto
   }
 
   function receberChat(lista) {
@@ -2377,11 +2405,12 @@
   function entrarMsgPresenca(m) {
     const caixa = document.querySelector('#presenca .presenca-msgs');
     if (!caixa || !presenca) return;
-    if (!presenca.confirmado) {
+    // Marcado como "já sorteado"/"ausente", a decisão vale: a mensagem aparece,
+    // mas não confirma a presença nem apaga o motivo (a outra conta de quem já
+    // ganhou costuma escrever no chat).
+    if (!presenca.confirmado && !presenca.motivo) {
       presenca.confirmado = true;
-      // apareceu depois de marcado: o motivo deixa de valer
-      if (presenca.motivo) marcarMotivo('');
-      else pintarStatusPresenca();
+      pintarStatusPresenca();
     }
     // igual ao chat da Jamble: foto, @ em cinza e o texto embaixo
     const linha = el('div', 'presenca-msg');
@@ -2742,7 +2771,7 @@
   };
   $('limparFiltroSorteio').onclick = () => trocarFiltro('');
   $('maisRanking').onclick = () => { limiteRanking += PASSO_RANKING; desenharRanking(); };
-  $('limparHistorico').onclick = () => { historico = []; ultimoResultado = null; mandar('limpar-historico'); desenharSorteio(); };
+  $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); ultimoResultado = null; mandar('limpar-historico'); desenharSorteio(); };
 
   $('btnSortear').onclick = () => {
     if (girando) return;

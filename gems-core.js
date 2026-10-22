@@ -661,6 +661,7 @@
           pessoas: users.length,
           envios: users.reduce((a, u) => a + (u.n || 0), 0),
           gemas: users.reduce((a, u) => a + (u.g || 0), 0),
+          compradores: id === h.showId ? compradores().length : Object.keys(s.buyers || {}).length,
           temFeed: !!(s.feed && s.feed.length),
         };
       })
@@ -685,7 +686,10 @@
       ? compradoresDoEscopo(o.escopo || 'live').map((c) => ({ ...c, envios: c.compras }))
       : ranking(o.escopo || escopo);
     const peso = (r) => (tipo === 'compradores' ? r.compras : r.gemas);
+    // marcado como "já sorteado" ou "ausente" sai da urna mesmo sem "não repetir"
+    const marcados = new Set(historico.filter((h) => h.motivo && h.tipo === tipo).map((h) => h.id));
     return base
+      .filter((r) => !marcados.has(r.id))
       .filter((r) => !o.semRepetir || !jaGanharam.has(chaveGanhou(tipo, r.id)))
       .map((r) => ({ ...r, bilhetes: modo === 'peso' ? Math.max(1, peso(r)) : 1 }));
   }
