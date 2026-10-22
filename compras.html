@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minhas compras — BetterJamble</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0d0d13;color:#ececf3;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:1400px;margin:0 auto;padding:28px 20px 60px}
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+  h1{margin:0;font-size:22px}
+  .sub{color:#8b8b9c;font-size:12.5px;margin-top:4px}
+  .btn{padding:8px 14px;border-radius:999px;border:1px solid #26262f;background:#15151d;color:#ececf3;
+    font:600 12.5px system-ui;cursor:pointer}
+  .btn:hover{border-color:#3b3b4b}
+  .btn.primary{background:linear-gradient(135deg,#e9e9f0,#c9c9d4);border-color:transparent;color:#101018}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .card{background:#14141c;border:1px solid #21212b;border-radius:12px;padding:12px 14px}
+  .card span{color:#8b8b9c;font-size:11.5px;display:block}
+  .card b{font-size:19px;font-variant-numeric:tabular-nums}
+  .filtros{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .filtros input,.filtros select{font:inherit;color:#ececf3;background:#14141c;border:1px solid #23232e;border-radius:999px;
+    padding:8px 14px;min-width:0}
+  .filtros input{flex:1 1 260px}
+  .tabela{background:#14141c;border:1px solid #21212b;border-radius:14px;overflow:auto;max-height:72vh}
+  table{border-collapse:collapse;width:100%;min-width:1080px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #1e1e28;font-size:12.5px;white-space:nowrap}
+  th{position:sticky;top:0;background:#17171f;color:#8b8b9c;font-weight:600;font-size:11.5px;cursor:pointer;user-select:none;z-index:1}
+  th:hover{color:#ececf3}
+  tbody tr:hover{background:#181822}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .prod{white-space:normal;min-width:240px;display:flex;align-items:center;gap:10px}
+  .thumb{width:30px;height:30px;border-radius:7px;object-fit:cover;background:#23232e;flex:none}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:600}
+  .p-roxo{background:#2a2250;color:#b9a8ff}.p-ambar{background:#3a2c10;color:#f6c35b}
+  .p-verde{background:#133222;color:#7ddba2}.p-vermelho{background:#3d1717;color:#ff9a9a}.p-cinza{background:#26262e;color:#b5b5c0}
+  code{font:12px ui-monospace,Consolas,monospace;background:#20202a;padding:2px 7px;border-radius:6px;cursor:copy}
+  code.ok{background:#133222;color:#7ddba2}
+  a{color:#d9d9e2;font-weight:600;text-decoration:none}
+  a:hover{text-decoration:underline}
+  .muted{color:#82828f}
+  .empty{padding:48px 20px;text-align:center;color:#8b8b9c;line-height:1.8;border:1px dashed #262633;border-radius:14px}
+  .rodape{color:#8b8b9c;font-size:12.5px;margin-top:12px}
+  @media print{body{background:#fff;color:#000}.filtros,.btn,header div:last-child{display:none}.tabela{max-height:none;border:0}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div><h1>Minhas compras</h1><div class="sub" id="sub">carregando…</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="csv">Baixar CSV</button>
+        <button class="btn" id="print">Imprimir / PDF</button>
+        <button class="btn primary" id="atualizar">Atualizar</button>
+      </div>
+    </header>
+    <div id="app"></div>
+  </div>
+  <script src="compras.js"></script>
+</body>
+</html>
