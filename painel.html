@@ -343,8 +343,6 @@
   .rk-titulo .navc-olho{margin:0 0 0 auto}
   .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);grid-template-areas:"ra dv rb" "ca dv cb"}
   #pane-ranking.rk-oculto .rk-conf,#pane-ranking.rk-oculto .fichas{display:none}
-  .escopo-ctx{margin:8px 0 0;font-size:11px;line-height:1.55;color:var(--bj-texto3)}
-  .escopo-ctx b{color:var(--bj-texto2)}
 
   /* ----------------------------------------------------------------- fichas */
   .fichas{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;flex:none}
@@ -1073,7 +1071,6 @@
                 </button>
                 </div>
               </div>
-              <p class="escopo-ctx" id="escopoCtx"></p>
             </div>
             <div class="menu-gemas" id="menuRkMetrica" role="listbox" aria-label="Ordenar compradores por" hidden></div>
 
@@ -1086,7 +1083,6 @@
 
           <!-- ............................................... SORTEIO -->
           <div class="pane" id="pane-sorteio" role="tabpanel" hidden>
-            <div class="conf-titulo" id="tituloSorteio">Sortear entre quem mandou gema</div>
             <div class="sorteio-conf">
               <!-- dois grupos lado a lado, divisória no meio e o botão na altura dos cards -->
               <div class="sel-linha">
