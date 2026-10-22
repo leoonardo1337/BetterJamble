@@ -412,14 +412,24 @@
     limpar(ctx);
     if (d.live) {
       const atual = (d.livesDoVendedor || []).find((l) => l.atual);
+      const est = d.live.estado;
+      const inicio = (est && est.inicio) || (atual && atual.inicio);
       ctx.appendChild(el('span', 'viva', vendedorArroba()));
-      ctx.appendChild(document.createTextNode(atual && atual.inicio ? ' · live de ' + quando(atual.inicio) : ' · live aberta'));
+      ctx.appendChild(document.createTextNode(inicio ? ' · live de ' + quando(inicio) : ' · live aberta'));
+      // no ar / encerrada (com a hora do fim e a duração, quando a extensão viu)
+      if (est && est.fim) {
+        ctx.appendChild(el('span', 'ctx-encerrada', ' · encerrada ' + (est.provisorio ? 'por volta das ' : 'às ')
+          + horaCurta(est.fim) + (inicio ? ' (' + duracao(est.fim - inicio) + ')' : '')));
+      } else if (est && est.aoVivo) {
+        ctx.appendChild(el('span', 'ctx-aovivo', ' · ao vivo' + (inicio ? ' há ' + duracao(Date.now() - inicio) : '')));
+      }
     } else {
       ctx.appendChild(document.createTextNode('nenhuma live aberta'));
     }
 
     $('aba-lives').disabled = !d.live;
-    $('aba-vivo').classList.toggle('gravando', !!d.live);
+    // o ponto vermelho só pisca com a live no ar; encerrada, ela não grava mais nada
+    $('aba-vivo').classList.toggle('gravando', !!d.live && !(d.live.estado && d.live.estado.fim));
     if (!d.live && tela === 'lives') trocarTela('vivo');
 
     pintarSemLive(!d.live);
@@ -733,6 +743,7 @@
       case 'outra-aba': return 'Outra aba desta live já está contando os espectadores.';
       case 'recuando': return 'A Jamble pediu para esperar (' + (a.motivo || 'erro') + '). A contagem de espectadores volta sozinha em instantes.';
       case 'pausado': return 'Contagem de espectadores pausada: a Jamble recusou 4 vezes seguidas (' + (a.motivo || 'erro') + '). Tenta de novo em 10 min.';
+      case 'encerrada': return 'Live encerrada' + (a.encerradaEm ? ' às ' + horaCurta(a.encerradaEm) : '') + ' — estes são os números finais dela.';
       default: return 'Abra a aba da live para começar a contar a audiência.';
     }
   }

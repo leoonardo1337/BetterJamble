@@ -253,11 +253,47 @@
     consulta.timer = setTimeout(rodar, ms);
   }
 
+  // A live acabou (aviso do gems-core, que vê is_over e o título da página):
+  // fecha as sessões de quem ainda estava assistindo e para de consultar a
+  // lista. Quem foi visto até perto do fim fica até o fim; quem já estava sem
+  // notícia fica até a última vez em que foi visto. Não vira "saiu": a live
+  // acabar não é a pessoa ir embora (a janela de retenção conta como "ficou
+  // pelo menos até aqui").
+  function encerrarLive(showId, fim) {
+    const sh = db[showId];
+    if (!sh || sh.encerradaEm) return;
+    sh.encerradaEm = fim;
+    Object.values(sh.pessoas || {}).forEach((p) => {
+      const ultima = p.s[p.s.length - 1];
+      if (!ultima || ultima[1] !== null) return;
+      const ate = fim - p.v < 120000 ? fim : p.v;
+      ultima[1] = Math.max(ultima[0], ate);
+      p.v = ultima[1];
+    });
+    salvar();
+  }
+  window.addEventListener('bj:live-status', (ev) => {
+    const d = ev && ev.detail;
+    if (!d || !d.showId) return;
+    if (d.encerrada) encerrarLive(d.showId, d.fim || Date.now());
+    else if (db[d.showId] && db[d.showId].encerradaEm) {
+      // fim provisório desfeito: a live voltou ao ar
+      delete db[d.showId].encerradaEm;
+      salvar();
+    }
+  });
+
   async function rodar() {
     const variacao = Math.round((Math.random() * 2 - 1) * VARIACAO);
     const proxima = () => agendar(INTERVALO + variacao);
 
     const id = showAtual || showIdDaUrl();
+    if (id && db[id] && db[id].encerradaEm) {
+      // live fechada: nada a consultar (confere de novo de vez em quando, caso volte)
+      if (consulta.status !== 'encerrada') { consulta.status = 'encerrada'; mudou = true; }
+      agendar(5 * 60000);
+      return;
+    }
     if (!painelAberto() || !id || !showIdDaUrl()) { consulta.status = 'aguardando'; proxima(); return; }
     if (!cabecalhos || !sellerAtual) { consulta.status = 'sem-token'; mudou = true; proxima(); return; }
     if (!pegarTrava()) { consulta.status = 'outra-aba'; mudou = true; proxima(); return; }
@@ -351,7 +387,7 @@
     // conta só até a última vez em que a pessoa foi vista. A última consulta
     // boa vem da memória ou do que ficou gravado (página recarregada).
     const ultimaOk = Math.max(consulta.ultima || 0, sh.ultimaConsulta || 0);
-    const fresca = consulta.status !== 'pausado' && agora - ultimaOk < 90000;
+    const fresca = !sh.encerradaEm && consulta.status !== 'pausado' && agora - ultimaOk < 90000;
     const pessoas = Object.entries(sh.pessoas).map(([pid, p]) => {
       const ms = p.s.reduce((a, [ini, fim]) => a + ((fim === null ? (fresca ? agora : p.v) : fim) - ini), 0);
       const ativo = fresca && !!(p.s.length && p.s[p.s.length - 1][1] === null);
@@ -366,7 +402,9 @@
       pessoas,
       eventos: (sh.eventos || []).slice(-250),
       // logo depois de recarregar a aba ainda não consultou, mas os dados gravados estão em dia
-      status: fresca && (consulta.status === 'aguardando' || consulta.status === 'sem-token') ? 'ok' : consulta.status,
+      status: sh.encerradaEm ? 'encerrada'
+        : fresca && (consulta.status === 'aguardando' || consulta.status === 'sem-token') ? 'ok' : consulta.status,
+      encerradaEm: sh.encerradaEm || null,
       motivo: consulta.motivo,
       ultimaConsulta: ultimaOk,
     };

@@ -275,6 +275,8 @@
     const h = live();
     const painel = window.__jambleTransporte && window.__jambleTransporte.aberto();
     if (!h || !h.sellerId || !painel || Date.now() < rankingProxima) return;
+    const est = estadoDaLive(h.showId);
+    if (est && est.fim) return;   // live encerrada: os pontos dela já estão fechados
     rankingProxima = Date.now() + 120000 + Math.round(Math.random() * 20000);   // ~2 min, com variação
     try {
       const r = await fetchOriginal('/api/live/seller-ranking?seller_id=' + encodeURIComponent(h.sellerId),
@@ -370,11 +372,13 @@
         if (typeof ev.data !== 'string') return;
         const temGema = ev.data.indexOf('"LIKE"') >= 0;
         const temChat = ev.data.indexOf('"messages"') >= 0;
-        if (!temGema && !temChat) return;
+        const temShow = ev.data.indexOf('"has_started"') >= 0;
+        if (!temGema && !temChat && !temShow) return;
         try {
           const msg = JSON.parse(ev.data);
           if (temGema) ingerir(msg);
           if (temChat) ingerirChat(msg);
+          if (temShow) ingerirShow(msg);
         } catch {}
       });
     }
@@ -703,6 +707,85 @@
     };
   }
 
+  // ---------------------------------------------------------------- live no ar / encerrada
+  // Os dados já são separados por live (show_id), nunca por dia: uma live que
+  // passa da meia-noite continua uma só. Aqui marcamos quando ela está no ar e
+  // quando acabou, para "fechar" os números dela.
+  //
+  // De onde vem:
+  //   - cada pacote "show" da conexão ao vivo traz has_started, is_over e
+  //     started_at (hora exata do início);
+  //   - o título da página diz "· Ao vivo |" ou "· Live encerrada |" (a página de
+  //     uma live encerrada nem abre a conexão).
+  // A Jamble não manda a hora do fim. Se a extensão viu a live no ar há pouco,
+  // o fim é o momento em que ela acabou; se a página já abriu encerrada, o fim
+  // é o último dado recebido daquela live e fica marcado como provisório.
+  const estadosLive = {};   // showId -> {aoVivo, inicio, fim, provisorio, vistoNoArEm} (memória)
+
+  function estadoDaLive(showId) {
+    const s = db.shows[showId];
+    const m = estadosLive[showId] || {};
+    if (!s && !estadosLive[showId]) return null;
+    return {
+      aoVivo: s && s.fimEm ? false : !!m.aoVivo,
+      inicio: (s && s.inicioJamble) || m.inicio || (s && s.startedAt) || 0,
+      fim: (s && s.fimEm) || m.fim || 0,
+      provisorio: !!((s && s.fimProvisorio) || m.provisorio),
+    };
+  }
+
+  function registrarEstadoLive(showId, info) {
+    if (!showId) return;
+    const m = estadosLive[showId] || (estadosLive[showId] = {});
+    const s = db.shows[showId];   // só lives que a extensão já guarda (nada de criar entrada vazia)
+    const agora = Date.now();
+    let mudou = false;
+    if (info.inicio && !m.inicio) { m.inicio = info.inicio; mudou = true; }
+    if (s && info.inicio && s.inicioJamble !== info.inicio) { s.inicioJamble = info.inicio; mudou = true; }
+    if (info.aoVivo) {
+      m.vistoNoArEm = agora;
+      if (!m.aoVivo) { m.aoVivo = true; mudou = true; }
+      // a live voltou (ex.: o vendedor reabriu): desfaz um fim provisório
+      if ((s && s.fimEm && s.fimProvisorio) || (m.fim && m.provisorio)) {
+        if (s) { delete s.fimEm; delete s.fimProvisorio; }
+        delete m.fim; delete m.provisorio;
+        mudou = true;
+        try { window.dispatchEvent(new CustomEvent('bj:live-status', { detail: { showId, encerrada: false } })); } catch {}
+      }
+    }
+    if (info.encerrada && !(s && s.fimEm) && !m.fim) {
+      const viuNoAr = m.vistoNoArEm && agora - m.vistoNoArEm < 5 * 60000;
+      const fim = viuNoAr ? agora : ((s && s.lastAt) || m.vistoNoArEm || agora);
+      m.aoVivo = false;
+      m.fim = fim;
+      m.provisorio = !viuNoAr;
+      if (s) { s.fimEm = fim; s.fimProvisorio = !viuNoAr; }
+      mudou = true;
+      try { window.dispatchEvent(new CustomEvent('bj:live-status', { detail: { showId, encerrada: true, fim, provisorio: !viuNoAr } })); } catch {}
+    }
+    if (mudou) { salvar(); avisar('live'); }
+  }
+
+  function ingerirShow(msg) {
+    const sh = msg && msg.data && msg.data.show;
+    if (!sh || !sh.id) return;
+    registrarEstadoLive(sh.id, {
+      inicio: sh.started_at ? Math.round(Number(sh.started_at) * 1000) : 0,
+      aoVivo: !!sh.has_started && !sh.is_over,
+      encerrada: !!sh.is_over,
+    });
+  }
+
+  // O título da página também diz o estado (e é o único sinal numa live que
+  // já abriu encerrada, porque ela nem conecta).
+  function conferirTitulo() {
+    const h = live();
+    if (!h) return;
+    const t = document.title || '';
+    if (/Live encerrada|Live ended/i.test(t)) registrarEstadoLive(h.showId, { encerrada: true });
+    else if (/·\s*Ao vivo\s*\||·\s*Live\s*\|/i.test(t)) registrarEstadoLive(h.showId, { aoVivo: true });
+  }
+
   // Lives do vendedor atual que a extensão acompanhou — serve para deixar
   // explícito, na tela, o que "todas as lives" está somando.
   function livesDoVendedor() {
@@ -715,8 +798,11 @@
         return {
           showId: id,
           atual: id === h.showId,
-          inicio: s.startedAt || 0,
-          fim: s.lastAt || 0,
+          // início e fim de verdade quando a extensão viu (ver estadoDaLive);
+          // senão, o primeiro e o último dado guardados
+          inicio: s.inicioJamble || s.startedAt || 0,
+          fim: s.fimEm || s.lastAt || 0,
+          encerrada: !!s.fimEm,
           pessoas: users.length,
           envios: users.reduce((a, u) => a + (u.n || 0), 0),
           gemas: users.reduce((a, u) => a + (u.g || 0), 0),
@@ -883,7 +969,7 @@
       seq,
       em: Date.now(),
       completo: !!o.completo,
-      live: h ? { showId: h.showId, sellerSlug: h.sellerSlug, sellerId: h.sellerId || null } : null,
+      live: h ? { showId: h.showId, sellerSlug: h.sellerSlug, sellerId: h.sellerId || null, estado: estadoDaLive(h.showId) } : null,
       escopo,
       filtro,
       nomeDoFiltro: filtro ? nomeDaGema(filtro) : '',
@@ -942,7 +1028,7 @@
   });
 
   // Rede de segurança: a navegação da Jamble é SPA e nem sempre passa pelos ganchos.
-  setInterval(() => { aoNavegar(); garantirCatalogo(); atualizarRanking(); }, 1500);
+  setInterval(() => { aoNavegar(); garantirCatalogo(); atualizarRanking(); conferirTitulo(); }, 1500);
   aoNavegar();
   garantirCatalogo();
 
@@ -953,6 +1039,7 @@
 
     // contexto
     live,                       // () -> {showId, sellerSlug, sellerId} | null
+    estadoDaLive,               // (showId) -> {aoVivo, inicio, fim, provisorio} | null
     estaEmLive: () => !!live(),
 
     // escopo e filtro
@@ -982,7 +1069,7 @@
     feedDesde,                  // (seq, escopo?) -> [envio]
     compradores,                // () -> [{id,usuario,avatar,compras,valor}]
     totais,                     // (escopo?) -> {pessoas,gemas,envios,livesNoEscopo,compradores,vendasValor,vendasCount}
-    livesDoVendedor,            // () -> [{showId,atual,inicio,fim,pessoas,envios,gemas,temFeed}]
+    livesDoVendedor,            // () -> [{showId,atual,inicio,fim,encerrada,pessoas,envios,gemas,temFeed}]
     estado,                     // ({completo,desde,limiteFeed}) -> snapshot do protocolo
     drenarNovos,                // () -> [envio] recém-chegados (consome)
 
