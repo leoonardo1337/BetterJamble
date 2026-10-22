@@ -631,6 +631,20 @@
   .op.sel[aria-checked="true"] .marca-radio{background:var(--bj-claro)}
   .op.sel[aria-checked="true"] .marca-radio::after{width:7px;height:7px;background:var(--bj-sobreClaro)}
   .sel-linha-2{margin-top:14px}
+  /* Sorteio: as duas linhas num grid só, para as opções poderem mudar de lugar
+     no layout empilhado (ficam logo acima do botão) */
+  .sel-grade{
+    display:grid;column-gap:12px;row-gap:9px;align-items:stretch;
+    grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr) minmax(130px,170px);
+    grid-template-areas:"ra dv rb ." "ca dv cb tg" "ra2 dv2 rb2 ." "ca2 dv2 cb2 bt";
+  }
+  .sel-grade > .sel-linha{display:contents}
+  .sel-grade .sel-linha-2 .sel-rot-a{grid-area:ra2;margin-top:5px}
+  .sel-grade .sel-linha-2 .sel-rot-b{grid-area:rb2;margin-top:5px}
+  .sel-grade .sel-linha-2 .sel-cards-a{grid-area:ca2}
+  .sel-grade .sel-linha-2 .sel-cards-b{grid-area:cb2}
+  .sel-grade .sel-linha-2 .sel-div{grid-area:dv2}
+  .sel-grade .sel-toggles{grid-area:tg}
   /* filtro de gema dentro do card Gemas */
   .filtro-gema{
     display:flex;align-items:center;gap:8px;width:100%;margin-top:9px;padding:6px 9px;
@@ -679,6 +693,8 @@
      abaixo de 860px eles ficavam com ~110px e o texto quebrava palavra por palavra. */
   @container (max-width:860px){
     .sel-linha{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb" "bt"}
+    .sel-grade{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb" "ra2" "ca2" "rb2" "cb2" "tg" "bt"}
+    .sel-grade .sel-div{display:none}
     /* o Ranking (sem a coluna do botão) continua numa linha até 620px */
     .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);grid-template-areas:"ra dv rb" "ca dv cb"}
     .sel-linha.sem-botao .sel-div{display:block}
@@ -1044,13 +1060,13 @@
                 <div class="sel-cards sel-cards-a" id="opcoesRkTipo" role="radiogroup" aria-label="Ranking de">
                 <button class="op sel" type="button" role="radio" data-rtipo="gemas" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l4 5-9 11L3 9z"/><path d="M3 9h18M9.5 4L8 9l4 11 4-11-1.5-5"/></svg></span>
-                  <span class="txt"><span class="rot">Gemas</span><small>quem mais mandou gema</small></span>
+                  <span class="txt"><span class="rot">Gemas</span><small>Quem mais mandou gema</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <!-- div e não button: tem o seletor de métrica dentro -->
                 <div class="op sel" role="radio" tabindex="0" data-rtipo="compradores" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></span>
-                  <span class="txt"><span class="rot">Compradores</span><small>quem mais comprou</small>
+                  <span class="txt"><span class="rot">Compradores</span><small>Quem mais comprou</small>
                     <button class="filtro-gema" id="rkMetrica" type="button" aria-haspopup="listbox" aria-expanded="false" title="Ordenar compradores por"></button>
                   </span>
                   <span class="marca-radio"></span>
@@ -1061,7 +1077,7 @@
                 <div class="sel-cards sel-cards-b" id="opcoesEscopo" role="radiogroup" aria-label="O que somar no ranking">
                 <button class="op sel" type="button" role="radio" data-escopo="live" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot">Nesta live</span><small id="subEscopoLive">só a live aberta agora</small></span>
+                  <span class="txt"><span class="rot">Nesta live</span><small id="subEscopoLive">Só a live aberta agora</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-escopo="vendedor" aria-checked="false">
@@ -1084,13 +1100,16 @@
           <!-- ............................................... SORTEIO -->
           <div class="pane" id="pane-sorteio" role="tabpanel" hidden>
             <div class="sorteio-conf">
+              <!-- as duas linhas num grid só (sel-grade): no estreito, as opções
+                   (checkboxes) descem para logo acima do botão Sortear -->
+              <div class="sel-grade">
               <!-- dois grupos lado a lado, divisória no meio e o botão na altura dos cards -->
               <div class="sel-linha">
                 <div class="sel-rot sel-rot-a"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.2a3 3 0 0 1 0 5.6M17.5 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>Entre</div>
                 <div class="sel-cards sel-cards-a" id="opcoesSorteioEscopo" role="radiogroup" aria-label="Entre quem sortear">
                 <button class="op sel" type="button" role="radio" data-sesc="live" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioLive">Nesta live</span><small id="subSorteioLive">só a live aberta agora</small></span>
+                  <span class="txt"><span class="rot" id="rotSorteioLive">Nesta live</span><small id="subSorteioLive">Só a live aberta agora</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-sesc="vendedor" aria-checked="false">
@@ -1104,20 +1123,20 @@
                 <div class="sel-cards sel-cards-b" id="opcoesModo" role="radiogroup" aria-label="Como calcular a chance">
                 <button class="op sel" type="button" role="radio" data-modo="peso" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="4" rx="1.5"/><rect x="13" y="10" width="7" height="10" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade</span><small id="subModoPeso">cada gema vale uma chance</small></span>
+                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade</span><small id="subModoPeso">Cada gema vale uma chance</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-modo="pessoa" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot">1 por pessoa</span><small>todo mundo com a mesma chance</small></span>
+                  <span class="txt"><span class="rot">1 por pessoa</span><small>Todo mundo com a mesma chance</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 </div>
                 <!-- coluna da direita, primeira linha: as duas opções empilhadas em cards -->
                 <div class="sel-toggles">
-                  <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span id="rotSemRepetir">não repetir quem já ganhou</span></label>
-                  <label class="sel-toggle"><input type="checkbox" id="exigirPresenca"><span>confirmar presença no chat</span></label>
-                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span>não repetir entre gemas e compras</span></label>
+                  <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span id="rotSemRepetir">Não repetir quem já ganhou</span></label>
+                  <label class="sel-toggle"><input type="checkbox" id="exigirPresenca"><span>Confirmar presença no chat</span></label>
+                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span>Não repetir entre gemas e compras</span></label>
                 </div>
               </div>
 
@@ -1129,14 +1148,14 @@
                      e botão dentro de botão não é permitido -->
                 <div class="op sel" role="radio" tabindex="0" data-tipo="gemas" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l4 5-9 11L3 9z"/><path d="M3 9h18M9.5 4L8 9l4 11 4-11-1.5-5"/></svg></span>
-                  <span class="txt"><span class="rot">Gemas</span><small>entre quem mandou gema</small>
+                  <span class="txt"><span class="rot">Gemas</span><small>Entre quem mandou gema</small>
                     <button class="filtro-gema" id="filtroGema" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sortear só entre quem mandou esta gema"></button>
                   </span>
                   <span class="marca-radio"></span>
                 </div>
                 <button class="op sel" type="button" role="radio" data-tipo="compradores" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></span>
-                  <span class="txt"><span class="rot">Compradores</span><small id="subTipoCompradores">entre quem comprou nesta live</small></span>
+                  <span class="txt"><span class="rot">Compradores</span><small id="subTipoCompradores">Entre quem comprou nesta live</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 </div>
@@ -1145,16 +1164,17 @@
                 <div class="sel-cards sel-cards-b" id="opcoesAnim" role="radiogroup" aria-label="Animação do sorteio">
                 <button class="op sel" type="button" role="radio" data-anim="subida" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></span>
-                  <span class="txt"><span class="rot">Subida</span><small>5s de nomes e o vencedor pousa no meio</small></span>
+                  <span class="txt"><span class="rot">Subida</span><small>Nomes sobem por 5 segundos e o vencedor pousa no meio</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-anim="feixes" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span>
-                  <span class="txt"><span class="rot">Feixes</span><small>5s de feixes e nomes indo para o centro</small></span>
+                  <span class="txt"><span class="rot">Feixes</span><small>Feixes levam os nomes ao centro por 5 segundos</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 </div>
                 <button class="botao-sortear" id="btnSortear" type="button">&#127922; Sortear</button>
+              </div>
               </div>
 
               <!-- lista do filtro de gema (posicionada pelo JS, abaixo do botão) -->

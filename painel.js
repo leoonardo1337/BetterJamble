@@ -1070,7 +1070,7 @@
     const m = limpar($('rkMetrica'));
     m.appendChild(el('span', 'nome-g', METRICAS[rkMetrica]));
     m.appendChild(el('span', 'seta', '▾'));
-    $('subEscopoLive').textContent = 'só a live aberta agora';
+    $('subEscopoLive').textContent = 'Só a live aberta agora';
     $('pane-ranking').classList.toggle('rk-oculto', rkOculto);
     const olho = $('btnRkOlho');
     olho.setAttribute('aria-pressed', rkOculto ? 'true' : 'false');
@@ -1556,7 +1556,7 @@
     const desde = registroMaisAntigo(comp);
     $('subSorteioVendedor').textContent = 'Todas as lives do canal' + (desde ? ' desde ' + dataLonga(desde) : '');
     $('rotModoPeso').textContent = 'Por quantidade';
-    $('subModoPeso').textContent = comp ? 'cada compra vale uma chance' : 'cada gema vale uma chance';
+    $('subModoPeso').textContent = comp ? 'Cada compra vale uma chance' : 'Cada gema vale uma chance';
 
     // O filtro de gema é herdado da tela "Ao vivo" e tem que aparecer por extenso:
     // sortear sem perceber que havia filtro é o erro mais caro da interface.
@@ -1570,7 +1570,7 @@
     const urna = base ? calcularUrna(base) : null;
 
     const fora = urna ? urna.fora.length : 0;
-    $('rotSemRepetir').textContent = 'não repetir quem já ganhou'
+    $('rotSemRepetir').textContent = 'Não repetir quem já ganhou'
       + (sorteio.semRepetir && fora ? ' (' + nf(fora) + ' ' + plural(fora, 'fora', 'fora') + ')' : '');
     $('semRepetir').checked = sorteio.semRepetir;
     $('exigirPresenca').checked = sorteio.presenca;
@@ -1663,14 +1663,14 @@
     if (!urna.lista.length) {
       caixa.appendChild(vazioSimples(comp
         ? (sorteio.semRepetir && urna.fora.length
-          ? 'Todo mundo que comprou já ganhou. Desmarque “não repetir” ou limpe a lista.'
+          ? 'Todo mundo que comprou já ganhou. Desmarque “Não repetir quem já ganhou” ou limpe a lista.'
           : sorteio.escopo === 'vendedor'
             ? 'Nenhuma compra salva ainda. A extensão guarda os compradores de cada live daqui em diante.'
             : 'Ninguém comprou nesta live ainda. O sorteio abre quando sair a primeira venda.')
         : dados.filtro
           ? 'Ninguém mandou ' + (dados.nomeDoFiltro || dados.filtro) + ' nesse escopo ainda — não há ninguém para sortear.'
           : sorteio.semRepetir && urna.fora.length
-            ? 'Todo mundo que mandou gema já ganhou. Desmarque “não repetir” ou limpe a lista.'
+            ? 'Todo mundo que mandou gema já ganhou. Desmarque “Não repetir quem já ganhou” ou limpe a lista.'
             : 'Ninguém mandou gema ainda. O sorteio abre sozinho quando a primeira gema chegar.'));
       return;
     }
@@ -1726,7 +1726,7 @@
       girando = false;
       $('btnSortear').classList.remove('girando');
       const alvo = limpar($('resultado'));
-      alvo.appendChild(vazioSimples('Ninguém elegível com essas opções. Confira o filtro de gema e a opção “não repetir”.'));
+      alvo.appendChild(vazioSimples('Ninguém elegível com essas opções. Confira o filtro de gema e a opção “Não repetir quem já ganhou”.'));
       desenharSorteio();
       return;
     }
@@ -2786,7 +2786,7 @@
       o.setAttribute('aria-selected', rkMetrica === k ? 'true' : 'false');
       o.appendChild(el('span', 'emj', k === 'valor' ? 'R$' : '🛍'));
       o.appendChild(el('span', 'nome-g', nome));
-      o.appendChild(el('span', 'info-g', k === 'valor' ? 'soma do que cada um pagou' : 'quantas compras cada um fez'));
+      o.appendChild(el('span', 'info-g', k === 'valor' ? 'Soma do que cada um pagou' : 'Quantas compras cada um fez'));
       o.onclick = (e) => {
         e.stopPropagation();
         fecharMenuMetrica();
@@ -2888,7 +2888,7 @@
       o.onclick = (e) => { e.stopPropagation(); escolherGema(id); };
       menu.appendChild(o);
     };
-    opcao('', el('span', 'emj', '💎'), 'Todos', 'qualquer gema');
+    opcao('', el('span', 'emj', '💎'), 'Todos', 'Qualquer gema');
     menu.appendChild(el('div', 'sep'));
     (d.catalogo || []).forEach((c) => opcao(c.id, iconeGema(c), c.nome, nf(c.preco) + ' 💎'));
     if (!(d.catalogo || []).length) menu.appendChild(vazioSimples('O catálogo de gemas ainda não carregou.'));
