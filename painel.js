@@ -1078,8 +1078,9 @@
     olho.title = rkOculto
       ? 'Mostrar os seletores' + (comp ? ' e os valores' : '')
       : 'Mostrar só o ranking' + (comp ? ' e esconder os valores' : '');
-    // com os seletores escondidos, uma linha diz o que está na tela
-    $('rkResumo').textContent = (comp ? 'Compradores · ' + METRICAS[rkMetrica].toLowerCase() : 'Gemas')
+    // título no formato do sorteio: diz o que está na tela (sobra sozinho
+    // quando o olho esconde os seletores)
+    $('rkResumo').textContent = (comp ? 'Ranking de compradores · ' + METRICAS[rkMetrica].toLowerCase() : 'Ranking de gemas')
       + ' · ' + ((dados && dados.escopo) === 'vendedor' ? 'todas as lives' : 'nesta live');
   }
 
