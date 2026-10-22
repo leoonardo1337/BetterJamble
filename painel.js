@@ -684,9 +684,9 @@
     const inicio = Math.min(am.length ? am[0][0] : Infinity, mins.length ? mins[0][0] : Infinity);
     if (!isFinite(inicio)) return [];
     const agora = Date.now();
-    let t0 = Math.floor(inicio / passo) * passo;
-    // no máximo 72 janelas na tela: lives longas mostram o trecho mais recente
-    t0 = Math.max(t0, Math.floor(agora / passo) * passo - 71 * passo);
+    // a live inteira, do começo até agora: em lives longas as janelas só ficam
+    // mais estreitas no gráfico
+    const t0 = Math.floor(inicio / passo) * passo;
     const lista = [];
     let ia = 0;
     let ultimo = null;

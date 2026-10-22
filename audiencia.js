@@ -159,7 +159,13 @@
         // guarda quando muda ou a cada 30s, para o gráfico não ter buracos
         if (!ult || ult[1] !== show.audience_count || agora - ult[0] > 30000) {
           sh.amostras.push([agora, show.audience_count]);
-          if (sh.amostras.length > 3000) sh.amostras.splice(0, sh.amostras.length - 3000);
+          // Passou do limite: afina a metade mais antiga (fica uma amostra a
+          // cada duas) em vez de descartar o começo, para o gráfico ainda
+          // cobrir a live inteira.
+          if (sh.amostras.length > 3000) {
+            const velhas = sh.amostras.splice(0, 1500).filter((_, i) => i % 2 === 0);
+            sh.amostras.unshift(...velhas);
+          }
           salvar();
         }
       }
@@ -342,7 +348,7 @@
     return {
       showId: id,
       inicio: sh.comecou || sh.inicio,
-      amostras: sh.amostras.slice(-1500),
+      amostras: sh.amostras,
       minutos: min,
       pessoas,
       eventos: (sh.eventos || []).slice(-250),
