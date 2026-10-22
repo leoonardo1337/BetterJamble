@@ -832,6 +832,24 @@
   .resultado .trofeu{font-size:19px;flex:none}
   .girando-nome{color:var(--bj-texto2)}
 
+  /* Resumo das Lives: por enquanto só o aviso de "em breve" */
+  .em-breve{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 24px 60px;gap:10px}
+  .em-breve-arte{width:min(240px,70%);height:auto;margin-bottom:8px}
+  .em-breve-arte .eb-base{fill:var(--bj-borda2)}
+  .em-breve-arte .eb-barra{fill:url(#ebOuro)}
+  .em-breve-arte .eb-tracejada{fill:none;stroke:#e3a80f;stroke-width:2;stroke-dasharray:5 5;opacity:.7}
+  .em-breve-arte .eb-faisca{fill:#f6cf5a}
+  .em-breve-arte .b1,.em-breve-arte .b2{transform-origin:center bottom;transform-box:fill-box;animation:ebSobe 2.6s ease-in-out infinite}
+  .em-breve-arte .b2{animation-delay:.3s}
+  .em-breve-arte .eb-faisca{transform-origin:center;transform-box:fill-box;animation:ebPisca 2.2s ease-in-out infinite}
+  .em-breve-arte .f2{animation-delay:.7s}
+  .em-breve-arte .f3{animation-delay:1.3s}
+  @keyframes ebSobe{0%,100%{transform:scaleY(.86)}50%{transform:scaleY(1)}}
+  @keyframes ebPisca{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
+  .em-breve-tag{padding:3px 11px;border:1.5px solid #e3a80f;border-radius:999px;color:#f6cf5a;
+    font:700 11px var(--bj-ui);letter-spacing:.12em;text-transform:uppercase}
+  .card.em-breve .em-breve-tit{margin:4px 0 0;font:700 21px/1.25 var(--bj-ui);letter-spacing:-.01em;text-transform:none;color:var(--bj-texto)}
+  .em-breve-txt{margin:0;max-width:440px;color:var(--bj-texto2);font-size:13.5px;line-height:1.55}
   .hist{margin-top:9px;max-height:300px;overflow-y:auto}
   .hl-remover{flex:none;width:22px;height:22px;display:grid;place-items:center;margin-left:auto;padding:0;border:0;border-radius:6px;
     background:none;color:var(--bj-texto3);font:600 16px/1 var(--bj-ui);cursor:pointer;opacity:.55;transition:opacity .15s,color .15s,background .15s}
@@ -844,6 +862,7 @@
   .hl .motivo{flex:none;padding:1px 7px;border:1px solid #f5c518;border-radius:999px;color:#f5c518;
     font-size:10.5px;font-weight:700;line-height:1.4}
   .hl .motivo.vermelho{border-color:#ff5252;color:#ff5252}
+  .hl .motivo.verde{border-color:#3ddc84;color:#3ddc84}
   .hl .como{flex:1;min-width:0;color:var(--bj-texto3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* -------------------------------------------------------------- tela lives */
@@ -975,7 +994,7 @@
   <nav class="abas" role="tablist" aria-label="Seções do painel">
     <span class="aba-fundo" id="abaFundo" aria-hidden="true"></span>
     <button class="aba" id="aba-vivo" role="tab" data-tela="vivo" aria-selected="true"><span class="rot">Ao vivo</span><span class="rec" aria-hidden="true"></span></button>
-    <button class="aba" id="aba-lives" role="tab" data-tela="lives" aria-selected="false"><span class="emj">&#128197;</span><span class="rot">Lives do vendedor</span></button>
+    <button class="aba" id="aba-lives" role="tab" data-tela="lives" aria-selected="false"><span class="emj">&#128197;</span><span class="rot">Resumo das Lives</span></button>
   </nav>
   <div class="topo-dir">
   <!-- auto resgate da "Recompensa por assistir" (resgate.js na aba da live) -->
@@ -1300,19 +1319,31 @@
     </div>
   </div>
 
-  <!-- ============================================ TELA 3: LIVES DO VENDEDOR -->
+  <!-- ============================================ TELA 3: RESUMO DAS LIVES -->
+  <!-- ainda sem conteúdo: só o aviso de "em breve" -->
   <div class="tela" id="tela-lives" role="tabpanel" aria-labelledby="aba-lives">
     <div class="uma">
-      <section class="card">
-        <h2 id="tituloLives">As lives que você acompanhou</h2>
-        <p class="sub" id="subLives"></p>
-        <p class="nota">
-          <span class="emj">&#9432;</span>
-          <span>A Jamble <b>não guarda histórico de gemas</b>. Esta lista é o que a extensão viu com a aba
-          aberta &mdash; não é o histórico do vendedor. Só as 30 lives mais recentes guardam o feed
-          detalhado; as outras mantêm apenas os totais.</span>
-        </p>
-        <div id="corpoLives"></div>
+      <section class="card em-breve">
+        <svg class="em-breve-arte" viewBox="0 0 240 160" aria-hidden="true">
+          <defs>
+            <linearGradient id="ebOuro" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f6cf5a"/><stop offset="1" stop-color="#d99206"/>
+            </linearGradient>
+          </defs>
+          <!-- barras de um gráfico sendo montado -->
+          <rect class="eb-base" x="40" y="128" width="160" height="2" rx="1"/>
+          <rect class="eb-barra b1" x="56" y="92" width="22" height="36" rx="5"/>
+          <rect class="eb-barra b2" x="88" y="70" width="22" height="58" rx="5"/>
+          <rect class="eb-barra b3 eb-tracejada" x="120" y="52" width="22" height="76" rx="5"/>
+          <rect class="eb-barra b4 eb-tracejada" x="152" y="34" width="22" height="94" rx="5"/>
+          <!-- faíscas -->
+          <path class="eb-faisca f1" d="M190 22l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+          <path class="eb-faisca f2" d="M44 46l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
+          <path class="eb-faisca f3" d="M214 70l2 4 4 2-4 2-2 4-2-4-4-2 4-2z"/>
+        </svg>
+        <span class="em-breve-tag">Em breve</span>
+        <h2 class="em-breve-tit">Estamos preparando novidades</h2>
+        <p class="em-breve-txt">Estamos desenvolvendo e preparando novas features. Em breve esta área estará disponível para uso.</p>
       </section>
     </div>
   </div>

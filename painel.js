@@ -7,7 +7,7 @@
 // O que NÃO se mexe: `ligar()`, `aplicar()` e `absorver()` são a cola com o
 // protocolo (docs/HANDOFF.md, seção 4). Todo o resto é desenho.
 //
-// Mapa: docs/PAINEL.md — três telas (Ao vivo, Sorteio, Lives do vendedor),
+// Mapa: docs/PAINEL.md — três telas (Ao vivo, Sorteio, Resumo das Lives),
 // escopo e filtro morando dentro do card de ranking, seis estados vazios.
 // ============================================================================
 (() => {
@@ -94,9 +94,12 @@
   // do histórico, mas um pacote que saiu dela antes de o motivo chegar não
   // pode apagar o badge: cada histórico recebido passa por aplicarMotivos.
   const motivosMarcados = new Map();
+  // Presenças confirmadas aqui, pelo mesmo motivo (a aba pode demorar a saber).
+  const confirmadosMarcados = new Set();
   function aplicarMotivos(lista) {
     (lista || []).forEach((h) => {
       const k = h.t + ':' + h.id;
+      if (confirmadosMarcados.has(k)) h.confirmado = true;
       if (!motivosMarcados.has(k)) return;
       const m = motivosMarcados.get(k);
       if (m) h.motivo = m; else delete h.motivo;
@@ -425,7 +428,6 @@
     if (d.live) {
       desenharVivo();
       desenharSorteio();
-      desenharLives();
     }
   }
 
@@ -1243,18 +1245,12 @@
     nota.appendChild(txt);
     v.appendChild(nota);
 
-    // Os atalhos só aparecem se houver conteúdo de verdade.
-    const anteriores = (d.livesDoVendedor || []).filter((l) => !l.atual).length;
+    // O atalho só aparece se houver conteúdo de verdade. (O das lives
+    // anteriores saiu junto com a tela Resumo das Lives, que está em breve.)
     const compradores = (d.compradores || []).length;
-    if (anteriores || compradores) {
+    if (compradores) {
       const atalhos = el('div', 'atalhos');
-      if (anteriores) {
-        const b = el('button', 'btn', 'ver as ' + nf(anteriores) + ' ' + plural(anteriores, 'live anterior', 'lives anteriores') + ' de ' + vendedorArroba());
-        b.type = 'button';
-        b.onclick = () => trocarTela('lives');
-        atalhos.appendChild(b);
-      }
-      if (compradores) {
+      {
         const b = el('button', 'btn', 'ver os compradores desta live (' + nf(compradores) + ')');
         b.type = 'button';
         b.onclick = () => trocarPane('insights');
@@ -1714,8 +1710,28 @@
   }
 
   function desenharResultadoVazio() {
+    // A lista é guardada: depois de recarregar, o palco volta com o último
+    // ganhador (e, se ainda não se resolveu, a espera pela presença).
+    const h = (historico || [])[0];
+    if (h && !girando && !esperandoSorteio) { restaurarUltimo(h); return; }
     const alvo = limpar($('resultado'));
-    alvo.appendChild(vazioSimples('Nenhum sorteio nesta sessão. A urna ao lado mostra quem está dentro e com que chance.'));
+    alvo.appendChild(vazioSimples('Nenhum sorteio ainda neste canal. A urna ao lado mostra quem está dentro e com que chance.'));
+  }
+
+  function restaurarUltimo(h) {
+    const d = dados || {};
+    // a foto vem da urna/ranking/compradores, se a pessoa ainda estiver lá
+    const achado = [].concat(d.ranking || [], d.compradores || [], (urnaRemota && urnaRemota.lista) || [])
+      .find((x) => x.id === h.id);
+    const vencedor = { id: h.id, usuario: h.usuario, avatar: (achado && achado.avatar) || '' };
+    ultimoResultado = { vencedor, chance: 0, participantes: 0, bilhetes: 0, restaurado: true };
+    presenca = sorteio.presenca && h.t
+      ? {
+        userId: h.id, usuario: String(h.usuario || '').toLowerCase(), t: h.t,
+        msgs: [], confirmado: !!h.confirmado, revelado: false, motivo: h.motivo || '',
+      }
+      : null;
+    pintarResultado(ultimoResultado);
   }
 
   function mostrarSorteio(r) {
@@ -2492,6 +2508,16 @@
     desenharSorteio();   // a urna e o histórico mudam junto
   }
 
+  // Presença confirmada: o vencedor ganha o badge "Ganhador" na lista (e fica
+  // guardado na aba, junto com o histórico).
+  function confirmarGanhador() {
+    if (!presenca || !presenca.t) return;
+    confirmadosMarcados.add(presenca.t + ':' + presenca.userId);
+    aplicarMotivos(historico);
+    mandar('confirmar-ganhador', { t: presenca.t, id: presenca.userId });
+    desenharHistorico();
+  }
+
   function receberChat(lista) {
     if (!presenca || !Array.isArray(lista)) return;
     for (const m of lista) {
@@ -2515,6 +2541,7 @@
     if (!presenca.confirmado && !presenca.motivo) {
       presenca.confirmado = true;
       pintarStatusPresenca();
+      confirmarGanhador();
     }
     // igual ao chat da Jamble: foto, @ em cinza e o texto embaixo
     const linha = el('div', 'presenca-msg');
@@ -2571,6 +2598,7 @@
       l.appendChild(el('span', 'quem', '@' + h.usuario));
       const motivo = MOTIVOS[h.motivo];
       if (motivo) l.appendChild(el('span', 'motivo ' + motivo.cor, motivo.rot));
+      else if (h.confirmado) l.appendChild(el('span', 'motivo verde', 'Ganhador'));
       const como = (h.tipo === 'compradores' ? 'compradores · ' : '')
         + (h.modo === 'pessoa' ? '1 por pessoa' : 'por quantidade')
         + (h.escopo === 'vendedor' ? ' · todas as lives' : '')
@@ -2601,74 +2629,8 @@
     desenharSorteio();
   }
 
-  // ====================================================== TELA LIVES DO VENDEDOR
-  function desenharLives() {
-    const d = dados;
-    const lives = d.livesDoVendedor || [];
-    const alvo = limpar($('corpoLives'));
-    $('tituloLives').textContent = 'As lives de ' + vendedorArroba() + ' que você acompanhou';
-
-    const gemas = lives.reduce((a, l) => a + (l.gemas || 0), 0);
-    const envios = lives.reduce((a, l) => a + (l.envios || 0), 0);
-    const sub = limpar($('subLives'));
-    sub.append(frase(
-      ['span', nf(lives.length) + ' ' + plural(lives.length, 'live', 'lives')],
-      [null, ' · ' + nf(gemas) + ' gemas · ' + nf(envios) + ' envios'
-        + (d.escopo === 'vendedor' ? ' · ' + nf((d.totais || {}).pessoas) + ' pessoas diferentes' : '')],
-    ));
-    sub.firstChild.className = 'forte';
-
-    // Com uma live só (primeiro uso), uma tabela de uma linha não ensina nada.
-    if (lives.length <= 1) {
-      const v = el('div', 'vazio');
-      v.appendChild(el('div', 'emj-g', '📅'));
-      v.appendChild(el('div', 'tit', 'Esta é a primeira live de ' + vendedorArroba() + ' que você acompanha.'));
-      v.appendChild(el('div', 'txt', 'A partir de agora, cada live que você assistir com a extensão entra nesta lista e passa a somar no escopo “todas as lives”.'));
-      alvo.appendChild(v);
-      return;
-    }
-
-    const tabela = el('table', 'tabela');
-    const thead = el('thead');
-    const tr = el('tr');
-    ['Quando', 'Duração', 'Pessoas', 'Envios', 'Gemas', 'Feed'].forEach((h) => tr.appendChild(el('th', null, h)));
-    thead.appendChild(tr);
-    tabela.appendChild(thead);
-
-    const tbody = el('tbody');
-    lives.forEach((l) => {
-      const linha = el('tr', l.atual ? 'agora' : '');
-      const q = el('td');
-      q.appendChild(document.createTextNode(quando(l.inicio || l.fim)));
-      if (l.atual) q.appendChild(el('span', 'selo', 'AGORA'));
-      linha.appendChild(q);
-      linha.appendChild(el('td', 'n', duracao((l.atual ? Date.now() : l.fim) - (l.inicio || l.fim))));
-      linha.appendChild(el('td', 'n', nf(l.pessoas)));
-      linha.appendChild(el('td', 'n', nf(l.envios)));
-      linha.appendChild(el('td', 'n', nf(l.gemas)));
-      const f = el('td');
-      if (l.temFeed) f.appendChild(el('span', null, '✓'));
-      else f.appendChild(el('span', 'fraco', '—  só totais'));
-      linha.appendChild(f);
-      tbody.appendChild(linha);
-    });
-    tabela.appendChild(tbody);
-    alvo.appendChild(tabela);
-
-    const rodape = el('div', 'rodape-lives');
-    if (d.escopo === 'vendedor') {
-      const b = el('button', 'btn', 'voltar a somar só esta live → Ao vivo');
-      b.type = 'button';
-      b.onclick = () => { mandar('escopo', { escopo: 'live' }); trocarTela('vivo'); };
-      rodape.appendChild(b);
-    } else {
-      const b = el('button', 'btn btn-claro', 'somar todas no ranking → Ao vivo');
-      b.type = 'button';
-      b.onclick = () => { mandar('escopo', { escopo: 'vendedor' }); trocarTela('vivo'); };
-      rodape.appendChild(b);
-    }
-    alvo.appendChild(rodape);
-  }
+  // ============================================================ RESUMO DAS LIVES
+  // A tela ainda não tem conteúdo: mostra só o aviso "Em breve" do HTML.
 
   // =============================================================== navegação
   function trocarTela(nome) {
@@ -2988,7 +2950,7 @@
   };
   $('limparFiltroSorteio').onclick = () => trocarFiltro('');
   $('maisRanking').onclick = () => { limiteRanking += PASSO_RANKING; desenharRanking(); };
-  $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); ultimoResultado = null; mandar('limpar-historico'); desenharSorteio(); };
+  $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); confirmadosMarcados.clear(); ultimoResultado = null; presenca = null; mandar('limpar-historico'); desenharSorteio(); };
 
   $('btnSortear').onclick = () => {
     if (girando) return;

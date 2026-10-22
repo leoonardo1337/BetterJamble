@@ -783,6 +783,16 @@
     avisar('sorteio');
   }
 
+  // O vencedor apareceu no chat (presença confirmada): fica marcado na lista.
+  function marcarConfirmado(t, id) {
+    garantirHistorico();
+    const h = historico.find((x) => x.t === t && x.id === id);
+    if (!h || h.confirmado) return;
+    h.confirmado = true;
+    salvarHistorico();
+    avisar('sorteio');
+  }
+
   function limparHistorico() {
     garantirHistorico();
     historico = [];
@@ -922,6 +932,7 @@
     historico: () => { garantirHistorico(); return historico.slice(); },
     marcarMotivo,               // (t, id, 'ja-sorteado'|'ausente'|'') -> marca a entrada do histórico
     removerGanhador,            // (t, id) -> tira a entrada do histórico; a pessoa volta para a urna
+    marcarConfirmado,           // (t, id) -> o vencedor confirmou presença no chat
     limparHistorico,
 
     // fotos
