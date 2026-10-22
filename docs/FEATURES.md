@@ -400,6 +400,6 @@ eles. Ranking, Sorteio e o feed de envios continuam seguindo escopo e filtro.
 
 As duas linhas de seletores do sorteio ficam num grid só (`.sel-grade`, com
 cada `.sel-linha` em `display:contents`). Largo, as três opções (checkboxes)
-ficam na coluna da direita da primeira linha e o botão Sortear na da segunda;
-empilhado (bloco com menos de 860 px), as opções descem para logo acima do
-botão. Os textos dos cards e das opções começam com maiúscula, sem ponto final.
+ficam numa linha embaixo dos seletores e o botão Sortear ocupa a coluna da
+direita inteira, de cima a baixo; empilhado (bloco com menos de 860 px), as
+opções ficam uma embaixo da outra, logo acima do botão. Os textos dos cards e das opções começam com maiúscula, sem ponto final.

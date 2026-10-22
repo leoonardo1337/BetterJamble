@@ -631,13 +631,15 @@
   .op.sel[aria-checked="true"] .marca-radio{background:var(--bj-claro)}
   .op.sel[aria-checked="true"] .marca-radio::after{width:7px;height:7px;background:var(--bj-sobreClaro)}
   .sel-linha-2{margin-top:14px}
-  /* Sorteio: as duas linhas num grid só, para as opções poderem mudar de lugar
-     no layout empilhado (ficam logo acima do botão) */
+  /* Sorteio: as duas linhas num grid só. Largo: as opções (checkboxes) numa
+     linha embaixo dos seletores e o botão Sortear ocupando a coluna da direita
+     inteira. Empilhado: as opções ficam logo acima do botão. */
   .sel-grade{
     display:grid;column-gap:12px;row-gap:9px;align-items:stretch;
     grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr) minmax(130px,170px);
-    grid-template-areas:"ra dv rb ." "ca dv cb tg" "ra2 dv2 rb2 ." "ca2 dv2 cb2 bt";
+    grid-template-areas:"ra dv rb bt" "ca dv cb bt" "ra2 dv2 rb2 bt" "ca2 dv2 cb2 bt" "tg tg tg bt";
   }
+  .sel-grade .sel-toggles{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:5px}
   .sel-grade > .sel-linha{display:contents}
   .sel-grade .sel-linha-2 .sel-rot-a{grid-area:ra2;margin-top:5px}
   .sel-grade .sel-linha-2 .sel-rot-b{grid-area:rb2;margin-top:5px}
@@ -694,6 +696,7 @@
   @container (max-width:860px){
     .sel-linha{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb" "bt"}
     .sel-grade{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb" "ra2" "ca2" "rb2" "cb2" "tg" "bt"}
+    .sel-grade .sel-toggles{grid-template-columns:minmax(0,1fr);margin-top:0}
     .sel-grade .sel-div{display:none}
     /* o Ranking (sem a coluna do botão) continua numa linha até 620px */
     .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);grid-template-areas:"ra dv rb" "ca dv cb"}
