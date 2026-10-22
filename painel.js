@@ -1173,7 +1173,8 @@
   function desenharPodio(rk, f) {
     const topo = rk.slice(0, 3);
     const assinatura = rkTipo + rkMetrica + (rkOculto ? 'o' : '') + (dados.escopo || '') + '|'
-      + topo.map((r) => r.id + ':' + f.num(r) + ':' + f.det(r)).join('|');
+      // a foto entra na conta: quando alguém do pódio troca de foto, ele redesenha
+      + topo.map((r) => r.id + ':' + f.num(r) + ':' + f.det(r) + ':' + (r.avatar || '')).join('|');
     const igual = assinatura === assinaturaPodio;
     assinaturaPodio = assinatura;
     if (igual) return;              // sem reanimar a entrada a cada delta

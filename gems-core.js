@@ -70,6 +70,10 @@
 
   let avatares = {};
   try { avatares = JSON.parse(localStorage.getItem(LS_AVATARES) || '{}') || {}; } catch {}
+  // quando cada foto do cache foi conferida pela última vez (ver conferirFoto)
+  const LS_AVATARES_EM = 'jamble:gems:avatars-em:v1';
+  let avataresEm = {};
+  try { avataresEm = JSON.parse(localStorage.getItem(LS_AVATARES_EM) || '{}') || {}; } catch {}
 
   // ---------------------------------------------------------------- avisos
   // Um único canal de notificação: inscritos diretos + evento no window.
@@ -108,7 +112,12 @@
     }, 1500);
   }
 
-  const salvarAvatares = () => { try { localStorage.setItem(LS_AVATARES, JSON.stringify(avatares)); } catch {} };
+  const salvarAvatares = () => {
+    try {
+      localStorage.setItem(LS_AVATARES, JSON.stringify(avatares));
+      localStorage.setItem(LS_AVATARES_EM, JSON.stringify(avataresEm));
+    } catch {}
+  };
 
   // Foto de perfil vista agora (gema, chat, compra, lista de espectadores):
   // vira a foto da pessoa no cache. Antes o cache guardava a primeira foto
@@ -118,7 +127,9 @@
   let timerFotos = 0;
   function fotoNova(userId, url) {
     url = foto(url);
-    if (!userId || !url || avatares[userId] === url) return;
+    if (!userId || !url) return;
+    avataresEm[userId] = Date.now();   // acabou de ser vista: está em dia
+    if (avatares[userId] === url) return;
     avatares[userId] = url;
     avatarFalhou.delete(userId);
     clearTimeout(timerFotos);
@@ -296,13 +307,37 @@
         try {
           const r = await fetchOriginal('/api/profile/full?user_id=' + encodeURIComponent(id),
             { headers: cabecalhos(), credentials: 'include' });
+          if (r.status === 403) cabecalhosDoSite = null;   // token vencido: espera o site mandar outro
           const j = r.ok ? await r.json() : null;
           const url = j && j.user && j.user.avatarUrl;
-          if (url) { avatares[id] = url; salvarAvatares(); avisar('avatar'); } else avatarFalhou.add(id);
-        } catch { avatarFalhou.add(id); }
-        finally { avatarOcupado--; bombearAvatares(); }
+          if (url) fotoNova(id, url);
+          else {
+            avatarFalhou.add(id);
+            // não deu agora: tenta de novo daqui a ~1h, e não a cada pacote
+            avataresEm[id] = Date.now() - FOTO_VALE + 3600000;
+          }
+        } catch { avatarFalhou.add(id); avataresEm[id] = Date.now() - FOTO_VALE + 3600000; }
+        finally { avatarOcupado--; setTimeout(bombearAvatares, 1500); }   // uma folga entre consultas
       })();
     }
+  }
+
+  // Quem trocou de foto e não apareceu de novo (sem gema, chat ou compra)
+  // ficava com a antiga para sempre. Fotos conferidas há mais de 12h são
+  // buscadas de novo no perfil (/api/profile/full, a mesma chamada do site),
+  // só para quem está na tela, no máximo 40 a cada 10 min.
+  const FOTO_VALE = 12 * 3600000;
+  let conferenciasJanela = 0;
+  let janelaDesde = Date.now();
+  function conferirFoto(userId) {
+    if (!userId || filaAvatar.includes(userId)) return;
+    if (Date.now() - (avataresEm[userId] || 0) < FOTO_VALE) return;
+    if (Date.now() - janelaDesde > 10 * 60000) { janelaDesde = Date.now(); conferenciasJanela = 0; }
+    if (conferenciasJanela >= 40) return;
+    conferenciasJanela++;
+    avatarFalhou.delete(userId);
+    filaAvatar.push(userId);
+    bombearAvatares();
   }
 
   function esquecerAvatar(userId, url) {
@@ -867,6 +902,10 @@
     };
     if (o.completo) base.feed = feed(o.limiteFeed || 250);
     else base.feedNovos = feedDesde(o.desde || 0);
+    // fotos de quem está na tela: as conferidas há mais de 12h são buscadas de novo
+    base.ranking.slice(0, 40).forEach((r) => conferirFoto(r.id));
+    base.compradores.slice(0, 20).forEach((c) => conferirFoto(c.id));
+    (base.feed || base.feedNovos || []).slice(-30).forEach((e) => conferirFoto(e.userId));
     return base;
   }
 
