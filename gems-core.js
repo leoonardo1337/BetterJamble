@@ -678,6 +678,15 @@
   // ganhar no sorteio de gemas não tira ninguém do sorteio de compradores.
   const chaveGanhou = (tipo, id) => (tipo === 'compradores' ? 'c:' : '') + id;
 
+  // Ganhou no outro tipo de sorteio? Pelo id e, por garantia, pelo @: o id de
+  // quem manda gema e o de quem compra vêm de respostas diferentes da Jamble.
+  function ganhouNoOutro(tipo, r) {
+    const outro = tipo === 'compradores' ? 'gemas' : 'compradores';
+    if (jaGanharam.has(chaveGanhou(outro, r.id))) return true;
+    const u = String(r.usuario || '').toLowerCase();
+    return !!u && historico.some((h) => h.tipo === outro && String(h.usuario || '').toLowerCase() === u);
+  }
+
   function participantes(op) {
     const o = op || {};
     const modo = o.modo === 'pessoa' ? 'pessoa' : 'peso';
@@ -691,6 +700,8 @@
     return base
       .filter((r) => !marcados.has(r.id))
       .filter((r) => !o.semRepetir || !jaGanharam.has(chaveGanhou(tipo, r.id)))
+      // quem ganhou no outro tipo (gemas <-> compradores) fica de fora
+      .filter((r) => !o.entreTipos || !ganhouNoOutro(tipo, r))
       .map((r) => ({ ...r, bilhetes: modo === 'peso' ? Math.max(1, peso(r)) : 1 }));
   }
 
@@ -735,6 +746,23 @@
   // ---------------------------------------------------------------- snapshot
   // Pacote que o transporte manda para o painel. `completo` troca tudo;
   // sem ele vêm só os envios novos (`feedNovos`) para acrescentar no fim.
+  // Insights da tela Ao vivo: sempre só a live aberta e sem o filtro de gema,
+  // independente do escopo e do filtro escolhidos no Ranking/Sorteio.
+  function vivo() {
+    const f = filtro;
+    filtro = '';
+    try {
+      return {
+        totais: totais('live'),
+        ranking: ranking('live'),
+        catalogo: catalogo('live'),
+        tempos: feed(250, 'live').map((e) => e.t),
+      };
+    } finally {
+      filtro = f;
+    }
+  }
+
   function estado(op) {
     const o = op || {};
     const h = live();
@@ -750,6 +778,7 @@
       ranking: ranking(),
       compradores: compradores(),
       totais: totais(),
+      vivo: vivo(),
       livesDoVendedor: livesDoVendedor(),
       historico: historico.slice(),
       // por tipo de sorteio (ver chaveGanhou)

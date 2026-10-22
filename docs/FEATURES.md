@@ -182,6 +182,14 @@ olhos independentes, e o Ranking só obedece ao dele.
 Mais a opção **não repetir quem já ganhou**, que tira da urna quem está em
 `jaGanharam`, e um histórico dos últimos vencedores.
 
+**Não repetir entre gemas e compras** (terceira opção, embaixo de "confirmar
+presença"): quem ganhou no sorteio de gemas fica fora do de compradores, e
+vice-versa — independente de "não repetir quem já ganhou", que vale dentro do
+mesmo tipo. A comparação é pelo id e também pelo @, porque o id de quem manda
+gema e o de quem compra vêm de respostas diferentes da Jamble
+(`ganhouNoOutro` em `gems-core.js`, `entreTipos` no pedido `sortear`; salva em
+`bj-sorteio-entre-tipos`).
+
 **Confirmação de presença.** Com "exigir presença" ligado, o palco mostra
 "Aguardando presença no chat…" embaixo do vencedor e, em cima disso, dois
 badges: **Já sorteado** (amarelo — a pessoa já ganhou com outra conta) e
@@ -378,3 +386,12 @@ canto inferior direito (classe `bj-solta`) em vez de sumir.
 | Escopo e filtro de gema | memória | nada |
 | Histórico do sorteio / quem já ganhou | memória | nada |
 | `seq` dos envios | memória (reatribuído na carga) | nada |
+
+## Insights da tela Ao vivo (3.10.0)
+
+Os indicadores (gemas, envios, vendido, compradores, tickets) e as leituras
+dos Insights são **sempre só da live aberta e sem filtro de gema**, qualquer
+que seja o escopo ("Todas as lives") ou o filtro escolhido no Ranking/Sorteio.
+O snapshot traz um bloco `vivo` (`totais`, `ranking`, `catalogo` e os
+horários do feed, calculados com escopo `live` e filtro desligado) só para
+eles. Ranking, Sorteio e o feed de envios continuam seguindo escopo e filtro.

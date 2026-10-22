@@ -119,7 +119,7 @@
         if (api) api.definirFiltro(p.iconeId || '');
         break;
       case 'sortear':
-        if (api) enviar('painel-sorteio', api.sortear({ modo: p.modo, semRepetir: !!p.semRepetir, escopo: p.escopo, tipo: p.tipo }));
+        if (api) enviar('painel-sorteio', api.sortear({ modo: p.modo, semRepetir: !!p.semRepetir, entreTipos: !!p.entreTipos, escopo: p.escopo, tipo: p.tipo }));
         break;
       // A tela de sorteio mostra a urna (quem está dentro e com que chance)
       // ANTES de clicar, e o escopo do sorteio é independente do escopo do

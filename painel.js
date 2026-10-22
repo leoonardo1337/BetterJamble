@@ -73,7 +73,11 @@
   // anim: 'subida' (nomes subindo + pouso do vencedor) ou 'feixes' (a original,
   // versão antiga está no commit c8fa2b9, em backup/sorteio-feixes-v1). Fica salva só neste navegador.
   // tipo: 'gemas' (quem mandou gema) ou 'compradores' (quem comprou nesta live)
-  const sorteio = { tipo: 'gemas', escopo: 'live', modo: 'peso', semRepetir: false, anim: lerAnim(), presenca: lerPresenca() };
+  const sorteio = {
+    tipo: 'gemas', escopo: 'live', modo: 'peso', semRepetir: false, anim: lerAnim(), presenca: lerPresenca(),
+    // quem ganhou num tipo (gemas/compradores) fica fora do outro
+    entreTipos: (() => { try { return localStorage.getItem('bj-sorteio-entre-tipos') === '1'; } catch { return false; } })(),
+  };
   const deCompradores = () => sorteio.tipo === 'compradores';
   function lerPresenca() {
     try { return localStorage.getItem('bj-sorteio-presenca') === '1'; } catch { return false; }
@@ -445,12 +449,19 @@
   }
 
   // ============================================================ TELA AO VIVO
+  // Os Insights são sempre só da live aberta, sem filtro de gema: o escopo e
+  // o filtro escolhidos no Ranking/Sorteio não valem aqui. Vem pronto da aba
+  // (`vivo`); sem ele (aba com versão antiga), cai no que o snapshot tiver.
+  function dadosDaLive() {
+    const d = dados || {};
+    return d.vivo || { totais: d.totais || {}, ranking: d.ranking || [], catalogo: d.catalogo || [], tempos: (d.feed || []).map((e) => e.t) };
+  }
+
   function desenharVivo() {
     const d = dados;
-    const t = d.totais || {};
-    const vendedor = d.escopo === 'vendedor';
+    const t = dadosDaLive().totais || {};
 
-    // ---- 5 indicadores (gemas e envios seguem o escopo; vendas são só da live aberta)
+    // ---- 5 indicadores, todos da live aberta
     numero($('iGemas'), t.gemas);
     numero($('iEnvios'), t.envios);
     numero($('iVendido'), t.vendasValor, brl);
@@ -473,10 +484,10 @@
     numero($('iCompradores'), t.compradores);
     numero($('iTicketCliente'), t.compradores ? t.vendasValor / t.compradores : 0, brl);
     numero($('iTicketVenda'), t.vendasCount ? t.vendasValor / t.vendasCount : 0, brl);
-    $('rGemas').textContent = vendedor ? 'gemas em ' + nf(t.livesNoEscopo) + ' ' + plural(t.livesNoEscopo, 'live', 'lives') : 'gemas';
+    $('rGemas').textContent = 'gemas';
     $('rEnvios').textContent = 'envios';
-    $('rVendido').textContent = vendedor ? 'vendido nesta live' : 'vendido';
-    $('rCompradores').textContent = vendedor ? 'compradores únicos nesta live' : 'compradores únicos';
+    $('rVendido').textContent = 'vendido';
+    $('rCompradores').textContent = 'compradores únicos';
     $('rTicketVenda').textContent = 'ticket médio por venda'
       + (t.vendasCount ? ' · ' + nf(t.vendasCount) + ' ' + plural(t.vendasCount, 'venda', 'vendas') : '');
 
@@ -500,12 +511,13 @@
     // ---- pódio + lista
     desenharRanking();
 
-    // ---- feed
+    // ---- feed (esse segue o escopo e o filtro do Ranking)
+    const tEsc = d.totais || {};
     const envios = (d.feed || []).length;
-    if (!modoViewers) $('tagFeed').textContent = vendedor ? nf(t.livesNoEscopo) + ' lives' : 'esta live';
+    if (!modoViewers) $('tagFeed').textContent = d.escopo === 'vendedor' ? nf(tEsc.livesNoEscopo) + ' lives' : 'esta live';
     limpar($('subFeed')).append(frase(
       ['span', nf(envios) + ' ' + plural(envios, 'envio', 'envios')],
-      [null, ' · ' + nf(t.gemas) + ' 💎' + (d.filtro ? ' · só ' + (d.nomeDoFiltro || d.filtro) : '')],
+      [null, ' · ' + nf(tEsc.gemas) + ' 💎' + (d.filtro ? ' · só ' + (d.nomeDoFiltro || d.filtro) : '')],
     ));
     $('subFeed').firstChild.className = 'forte';
     desenharFeed();
@@ -517,7 +529,7 @@
       [null, ' · ' + brl(t.vendasValor) + ' · ' + nf(t.vendasCount) + ' ' + plural(t.vendasCount, 'compra', 'compras')],
     ));
     $('subCompradores').firstChild.className = 'forte';
-    $('notaCompradores').hidden = !vendedor;
+    $('notaCompradores').hidden = true;   // os Insights são sempre da live aberta: o aviso não se aplica
 
     const lista = limpar($('compradores'));
     if (!cp.length) {
@@ -539,9 +551,11 @@
     const d = dados;
     if (!d) return;
     const alvo = limpar($('leituras'));
-    const t = d.totais || {};
-    const rank = d.ranking || [];
-    const envios = d.feed || [];
+    // só a live aberta, sem filtro (ver dadosDaLive)
+    const v = dadosDaLive();
+    const t = v.totais || {};
+    const rank = v.ranking || [];
+    const tempos = v.tempos || [];
     const compradores = d.compradores || [];
     const linhas = [];
 
@@ -567,7 +581,7 @@
     }
 
     // Gema que mais rendeu: envios x preço de cada tipo.
-    const porTipo = (d.catalogo || []).filter((c) => c.envios > 0)
+    const porTipo = (v.catalogo || []).filter((c) => c.envios > 0)
       .map((c) => ({ nome: c.nome, total: c.envios * c.preco, envios: c.envios }))
       .sort((a, b) => b.total - a.total);
     if (porTipo.length) {
@@ -580,10 +594,10 @@
     }
 
     // Ritmo: o feed guarda o horário de cada envio.
-    if (envios.length > 1) {
+    if (tempos.length > 1) {
       const agora = Date.now();
-      const ultimos = envios.filter((e) => agora - e.t < 300000);
-      const janela = Math.max(1, Math.min(5, Math.round((agora - envios[0].t) / 60000)));
+      const ultimos = tempos.filter((tt) => agora - tt < 300000);
+      const janela = Math.max(1, Math.min(5, Math.round((agora - tempos[0]) / 60000)));
       linhas.push([nf(ultimos.length), [
         [null, ultimos.length
           ? 'envios nos últimos ' + janela + ' ' + plural(janela, 'minuto', 'minutos') + '. '
@@ -1560,6 +1574,7 @@
       + (sorteio.semRepetir && fora ? ' (' + nf(fora) + ' ' + plural(fora, 'fora', 'fora') + ')' : '');
     $('semRepetir').checked = sorteio.semRepetir;
     $('exigirPresenca').checked = sorteio.presenca;
+    $('entreTipos').checked = sorteio.entreTipos;
 
     desenharUrna(urna);
     $('btnSortear').disabled = girando || !urna || !urna.lista.length;
@@ -1606,9 +1621,16 @@
     // marcado como "já sorteado" ou "ausente" sai sempre (a aba faz o mesmo)
     const tipo = comp ? 'compradores' : 'gemas';
     (historico || []).forEach((h) => { if (h.motivo && (h.tipo || 'gemas') === tipo) ganhadores.add(h.id); });
+    // "não repetir entre gemas e compras": quem ganhou no outro tipo, pelo id
+    // ou pelo @ (os ids das duas listas vêm de respostas diferentes da Jamble)
+    const nomesOutro = new Set();
+    if (sorteio.entreTipos) {
+      ((comp ? dados.jaGanharam : dados.jaGanharamCompradores) || []).forEach((id) => ganhadores.add(id));
+      (historico || []).forEach((h) => { if ((h.tipo || 'gemas') !== tipo) nomesOutro.add(String(h.usuario || '').toLowerCase()); });
+    }
     const dentro = [];
     const fora = [];
-    base.forEach((r) => (ganhadores.has(r.id) ? fora : dentro).push(r));
+    base.forEach((r) => (ganhadores.has(r.id) || nomesOutro.has(String(r.usuario || '').toLowerCase()) ? fora : dentro).push(r));
     const lista = dentro
       .map((r) => Object.assign({}, r, { bilhetes: sorteio.modo === 'peso' ? Math.max(1, comp ? r.compras : r.gemas) : 1 }))
       .sort((a, b) => b.bilhetes - a.bilhetes || b.envios - a.envios);
@@ -2932,6 +2954,11 @@
     timerAudResize = setTimeout(() => { if (paneAtivo === 'insights') desenharAudiencia(); }, 150);
   });
 
+  $('entreTipos').onchange = (e) => {
+    sorteio.entreTipos = !!e.target.checked;
+    try { localStorage.setItem('bj-sorteio-entre-tipos', sorteio.entreTipos ? '1' : '0'); } catch {}
+    desenharSorteio();
+  };
   $('exigirPresenca').onchange = (e) => {
     sorteio.presenca = !!e.target.checked;
     try { localStorage.setItem('bj-sorteio-presenca', sorteio.presenca ? '1' : '0'); } catch {}
@@ -2950,6 +2977,7 @@
       tipo: sorteio.tipo,
       modo: sorteio.modo,
       semRepetir: sorteio.semRepetir,
+      entreTipos: sorteio.entreTipos,
       escopo: sorteio.escopo,
     });
     // Se a aba não responder, o botão não pode ficar preso. Se respondeu, a

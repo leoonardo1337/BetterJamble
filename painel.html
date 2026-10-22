@@ -657,7 +657,7 @@
   .menu-gemas .sep{height:1px;background:var(--bj-borda2);margin:4px 2px}
   /* as duas opções do sorteio como cards, empilhadas na coluna do botão:
      juntas têm a altura dos cards ao lado */
-  .sel-toggles{grid-area:bt;display:grid;grid-template-rows:1fr 1fr;gap:8px;min-width:0}
+  .sel-toggles{grid-area:bt;display:grid;grid-auto-rows:1fr;gap:6px;min-width:0}
   .sel-toggle{
     display:flex;align-items:center;gap:9px;min-width:0;padding:8px 11px;border-radius:12px;cursor:pointer;
     border:1px solid var(--bj-borda);background:var(--bj-fundo3);
@@ -1117,6 +1117,7 @@
                 <div class="sel-toggles">
                   <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span id="rotSemRepetir">não repetir quem já ganhou</span></label>
                   <label class="sel-toggle"><input type="checkbox" id="exigirPresenca"><span>confirmar presença no chat</span></label>
+                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span>não repetir entre gemas e compras</span></label>
                 </div>
               </div>
 
