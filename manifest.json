@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterJamble",
-  "version": "3.11.1",
+  "version": "3.11.2",
   "description": "Exporta pedidos da Jamble, mostra o total vendido nas lives e abre um painel com ranking de gemas, compradores e sorteio.",
   "content_scripts": [
     {
