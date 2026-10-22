@@ -149,9 +149,13 @@ extensão não guarda histórico de vendas de vendedores.
 
 ## 4b. Ranking: gemas ou compradores (3.9.0)
 
-O topo da aba Ranking tem dois grupos de cards no mesmo padrão do sorteio:
-**Ranking de** (Gemas · Compradores) e, embaixo, **Somando** (Nesta live ·
-Todas as lives — o escopo, que vale para os dois tipos). O card Compradores tem
+O topo da aba Ranking usa as mesmas classes dos seletores do sorteio
+(`sorteio-conf`, `sel-linha sem-botao`, `op sel`): uma linha com dois grupos
+separados por divisória — **Ranking** (Gemas · Compradores) e **Somando**
+(Nesta live · Todas as lives — o escopo, que vale para os dois tipos). Sem a
+coluna do botão, a linha só empilha abaixo de 620 px. Em cima, um título no
+formato do sorteio diz o que está na tela ("Ranking de gemas · nesta live")
+e leva o olho. O card Compradores tem
 um seletor **Valor total / Compras totais** que define a ordem e o número
 grande de cada linha. Os compradores desta live vêm do snapshot; os de todas as
 lives são pedidos à aba (`participantes` com `tipo: 'compradores'`, a mesma
