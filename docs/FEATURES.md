@@ -182,8 +182,8 @@ olhos independentes, e o Ranking só obedece ao dele.
 Mais a opção **Não repetir quem já ganhou**, que tira da urna quem está em
 `jaGanharam`, e um histórico dos últimos vencedores.
 
-**Não repetir entre gemas e compras** (terceira opção, embaixo de "Confirmar
-presença no chat"): quem ganhou no sorteio de gemas fica fora do de compradores, e
+**Não repetir ganhadores entre gemas e compradores** (terceira opção, ao lado
+de "Confirmar presença no chat"): quem ganhou no sorteio de gemas fica fora do de compradores, e
 vice-versa — independente de "não repetir quem já ganhou", que vale dentro do
 mesmo tipo. A comparação é pelo id e também pelo @, porque o id de quem manda
 gema e o de quem compra vêm de respostas diferentes da Jamble

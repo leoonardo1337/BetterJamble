@@ -1621,7 +1621,7 @@
     // marcado como "já sorteado" ou "ausente" sai sempre (a aba faz o mesmo)
     const tipo = comp ? 'compradores' : 'gemas';
     (historico || []).forEach((h) => { if (h.motivo && (h.tipo || 'gemas') === tipo) ganhadores.add(h.id); });
-    // "não repetir entre gemas e compras": quem ganhou no outro tipo, pelo id
+    // "Não repetir ganhadores entre gemas e compradores": quem ganhou no outro tipo, pelo id
     // ou pelo @ (os ids das duas listas vêm de respostas diferentes da Jamble)
     const nomesOutro = new Set();
     if (sorteio.entreTipos) {
