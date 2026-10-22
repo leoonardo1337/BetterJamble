@@ -147,6 +147,27 @@ extensão não guarda histórico de vendas de vendedores.
 
 ---
 
+## 4b. Ranking: gemas ou compradores (3.9.0)
+
+O topo da aba Ranking tem dois grupos de cards no mesmo padrão do sorteio:
+**Ranking de** (Gemas · Compradores) e, embaixo, **Somando** (Nesta live ·
+Todas as lives — o escopo, que vale para os dois tipos). O card Compradores tem
+um seletor **Valor total / Compras totais** que define a ordem e o número
+grande de cada linha. Os compradores desta live vêm do snapshot; os de todas as
+lives são pedidos à aba (`participantes` com `tipo: 'compradores'`, a mesma
+lista da urna). As fichas de gema só aparecem no ranking de gemas.
+
+O **olho** ao lado de "Ranking de" deixa só o ranking na tela: esconde os
+seletores, as fichas e o texto de quantas lives foram acompanhadas, e mostra
+uma linha com o que está valendo. No ranking de compradores ele também troca
+valores e quantidades por `***`; no de gemas os números continuam. Tipo,
+métrica e olho ficam salvos no navegador (`bj-rk-tipo`, `bj-rk-metrica`,
+`bj-rk-oculto`).
+
+O olho do menu do card (modo privado, que borra e troca números por `***`)
+**não vale para a aba Ranking** e some enquanto ela está aberta: são dois
+olhos independentes, e o Ranking só obedece ao dele.
+
 ## 5. Sorteio
 
 **O que faz.** Sorteia entre quem mandou gema. Dois modos:

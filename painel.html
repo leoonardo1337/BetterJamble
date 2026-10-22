@@ -336,6 +336,15 @@
   .op .txt{min-width:0}
   .op .txt small{display:block;font-weight:400;font-size:11px;color:var(--bj-texto3);margin-top:1px}
   .op[aria-checked="true"] .txt small{color:var(--bj-texto2)}
+  /* Ranking: cabeçalho com o olho + seletores no mesmo padrão do sorteio */
+  .rk-topo{display:flex;align-items:center;gap:10px;margin-top:12px;min-height:30px}
+  .rk-resumo{flex:1;min-width:0;font-size:12px;color:var(--bj-texto3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rk-olho{margin-left:auto}
+  .rk-conf{container-type:inline-size;margin-top:9px}
+  .rk-rot2{margin-top:14px;margin-bottom:9px}
+  .rk-resumo{visibility:hidden}
+  #pane-ranking.rk-oculto .rk-resumo{visibility:visible}
+  #pane-ranking.rk-oculto .rk-conf,#pane-ranking.rk-oculto .fichas{display:none}
   .escopo-ctx{margin:8px 0 0;font-size:11px;line-height:1.55;color:var(--bj-texto3)}
   .escopo-ctx b{color:var(--bj-texto2)}
 
@@ -516,6 +525,8 @@
      topo e a parte de "Audiência" para baixo tem o próprio olho. Por isso,
      ali, o borrão vai nos filhos do painel, e não no painel inteiro. */
   .card.privado > #pane-insights{filter:none}
+  /* o Ranking tem o próprio olho (só o ranking na tela): o do menu não mexe nele */
+  .card.privado > #pane-ranking{filter:none}
   .card.privado > #pane-insights > :not(.secao-priv){filter:blur(7px)}
   #pane-insights > *, .secao-priv > *{transition:filter .2s ease}
   .secao-priv{display:flex;flex-direction:column;min-height:0}
@@ -1006,20 +1017,48 @@
 
           <!-- ............................................... RANKING -->
           <div class="pane" id="pane-ranking" role="tabpanel">
-            <div class="escopo">
-            <div class="escopo-rot">Somando</div>
-            <div class="opcoes" id="opcoesEscopo" role="radiogroup" aria-label="O que somar no ranking">
-            <button class="op" type="button" role="radio" data-escopo="live" aria-checked="true">
-            <span class="marca-radio"></span>
-            <span class="txt"><span class="rot">Só esta live</span><small id="subEscopoLive">a live que está aberta agora</small></span>
-            </button>
-            <button class="op" type="button" role="radio" data-escopo="vendedor" aria-checked="false">
-            <span class="marca-radio"></span>
-            <span class="txt"><span class="rot" id="rotEscopoVendedor">Todas as lives</span><small id="subEscopoVendedor">Todas as lives do canal</small></span>
-            </button>
+            <!-- cabeçalho sempre visível: o olho esconde os seletores (e, no ranking
+                 de compradores, os valores) e deixa só o ranking na tela -->
+            <div class="rk-topo">
+              <div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5v1.5A3.5 3.5 0 0 0 8 11M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11"/></svg>Ranking de</div>
+              <span class="rk-resumo" id="rkResumo"></span>
+              <button class="navc-olho rk-olho" id="btnRkOlho" type="button" aria-pressed="false" title="Mostrar só o ranking">
+                <svg class="olho-aberto" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="olho-fechado" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.6c.5-.1.9-.1 1.4-.1 6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.6 6.6C3.9 8.4 2.5 12 2.5 12S6 18.5 12 18.5c1.8 0 3.3-.5 4.6-1.3"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+              </button>
             </div>
-            <p class="escopo-ctx" id="escopoCtx"></p>
+            <div class="rk-conf" id="rkConf">
+              <div class="sel-cards" id="opcoesRkTipo" role="radiogroup" aria-label="Ranking de">
+                <button class="op sel" type="button" role="radio" data-rtipo="gemas" aria-checked="true">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l4 5-9 11L3 9z"/><path d="M3 9h18M9.5 4L8 9l4 11 4-11-1.5-5"/></svg></span>
+                  <span class="txt"><span class="rot">Gemas</span><small>quem mais mandou gema</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                <!-- div e não button: tem o seletor de métrica dentro -->
+                <div class="op sel" role="radio" tabindex="0" data-rtipo="compradores" aria-checked="false">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></span>
+                  <span class="txt"><span class="rot">Compradores</span><small>quem mais comprou</small>
+                    <button class="filtro-gema" id="rkMetrica" type="button" aria-haspopup="listbox" aria-expanded="false" title="Ordenar compradores por"></button>
+                  </span>
+                  <span class="marca-radio"></span>
+                </div>
+              </div>
+              <div class="sel-rot rk-rot2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Somando</div>
+              <div class="sel-cards" id="opcoesEscopo" role="radiogroup" aria-label="O que somar no ranking">
+                <button class="op sel" type="button" role="radio" data-escopo="live" aria-checked="true">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
+                  <span class="txt"><span class="rot">Nesta live</span><small id="subEscopoLive">só a live aberta agora</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                <button class="op sel" type="button" role="radio" data-escopo="vendedor" aria-checked="false">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+                  <span class="txt"><span class="rot" id="rotEscopoVendedor">Todas as lives</span><small id="subEscopoVendedor">Todas as lives do canal</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+              </div>
+              <p class="escopo-ctx" id="escopoCtx"></p>
             </div>
+            <div class="menu-gemas" id="menuRkMetrica" role="listbox" aria-label="Ordenar compradores por" hidden></div>
 
             <div class="fichas" id="fichas"></div>
             <div class="regua"></div>

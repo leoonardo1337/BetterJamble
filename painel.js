@@ -102,6 +102,17 @@
   function lerAnim() {
     try { return localStorage.getItem('bj-anim-sorteio') === 'feixes' ? 'feixes' : 'subida'; } catch { return 'subida'; }
   }
+  // Ranking: de gemas ou de compradores (ordenado por valor ou por compras) e
+  // o olho que deixa só o ranking na tela (e, em compradores, esconde os valores).
+  const lerLS = (k, ok, padrao) => { try { const v = localStorage.getItem(k); return ok.indexOf(v) >= 0 ? v : padrao; } catch { return padrao; } };
+  const salvarLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  let rkTipo = lerLS('bj-rk-tipo', ['gemas', 'compradores'], 'gemas');
+  let rkMetrica = lerLS('bj-rk-metrica', ['valor', 'compras'], 'valor');
+  let rkOculto = lerLS('bj-rk-oculto', ['1', '0'], '0') === '1';
+  const METRICAS = { valor: 'Valor total', compras: 'Compras totais' };
+  let rkCompradoresCanal = null;   // compradores de todas as lives (pedidos à aba)
+  let rkCanalVelho = true;
+  let rkCanalPedidoEm = 0;
   let urnaRemota = null;        // {escopo, lista} quando o escopo do sorteio é outro
   let urnaVelha = false;        // chegou gema nova depois da última lista pedida
   let urnaPedidaEm = 0;
@@ -162,8 +173,17 @@
         break;
       case 'painel-urna':
         if (payload && payload.escopo) {
-          urnaRemota = { escopo: payload.escopo, tipo: payload.tipo || 'gemas', lista: payload.lista || [] };
-          urnaVelha = false;
+          const tipo = payload.tipo || 'gemas';
+          // a mesma resposta serve ao ranking de compradores do canal
+          if (tipo === 'compradores' && payload.escopo === 'vendedor') {
+            rkCompradoresCanal = payload.lista || [];
+            rkCanalVelho = false;
+            if (rkTipo === 'compradores' && dados) desenharRanking();
+          }
+          if (payload.escopo === sorteio.escopo && tipo === sorteio.tipo) {
+            urnaRemota = { escopo: payload.escopo, tipo, lista: payload.lista || [] };
+            urnaVelha = false;
+          }
         }
         desenharSorteio();
         break;
@@ -196,6 +216,7 @@
     // urna que veio por fora passa a ser velha (mas continua na tela até a
     // nova chegar, para não piscar).
     urnaVelha = true;
+    rkCanalVelho = true;
     if (p.completo || !dados) {
       dados = Object.assign({}, p, { feed: p.feed || [] });
       reconstruirFeed = true;
@@ -465,14 +486,17 @@
     });
     // Quantas lives entram e de quem fica no texto logo abaixo (escopoCtx).
     $('rotEscopoVendedor').textContent = 'Todas as lives';
-    $('subEscopoVendedor').textContent = 'Todas as lives do canal';
+    const desdeRk = registroMaisAntigo(rkTipo === 'compradores');
+    $('subEscopoVendedor').textContent = 'Todas as lives do canal' + (desdeRk ? ' desde ' + dataLonga(desdeRk) : '');
     $('escopoCtx').textContent = textoDoEscopo();
+    desenharSeletoresRanking();
 
-    // ---- filtro: faixa de fichas (7.6: sem catálogo, sem faixa)
+    // ---- filtro: faixa de fichas (7.6: sem catálogo, sem faixa); só no de gemas
     desenharFichas();
+    if (rkTipo === 'compradores') $('fichas').hidden = true;
 
     const tag = $('tagRanking');
-    tag.hidden = !d.filtro;
+    tag.hidden = !d.filtro || rkTipo === 'compradores';
     if (d.filtro) tag.textContent = 'só ' + (d.nomeDoFiltro || d.filtro);
 
     // ---- pódio + lista
@@ -1040,34 +1064,102 @@
     return l;
   }
 
+  // Seletores do ranking (tipo, métrica, escopo) e o olho.
+  function desenharSeletoresRanking() {
+    const comp = rkTipo === 'compradores';
+    document.querySelectorAll('[data-rtipo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.rtipo === rkTipo ? 'true' : 'false'));
+    const m = limpar($('rkMetrica'));
+    m.appendChild(el('span', 'nome-g', METRICAS[rkMetrica]));
+    m.appendChild(el('span', 'seta', '▾'));
+    $('subEscopoLive').textContent = 'só a live aberta agora';
+    $('pane-ranking').classList.toggle('rk-oculto', rkOculto);
+    const olho = $('btnRkOlho');
+    olho.setAttribute('aria-pressed', rkOculto ? 'true' : 'false');
+    olho.title = rkOculto
+      ? 'Mostrar os seletores' + (comp ? ' e os valores' : '')
+      : 'Mostrar só o ranking' + (comp ? ' e esconder os valores' : '');
+    // com os seletores escondidos, uma linha diz o que está na tela
+    $('rkResumo').textContent = (comp ? 'Compradores · ' + METRICAS[rkMetrica].toLowerCase() : 'Gemas')
+      + ' · ' + ((dados && dados.escopo) === 'vendedor' ? 'todas as lives' : 'nesta live');
+  }
+
+  // Compradores do escopo do ranking, já ordenados pela métrica. Os de todas
+  // as lives vêm da aba (a mesma lista que a urna de compradores usa).
+  function rankingCompradores() {
+    const d = dados;
+    let base;
+    if (d.escopo === 'vendedor') {
+      if ((!rkCompradoresCanal || rkCanalVelho) && Date.now() - rkCanalPedidoEm > 2000) {
+        rkCanalPedidoEm = Date.now();
+        mandar('participantes', { escopo: 'vendedor', tipo: 'compradores' });
+      }
+      if (!rkCompradoresCanal) return null;
+      base = rkCompradoresCanal;
+    } else {
+      base = d.compradores || [];
+    }
+    const [a, b] = rkMetrica === 'compras' ? ['compras', 'valor'] : ['valor', 'compras'];
+    return base.slice().sort((x, y) => (y[a] || 0) - (x[a] || 0) || (y[b] || 0) - (x[b] || 0));
+  }
+
+  // Como cada tipo de ranking se escreve: valor grande, unidade e detalhe.
+  // Compradores com o olho fechado: valores viram ***.
+  function formatoRanking() {
+    const vendedor = dados.escopo === 'vendedor';
+    const lives = (r) => (vendedor && r.lives ? ' · ' + nf(r.lives) + ' ' + plural(r.lives, 'live', 'lives') : '');
+    if (rkTipo !== 'compradores') {
+      return {
+        num: (r) => r.gemas || 0,
+        valor: (r) => nf(r.gemas),
+        unidade: '💎',
+        det: (r) => nf(r.envios) + ' ' + plural(r.envios, 'envio', 'envios') + lives(r),
+        aria: (r) => nf(r.gemas) + ' gemas',
+      };
+    }
+    const oculto = rkOculto;
+    const porValor = rkMetrica === 'valor';
+    const compras = (r) => nf(r.compras) + ' ' + plural(r.compras, 'compra', 'compras');
+    return {
+      num: (r) => (porValor ? r.valor : r.compras) || 0,
+      valor: (r) => (oculto ? '***' : porValor ? brl(r.valor) : nf(r.compras)),
+      unidade: porValor ? '' : '🛍',
+      det: (r) => (oculto ? '***' : porValor ? compras(r) : brl(r.valor)) + lives(r),
+      aria: (r) => (oculto ? 'valor escondido' : porValor ? brl(r.valor) : compras(r)),
+    };
+  }
+
   function desenharRanking() {
     const d = dados;
-    const rk = d.ranking || [];
+    const comp = rkTipo === 'compradores';
+    const rk = comp ? rankingCompradores() : (d.ranking || []);
     const podio = $('podio');
     const alvo = limpar($('ranking'));
     const btnMais = $('maisRanking');
 
-    if (!rk.length) {
+    if (!rk || !rk.length) {
       podio.hidden = true;
       limpar(podio);
+      assinaturaPodio = '';
       btnMais.hidden = true;
-      alvo.appendChild(vazioRanking());
+      alvo.appendChild(!comp ? vazioRanking()
+        : !rk ? vazioSimples('Buscando os compradores das lives salvas…')
+          : vazioSimples(d.escopo === 'vendedor'
+            ? 'Nenhuma compra salva ainda nas lives deste canal.'
+            : 'Ninguém comprou nesta live ainda.'));
       return;
     }
 
+    const f = formatoRanking();
     // O pódio só nasce com 3 pessoas: com 1 ou 2 ele parece defeito.
     const temPodio = rk.length >= 3;
     podio.hidden = !temPodio;
-    if (temPodio) desenharPodio(rk);
-    else limpar(podio);
+    if (temPodio) desenharPodio(rk, f);
+    else { limpar(podio); assinaturaPodio = ''; }
 
     const inicio = temPodio ? 3 : 0;
     const resto = rk.slice(inicio);
-    const vendedor = d.escopo === 'vendedor';
     resto.slice(0, limiteRanking).forEach((r, i) => {
-      const det = nf(r.envios) + ' ' + plural(r.envios, 'envio', 'envios')
-        + (vendedor ? ' · ' + nf(r.lives) + ' ' + plural(r.lives, 'live', 'lives') : '');
-      alvo.appendChild(linhaPessoa(inicio + i + 1, r, det, nf(r.gemas), '💎'));
+      alvo.appendChild(linhaPessoa(inicio + i + 1, r, f.det(r), f.valor(r), f.unidade));
     });
 
     const faltam = resto.length - limiteRanking;
@@ -1076,28 +1168,28 @@
   }
 
   let assinaturaPodio = '';
-  function desenharPodio(rk) {
+  function desenharPodio(rk, f) {
     const topo = rk.slice(0, 3);
-    const assinatura = topo.map((r) => r.id + ':' + r.gemas).join('|');
+    const assinatura = rkTipo + rkMetrica + (rkOculto ? 'o' : '') + (dados.escopo || '') + '|'
+      + topo.map((r) => r.id + ':' + f.num(r) + ':' + f.det(r)).join('|');
     const igual = assinatura === assinaturaPodio;
     assinaturaPodio = assinatura;
     if (igual) return;              // sem reanimar a entrada a cada delta
 
     const podio = limpar($('podio'));
-    const max = Math.max(...topo.map((r) => r.gemas || 0), 1);
+    const max = Math.max(...topo.map((r) => f.num(r)), 1);
     const medalhas = ['👑', '🥈', '🥉'];
     [1, 0, 2].forEach((idx) => {
       const r = topo[idx];
       const g = el('div', 'degrau p' + (idx + 1));
-      g.setAttribute('aria-label', (idx + 1) + 'º lugar: @' + r.usuario + ', ' + nf(r.gemas) + ' gemas');
+      g.setAttribute('aria-label', (idx + 1) + 'º lugar: @' + r.usuario + ', ' + f.aria(r));
       g.appendChild(el('div', 'medalha', medalhas[idx]));
       g.appendChild(avatar(r.avatar, r.usuario, r.id, idx === 0 ? 'av-g' : 'av-m'));
       g.appendChild(el('div', 'quem', '@' + r.usuario));
-      g.appendChild(el('div', 'gem', nf(r.gemas)));
-      g.appendChild(el('div', 'det', nf(r.envios) + ' ' + plural(r.envios, 'envio', 'envios')
-        + (dados.escopo === 'vendedor' ? ' · ' + nf(r.lives) + ' ' + plural(r.lives, 'live', 'lives') : '')));
+      g.appendChild(el('div', 'gem', f.valor(r)));
+      g.appendChild(el('div', 'det', f.det(r)));
       const pedestal = el('div', 'pedestal', String(idx + 1) + 'º');
-      pedestal.style.height = Math.round(18 + 34 * ((r.gemas || 0) / max)) + 'px';
+      pedestal.style.height = Math.round(18 + 34 * (f.num(r) / max)) + 'px';
       g.appendChild(pedestal);
       podio.appendChild(g);
     });
@@ -1279,14 +1371,15 @@
   //
   // São duas áreas, cada uma com seu olho: A = o card inteiro (o olho do
   // menu), menos a parte de "Audiência" dos Insights para baixo, que é a B
-  // (olho no título dela).
+  // (olho no título dela). A aba Ranking fica fora das duas: ela tem o olho
+  // dela (btnRkOlho), e o do menu nem aparece enquanto ela está aberta.
   const NUMERO = /\d[\d.,:%]*/g;
   const textosOriginais = new WeakMap();   // nó de texto -> {orig, masc}
   const lerLigado = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
   let privado = lerLigado('bj-privado');      // área A
   let privadoB = lerLigado('bj-privado-b');   // área B
   const naAreaB = (n) => $('secaoAudiencia').contains(n);
-  const naAreaA = (n) => $('cardRanking').contains(n) && !$('menuCard').contains(n) && !naAreaB(n);
+  const naAreaA = (n) => $('cardRanking').contains(n) && !$('menuCard').contains(n) && !naAreaB(n) && !$('pane-ranking').contains(n);
   const escondido = (n) => (privado && naAreaA(n)) || (privadoB && naAreaB(n));
 
   function mascararTexto(n) {
@@ -1343,6 +1436,7 @@
     aplicarPrivado();
   };
   if (privado || privadoB) aplicarPrivado();
+  $('btnPrivado').hidden = true;   // o painel abre na aba Ranking, que tem o olho dela
 
   // ------------------------------------------------- feed de espectadores
   // Nos Insights o card do feed troca de assunto: em vez dos envios de gema,
@@ -2599,6 +2693,7 @@
       const p = $('pane-' + n);
       if (p) p.hidden = n !== nome;
     });
+    $('btnPrivado').hidden = nome === 'ranking';
     moverFundoDoMenu(true);
     // O sorteio precisa de largura (palco, urna, dois grupos de opções lado a
     // lado); o feed cede espaço enquanto essa aba estiver aberta.
@@ -2632,6 +2727,90 @@
   document.querySelectorAll('[data-escopo]').forEach((b) => {
     b.onclick = () => { assinaturaPodio = ''; mandar('escopo', { escopo: b.dataset.escopo }); };
   });
+
+  // ---- ranking: tipo, métrica dos compradores e o olho
+  function redesenharRanking() {
+    if (!dados) return;
+    limiteRanking = PASSO_RANKING;
+    desenharSeletoresRanking();
+    desenharFichas();
+    if (rkTipo === 'compradores') $('fichas').hidden = true;
+    $('tagRanking').hidden = !dados.filtro || rkTipo === 'compradores';
+    desenharRanking();
+  }
+  function trocarTipoRanking(tipo) {
+    if (rkTipo === tipo) return;
+    rkTipo = tipo;
+    salvarLS('bj-rk-tipo', tipo);
+    assinaturaFichas = '';   // as fichas voltam ao trocar para gemas
+    redesenharRanking();
+  }
+  document.querySelectorAll('[data-rtipo]').forEach((b) => {
+    b.onclick = () => trocarTipoRanking(b.dataset.rtipo);
+    // o card de Compradores é um div (tem o seletor dentro): teclado como num botão
+    b.onkeydown = (e) => {
+      if (e.target !== b || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      b.click();
+    };
+  });
+  $('btnRkOlho').onclick = () => {
+    rkOculto = !rkOculto;
+    salvarLS('bj-rk-oculto', rkOculto ? '1' : '0');
+    redesenharRanking();
+  };
+
+  // menu "Valor total / Compras totais", no mesmo formato do filtro de gema
+  const menuMetrica = $('menuRkMetrica');
+  document.body.appendChild(menuMetrica);
+  function fecharMenuMetrica() {
+    menuMetrica.hidden = true;
+    $('rkMetrica').setAttribute('aria-expanded', 'false');
+  }
+  function abrirMenuMetrica() {
+    limpar(menuMetrica);
+    Object.entries(METRICAS).forEach(([k, nome]) => {
+      const o = el('button');
+      o.type = 'button';
+      o.setAttribute('role', 'option');
+      o.setAttribute('aria-selected', rkMetrica === k ? 'true' : 'false');
+      o.appendChild(el('span', 'emj', k === 'valor' ? 'R$' : '🛍'));
+      o.appendChild(el('span', 'nome-g', nome));
+      o.appendChild(el('span', 'info-g', k === 'valor' ? 'soma do que cada um pagou' : 'quantas compras cada um fez'));
+      o.onclick = (e) => {
+        e.stopPropagation();
+        fecharMenuMetrica();
+        rkMetrica = k;
+        salvarLS('bj-rk-metrica', k);
+        rkTipo = 'compradores';
+        salvarLS('bj-rk-tipo', rkTipo);
+        redesenharRanking();
+      };
+      menuMetrica.appendChild(o);
+    });
+    const r = $('rkMetrica').getBoundingClientRect();
+    const larg = Math.max(r.width, 260);
+    menuMetrica.style.width = larg + 'px';
+    menuMetrica.style.left = Math.min(r.left, window.innerWidth - larg - 8) + 'px';
+    menuMetrica.hidden = false;
+    const cabeAbaixo = window.innerHeight - r.bottom - 8 >= menuMetrica.scrollHeight;
+    menuMetrica.style.top = (cabeAbaixo ? r.bottom + 4 : Math.max(8, r.top - menuMetrica.offsetHeight - 4)) + 'px';
+    $('rkMetrica').setAttribute('aria-expanded', 'true');
+  }
+  $('rkMetrica').onclick = (e) => {
+    e.stopPropagation();   // não conta como clique no card
+    if (!menuMetrica.hidden) { fecharMenuMetrica(); return; }
+    trocarTipoRanking('compradores');
+    abrirMenuMetrica();
+  };
+  $('rkMetrica').onkeydown = (e) => e.stopPropagation();
+  document.addEventListener('mousedown', (e) => {
+    if (menuMetrica.hidden || menuMetrica.contains(e.target) || $('rkMetrica').contains(e.target)) return;
+    fecharMenuMetrica();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMenuMetrica(); });
+  window.addEventListener('resize', fecharMenuMetrica);
+  document.addEventListener('scroll', (e) => { if (!menuMetrica.contains(e.target)) fecharMenuMetrica(); }, true);
 
   document.querySelectorAll('[data-sesc]').forEach((b) => {
     b.onclick = () => {
