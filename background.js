@@ -107,7 +107,7 @@ async function abrirPainel() {
 }
 
 // ---------------------------------------------------------------- mensagens da página
-chrome.runtime.onMessage.addListener((msg, sender) => {
+chrome.runtime.onMessage.addListener((msg, sender, responder) => {
   if (!msg) return;
 
   // Atalho antigo: abrir uma página da extensão numa aba.
@@ -151,7 +151,10 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     return;
   }
 
-  if (msg.type === 'bj-abrir-painel') { abrirPainel(); return; }
+  // Responde na hora: o bridge pede com callback e, sem resposta, o Chrome
+  // entrega "The message port closed before a response was received" — que o
+  // botão da página lia como "extensão recarregada" e virava ↻ a cada clique.
+  if (msg.type === 'bj-abrir-painel') { abrirPainel(); responder({ ok: true }); return; }
 
   if (msg.type === 'bj-pagina-pronta') {
     // A aba de origem (re)carregou: o painel precisa se reatar. Outra aba

@@ -317,6 +317,13 @@
       presente(sh, x.id, { u: x.username, a: x.avatarUrl, r: x.role || null }, t, silencioso);
     });
     if (silencioso) evento(sh, { t, tipo: 'inicio', n: lista.filter((x) => x.role !== 'host').length });
+    // a lista traz a foto atual de cada um: o gems-core atualiza o cache de
+    // fotos com ela (ranking, feed e sorteio passam a mostrar a foto nova)
+    try {
+      window.dispatchEvent(new CustomEvent('bj:fotos', {
+        detail: { fotos: lista.filter((x) => x.avatarUrl).map((x) => ({ id: x.id, url: x.avatarUrl })) },
+      }));
+    } catch {}
     if (completa) {
       Object.entries(sh.pessoas).forEach(([id, p]) => {
         const ultima = p.s[p.s.length - 1];

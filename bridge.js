@@ -64,7 +64,14 @@
       try {
         if (!chrome.runtime || !chrome.runtime.id) { falhou('orfao'); return; }
         chrome.runtime.sendMessage({ type: 'bj-abrir-painel', payload: msg.payload || null }, () => {
-          if (chrome.runtime.lastError) falhou('orfao');
+          const erro = chrome.runtime.lastError;
+          if (!erro) return;
+          // "port closed" = o background recebeu e só não respondeu: não é falha.
+          // Órfão de verdade é "context invalidated" (extensão recarregada) ou
+          // ninguém do outro lado ("Receiving end does not exist").
+          const texto = String(erro.message || '');
+          if (/port closed/i.test(texto)) return;
+          falhou('orfao');
         });
       } catch { falhou('orfao'); }
       return;

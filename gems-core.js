@@ -110,6 +110,21 @@
 
   const salvarAvatares = () => { try { localStorage.setItem(LS_AVATARES, JSON.stringify(avatares)); } catch {} };
 
+  // Foto de perfil vista agora (gema, chat, compra, lista de espectadores):
+  // vira a foto da pessoa no cache. Antes o cache guardava a primeira foto
+  // resolvida para sempre e ela tinha prioridade sobre a dos eventos — quem
+  // trocava de foto continuava com a antiga (o endereço velho ainda existe no
+  // CDN, então nunca dava erro para forçar a renovação).
+  let timerFotos = 0;
+  function fotoNova(userId, url) {
+    url = foto(url);
+    if (!userId || !url || avatares[userId] === url) return;
+    avatares[userId] = url;
+    avatarFalhou.delete(userId);
+    clearTimeout(timerFotos);
+    timerFotos = setTimeout(() => { salvarAvatares(); avisar('avatar'); }, 1000);
+  }
+
   // ---------------------------------------------------------------- auth / fetch
   const fetchOriginal = window.fetch;
 
@@ -377,8 +392,9 @@
         chatVisto.add(m.id);
         if (chatVisto.size > 2000) chatVisto.delete(chatVisto.values().next().value);
       }
-      if (historico) continue;
       const p = m.sender_profile || {};
+      fotoNova(m.sender_id || p.id, avatarDoEvento(p, m.sender_id || p.id));
+      if (historico) continue;
       novas.push({
         id: m.id || '',
         userId: m.sender_id || p.id || '',
@@ -430,7 +446,7 @@
       const u = show.users[userId] || (show.users[userId] = { u: p.username || userId, n: 0, g: 0, icons: {}, last: 0 });
       if (p.username) u.u = p.username;
       const av = avatarDoEvento(p, userId);
-      if (av) u.a = av;
+      if (av) { u.a = av; fotoNova(userId, av); }
       u.n++;
       u.g += valor;
       u.icons[icone] = (u.icons[icone] || 0) + 1;
@@ -607,7 +623,10 @@
     });
     if (!show.seller || show.seller === '?') show.seller = h.sellerSlug;
     show.buyers = {};
-    d.lista.forEach((c) => { show.buyers[c.id] = { u: c.u, a: c.a || '', n: Number(c.n) || 0, v: Number(c.v) || 0 }; });
+    d.lista.forEach((c) => {
+      show.buyers[c.id] = { u: c.u, a: c.a || '', n: Number(c.n) || 0, v: Number(c.v) || 0 };
+      fotoNova(c.id, c.a);   // a lista de vendidos traz a foto atual de quem comprou
+    });
     salvar();
   }
 
@@ -877,6 +896,11 @@
   });
   window.addEventListener('popstate', () => { aoNavegar(); setTimeout(aoNavegar, 0); });
   window.addEventListener('jamble:compradores', () => { guardarCompradores(); avisar('compradores'); });
+  // fotos atuais vindas da lista de espectadores (audiencia.js)
+  window.addEventListener('bj:fotos', (ev) => {
+    const lista = ev && ev.detail && ev.detail.fotos;
+    if (Array.isArray(lista)) lista.forEach((f) => f && fotoNova(f.id, f.url));
+  });
 
   // Rede de segurança: a navegação da Jamble é SPA e nem sempre passa pelos ganchos.
   setInterval(() => { aoNavegar(); garantirCatalogo(); atualizarRanking(); }, 1500);
