@@ -71,7 +71,7 @@
   const PASSO_RANKING = 10;
 
   // anim: 'subida' (nomes subindo + pouso do vencedor) ou 'feixes' (a original,
-  // guardada em backup/sorteio-feixes-v1). Fica salva só neste navegador.
+  // versão antiga está no commit c8fa2b9, em backup/sorteio-feixes-v1). Fica salva só neste navegador.
   // tipo: 'gemas' (quem mandou gema) ou 'compradores' (quem comprou nesta live)
   const sorteio = { tipo: 'gemas', escopo: 'live', modo: 'peso', semRepetir: false, anim: lerAnim(), presenca: lerPresenca() };
   const deCompradores = () => sorteio.tipo === 'compradores';
