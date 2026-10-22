@@ -162,8 +162,7 @@ lives são pedidos à aba (`participantes` com `tipo: 'compradores'`, a mesma
 lista da urna). As fichas de gema só aparecem no ranking de gemas.
 
 O **olho** ao lado de "Ranking de" deixa só o ranking na tela: esconde os
-seletores, as fichas e o texto de quantas lives foram acompanhadas, e mostra
-uma linha com o que está valendo. No ranking de compradores ele também troca
+seletores e as fichas, e deixa o título com o que está valendo. No ranking de compradores ele também troca
 valores e quantidades por `***`; no de gemas os números continuam. Tipo,
 métrica e olho ficam salvos no navegador (`bj-rk-tipo`, `bj-rk-metrica`,
 `bj-rk-oculto`).

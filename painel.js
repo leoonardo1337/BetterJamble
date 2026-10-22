@@ -484,11 +484,9 @@
     document.querySelectorAll('[data-escopo]').forEach((b) => {
       b.setAttribute('aria-checked', b.dataset.escopo === d.escopo ? 'true' : 'false');
     });
-    // Quantas lives entram e de quem fica no texto logo abaixo (escopoCtx).
     $('rotEscopoVendedor').textContent = 'Todas as lives';
     const desdeRk = registroMaisAntigo(rkTipo === 'compradores');
     $('subEscopoVendedor').textContent = 'Todas as lives do canal' + (desdeRk ? ' desde ' + dataLonga(desdeRk) : '');
-    $('escopoCtx').textContent = textoDoEscopo();
     desenharSeletoresRanking();
 
     // ---- filtro: faixa de fichas (7.6: sem catálogo, sem faixa); só no de gemas
@@ -972,19 +970,6 @@
       if (!p.chat && !p.gemas && p.ms >= 10 * 60000) q.appendChild(el('span', 'calado', 'calado'));
       lista.appendChild(l);
     });
-  }
-
-  function textoDoEscopo() {
-    const d = dados;
-    const lives = d.livesDoVendedor || [];
-    if (!lives.length) return 'A Jamble não dá histórico: só entra o que acontece com a aba da live aberta.';
-    const inicio = Math.min(...lives.map((l) => l.inicio || l.fim || Date.now()).filter(Boolean));
-    const fim = Math.max(...lives.map((l) => l.fim || l.inicio || 0));
-    const periodo = soDia(inicio) === soDia(fim) ? 'no dia ' + diaMes(fim) : 'de ' + diaMes(inicio) + ' a ' + diaMes(fim);
-    const quantas = lives.length > 1
-      ? nf(lives.length) + ' lives de ' + vendedorArroba() + ' acompanhadas com a extensão, ' + periodo + '. '
-      : '1 live de ' + vendedorArroba() + ' acompanhada com a extensão, ' + periodo + '. ';
-    return quantas + 'A Jamble não dá histórico: só entra o que aconteceu com a aba aberta.';
   }
 
   // ------------------------------------------------------------- fichas
@@ -1552,9 +1537,6 @@
     document.querySelectorAll('[data-sesc]').forEach((b) => b.setAttribute('aria-checked', b.dataset.sesc === sorteio.escopo ? 'true' : 'false'));
     document.querySelectorAll('[data-modo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.modo === sorteio.modo ? 'true' : 'false'));
     document.querySelectorAll('[data-anim]').forEach((b) => b.setAttribute('aria-checked', b.dataset.anim === sorteio.anim ? 'true' : 'false'));
-    $('tituloSorteio').textContent = comp
-      ? (sorteio.escopo === 'vendedor' ? 'Sortear entre quem comprou no canal' : 'Sortear entre quem comprou nesta live')
-      : 'Sortear entre quem mandou gema';
     $('rotSorteioLive').textContent = 'Nesta live';
     $('rotSorteioVendedor').textContent = 'Todas as lives';
     const desde = registroMaisAntigo(comp);
@@ -1745,7 +1727,7 @@
     $('palco').classList.remove('com-presenca');
     preCarregarFotos([r.vencedor].concat(r.participantes || []));
     const pronto = () => { pintarResultado(ultimoResultado); desenharSorteio(); };
-    if (sorteio.anim === 'feixes') girar(r.participantes || [], pronto);
+    if (sorteio.anim === 'feixes') girar(r.participantes || [], r.vencedor, pronto);
     else girarSubida(r.participantes || [], r.vencedor, pronto);
   }
 
@@ -1953,7 +1935,12 @@
   }
 
   // Giro: 5s de palco. É desenho — o vencedor já veio pronto do gems-core.
-  function girar(participantes, pronto) {
+  function girar(todos, vencedor, pronto) {
+    // O letreiro desacelera e para no último nome: esse nome tem que ser o
+    // vencedor, senão parece que ia ser um e foi outro. A ordem é a urna
+    // embaralhada com o vencedor no fim.
+    const outros = todos.filter((x) => !vencedor || x.id !== vencedor.id);
+    const participantes = embaralhar(outros.slice()).concat(vencedor ? [vencedor] : []);
     const nomes = participantes.map((p) => '@' + p.usuario);
     const fim = () => {
       girando = false;
@@ -1978,7 +1965,7 @@
       fonte: getComputedStyle(document.body).fontFamily || 'sans-serif',
       mostrado: -1,
       // urna pequena dá mais de uma volta no letreiro; a última volta sempre
-      // termina no último nome, exatamente no fim do giro
+      // termina no último nome (o vencedor), exatamente no fim do giro
       passos: nomes.length * Math.max(1, Math.ceil(30 / nomes.length)),
       voando: fila.map((txt, i) => {
         const prof = Math.random();
@@ -2022,8 +2009,8 @@
         p.ctx = m.ctx; p.l = m.l; p.a = m.a;
       }
 
-      // O letreiro passa por TODOS os nomes da urna, na ordem dela, e o
-      // vencedor só aparece depois do "N de N". A posição sai do relógio (e não
+      // O letreiro passa por TODOS os nomes da urna, numa ordem embaralhada
+      // que termina no vencedor: o "N de N" é ele. A posição sai do relógio (e não
       // de um nome por quadro): assim urna de centenas cabe nos 5s sem a rede
       // de segurança revelar no meio da volta. Começa rápido e desacelera.
       // O vencedor não sai daqui: ele já veio sorteado pelo gems-core.
