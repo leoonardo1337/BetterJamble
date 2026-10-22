@@ -597,15 +597,30 @@
   .sel-rot svg,.sel-ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .sel-rot svg .ch,.sel-ico svg .ch{fill:currentColor;stroke:none}
   .sel-cards{display:grid;grid-template-columns:1fr 1fr;gap:9px;min-width:0}
+  /* ícone, título e marcador na primeira linha; a descrição (e o filtro de
+     gema) ocupa a largura toda embaixo. Antes ela ficava espremida na coluna do
+     título e, em tela de notebook, virava uma tira de 3–4 linhas com o card
+     cheio de espaço vazio. */
   .op.sel{
-    display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:11px;align-items:start;
-    padding:13px 13px 14px;border-radius:13px;min-height:96px;font-size:13.5px;line-height:1.3;
+    display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:10px;align-items:center;align-content:start;
+    padding:12px 13px 13px;border-radius:13px;font-size:13.5px;line-height:1.3;
   }
+  .op.sel .txt{display:contents}
+  .op.sel .txt small,.op.sel .filtro-gema{grid-column:1 / -1}
+  .op.sel .sel-ico{grid-area:1 / 1}
+  .op.sel .marca-radio{grid-area:1 / 3}
   .op.sel .sel-ico{color:var(--bj-texto3);display:flex;margin-top:1px;transition:color .14s}
   .op.sel .sel-ico svg{width:21px;height:21px}
   .op.sel[aria-checked="true"] .sel-ico,.op.sel:hover .sel-ico{color:var(--bj-texto)}
   .op.sel .txt .rot{display:block;font-weight:700}
-  .op.sel .txt small{font-size:11.5px;line-height:1.4;margin-top:6px}
+  .op.sel .txt small{font-size:11.5px;line-height:1.4;margin-top:7px}
+  .op.sel .txt .rot{grid-area:1 / 2;min-width:0}
+  /* notebook (card de ~180px): sem o ícone, o título cabe numa linha só */
+  @container (min-width:861px) and (max-width:1100px){
+    .op.sel{column-gap:8px;padding:11px 12px 12px}
+    .op.sel .sel-ico{display:none}
+    .op.sel .txt .rot{grid-column:1 / 3}
+  }
   .op.sel .marca-radio{width:18px;height:18px;border-width:2px;margin-top:0}
   .op.sel[aria-checked="true"] .marca-radio{background:var(--bj-claro)}
   .op.sel[aria-checked="true"] .marca-radio::after{width:7px;height:7px;background:var(--bj-sobreClaro)}
@@ -1023,12 +1038,12 @@
                 <div class="sel-cards sel-cards-a" id="opcoesSorteioEscopo" role="radiogroup" aria-label="Entre quem sortear">
                 <button class="op sel" type="button" role="radio" data-sesc="live" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioLive">Quem mandou nesta live</span><small id="subSorteioLive">só a live aberta agora</small></span>
+                  <span class="txt"><span class="rot" id="rotSorteioLive">Nesta live</span><small id="subSorteioLive">só a live aberta agora</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-sesc="vendedor" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioVendedor">Quem mandou em qualquer live</span><small id="subSorteioVendedor">Todas as lives do canal</small></span>
+                  <span class="txt"><span class="rot" id="rotSorteioVendedor">Todas as lives</span><small id="subSorteioVendedor">Todas as lives do canal</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 </div>
@@ -1037,7 +1052,7 @@
                 <div class="sel-cards sel-cards-b" id="opcoesModo" role="radiogroup" aria-label="Como calcular a chance">
                 <button class="op sel" type="button" role="radio" data-modo="peso" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="4" rx="1.5"/><rect x="13" y="10" width="7" height="10" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade de gemas</span><small id="subModoPeso">cada gema vale uma chance</small></span>
+                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade</span><small id="subModoPeso">cada gema vale uma chance</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-modo="pessoa" aria-checked="false">
@@ -1077,7 +1092,7 @@
                 <div class="sel-cards sel-cards-b" id="opcoesAnim" role="radiogroup" aria-label="Animação do sorteio">
                 <button class="op sel" type="button" role="radio" data-anim="subida" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></span>
-                  <span class="txt"><span class="rot">Nomes subindo</span><small>5s de nomes e o vencedor pousa no meio</small></span>
+                  <span class="txt"><span class="rot">Subida</span><small>5s de nomes e o vencedor pousa no meio</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-anim="feixes" aria-checked="false">

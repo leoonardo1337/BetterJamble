@@ -1460,11 +1460,11 @@
     $('tituloSorteio').textContent = comp
       ? (sorteio.escopo === 'vendedor' ? 'Sortear entre quem comprou no canal' : 'Sortear entre quem comprou nesta live')
       : 'Sortear entre quem mandou gema';
-    $('rotSorteioLive').textContent = comp ? 'Quem comprou nesta live' : 'Quem mandou nesta live';
-    $('rotSorteioVendedor').textContent = comp ? 'Quem comprou em qualquer live' : 'Quem mandou em qualquer live';
+    $('rotSorteioLive').textContent = 'Nesta live';
+    $('rotSorteioVendedor').textContent = 'Todas as lives';
     const desde = registroMaisAntigo(comp);
     $('subSorteioVendedor').textContent = 'Todas as lives do canal' + (desde ? ' desde ' + dataLonga(desde) : '');
-    $('rotModoPeso').textContent = comp ? 'Por quantidade de compras' : 'Por quantidade de gemas';
+    $('rotModoPeso').textContent = 'Por quantidade';
     $('subModoPeso').textContent = comp ? 'cada compra vale uma chance' : 'cada gema vale uma chance';
 
     // O filtro de gema é herdado da tela "Ao vivo" e tem que aparecer por extenso:
