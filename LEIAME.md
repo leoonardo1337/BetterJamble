@@ -36,7 +36,7 @@ Passando o mouse, mostra o resumo da live; clicando, abre o painel numa
 - **Ao vivo** — dois cards lado a lado: à esquerda um card com menu próprio
   (Ranking · Sorteio · Insights) e à direita o feed de envios estilo console
   (mais novo embaixo, rolagem presa no fim), sempre visível;
-- **Lives do vendedor** — a lista das lives daquele vendedor que você acompanhou
+- **Resumo das Lives** — a lista das lives daquele vendedor que você acompanhou
   com a extensão, que é o que o escopo "todas as lives" soma.
 
 Dentro do card da esquerda:

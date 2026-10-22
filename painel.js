@@ -7,7 +7,7 @@
 // O que NÃO se mexe: `ligar()`, `aplicar()` e `absorver()` são a cola com o
 // protocolo (docs/HANDOFF.md, seção 4). Todo o resto é desenho.
 //
-// Mapa: docs/PAINEL.md — três telas (Ao vivo, Sorteio, Lives do vendedor),
+// Mapa: docs/PAINEL.md — três telas (Ao vivo, Sorteio, Resumo das Lives),
 // escopo e filtro morando dentro do card de ranking, seis estados vazios.
 // ============================================================================
 (() => {
@@ -425,7 +425,6 @@
     if (d.live) {
       desenharVivo();
       desenharSorteio();
-      desenharLives();
     }
   }
 
@@ -1243,18 +1242,12 @@
     nota.appendChild(txt);
     v.appendChild(nota);
 
-    // Os atalhos só aparecem se houver conteúdo de verdade.
-    const anteriores = (d.livesDoVendedor || []).filter((l) => !l.atual).length;
+    // O atalho só aparece se houver conteúdo de verdade. (O das lives
+    // anteriores saiu junto com a tela Resumo das Lives, que está em breve.)
     const compradores = (d.compradores || []).length;
-    if (anteriores || compradores) {
+    if (compradores) {
       const atalhos = el('div', 'atalhos');
-      if (anteriores) {
-        const b = el('button', 'btn', 'ver as ' + nf(anteriores) + ' ' + plural(anteriores, 'live anterior', 'lives anteriores') + ' de ' + vendedorArroba());
-        b.type = 'button';
-        b.onclick = () => trocarTela('lives');
-        atalhos.appendChild(b);
-      }
-      if (compradores) {
+      {
         const b = el('button', 'btn', 'ver os compradores desta live (' + nf(compradores) + ')');
         b.type = 'button';
         b.onclick = () => trocarPane('insights');
@@ -2601,74 +2594,8 @@
     desenharSorteio();
   }
 
-  // ====================================================== TELA LIVES DO VENDEDOR
-  function desenharLives() {
-    const d = dados;
-    const lives = d.livesDoVendedor || [];
-    const alvo = limpar($('corpoLives'));
-    $('tituloLives').textContent = 'As lives de ' + vendedorArroba() + ' que você acompanhou';
-
-    const gemas = lives.reduce((a, l) => a + (l.gemas || 0), 0);
-    const envios = lives.reduce((a, l) => a + (l.envios || 0), 0);
-    const sub = limpar($('subLives'));
-    sub.append(frase(
-      ['span', nf(lives.length) + ' ' + plural(lives.length, 'live', 'lives')],
-      [null, ' · ' + nf(gemas) + ' gemas · ' + nf(envios) + ' envios'
-        + (d.escopo === 'vendedor' ? ' · ' + nf((d.totais || {}).pessoas) + ' pessoas diferentes' : '')],
-    ));
-    sub.firstChild.className = 'forte';
-
-    // Com uma live só (primeiro uso), uma tabela de uma linha não ensina nada.
-    if (lives.length <= 1) {
-      const v = el('div', 'vazio');
-      v.appendChild(el('div', 'emj-g', '📅'));
-      v.appendChild(el('div', 'tit', 'Esta é a primeira live de ' + vendedorArroba() + ' que você acompanha.'));
-      v.appendChild(el('div', 'txt', 'A partir de agora, cada live que você assistir com a extensão entra nesta lista e passa a somar no escopo “todas as lives”.'));
-      alvo.appendChild(v);
-      return;
-    }
-
-    const tabela = el('table', 'tabela');
-    const thead = el('thead');
-    const tr = el('tr');
-    ['Quando', 'Duração', 'Pessoas', 'Envios', 'Gemas', 'Feed'].forEach((h) => tr.appendChild(el('th', null, h)));
-    thead.appendChild(tr);
-    tabela.appendChild(thead);
-
-    const tbody = el('tbody');
-    lives.forEach((l) => {
-      const linha = el('tr', l.atual ? 'agora' : '');
-      const q = el('td');
-      q.appendChild(document.createTextNode(quando(l.inicio || l.fim)));
-      if (l.atual) q.appendChild(el('span', 'selo', 'AGORA'));
-      linha.appendChild(q);
-      linha.appendChild(el('td', 'n', duracao((l.atual ? Date.now() : l.fim) - (l.inicio || l.fim))));
-      linha.appendChild(el('td', 'n', nf(l.pessoas)));
-      linha.appendChild(el('td', 'n', nf(l.envios)));
-      linha.appendChild(el('td', 'n', nf(l.gemas)));
-      const f = el('td');
-      if (l.temFeed) f.appendChild(el('span', null, '✓'));
-      else f.appendChild(el('span', 'fraco', '—  só totais'));
-      linha.appendChild(f);
-      tbody.appendChild(linha);
-    });
-    tabela.appendChild(tbody);
-    alvo.appendChild(tabela);
-
-    const rodape = el('div', 'rodape-lives');
-    if (d.escopo === 'vendedor') {
-      const b = el('button', 'btn', 'voltar a somar só esta live → Ao vivo');
-      b.type = 'button';
-      b.onclick = () => { mandar('escopo', { escopo: 'live' }); trocarTela('vivo'); };
-      rodape.appendChild(b);
-    } else {
-      const b = el('button', 'btn btn-claro', 'somar todas no ranking → Ao vivo');
-      b.type = 'button';
-      b.onclick = () => { mandar('escopo', { escopo: 'vendedor' }); trocarTela('vivo'); };
-      rodape.appendChild(b);
-    }
-    alvo.appendChild(rodape);
-  }
+  // ============================================================ RESUMO DAS LIVES
+  // A tela ainda não tem conteúdo: mostra só o aviso "Em breve" do HTML.
 
   // =============================================================== navegação
   function trocarTela(nome) {

@@ -414,3 +414,12 @@ partir dela). Cada linha tem um **×** que tira a pessoa da lista
 (`removerGanhador`, mensagem `remover-ganhador`): ela volta para a urna. "limpar
 lista" continua zerando tudo do canal. Ganhadores de outros dias mostram a
 data junto da hora.
+
+## Tela "Resumo das Lives" (3.11.1)
+
+A antiga aba **Lives do vendedor** virou **Resumo das Lives** e, por enquanto,
+mostra só um aviso de "Em breve" (arte em SVG inline, sem conteúdo). A tabela
+das lives acompanhadas (`desenharLives`) e o atalho "ver as N lives
+anteriores" do estado vazio do ranking saíram. Os dados por live
+(`livesDoVendedor`) continuam vindo no snapshot e seguem em uso no escopo
+"Todas as lives" e na data do card.
