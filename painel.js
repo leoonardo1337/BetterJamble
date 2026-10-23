@@ -126,6 +126,7 @@
   let girando = false;
   let esperandoSorteio = false;   // pediu à aba e a resposta ainda não chegou
   let ultimoResultado = null;
+  let liveDoPalco = null;         // showId da live a que o palco se refere
   let historico = [];
 
   const avatarPedidos = new Set();
@@ -224,6 +225,13 @@
     // nova chegar, para não piscar).
     urnaVelha = true;
     rkCanalVelho = true;
+    // Trocou de live (no mesmo canal ou em outro): o palco não pode continuar
+    // mostrando o ganhador de antes nem esperando a presença dele.
+    const novaLive = p.live && p.live.showId;
+    if (novaLive && novaLive !== liveDoPalco) {
+      if (liveDoPalco !== null && !girando) { pararPalco(); ultimoResultado = null; presenca = null; }
+      liveDoPalco = novaLive;
+    }
     if (p.completo || !dados) {
       dados = Object.assign({}, p, { feed: p.feed || [] });
       reconstruirFeed = true;
@@ -1728,12 +1736,13 @@
   }
 
   function desenharResultadoVazio() {
-    // A lista é guardada: depois de recarregar, o palco volta com o último
-    // ganhador (e, se ainda não se resolveu, a espera pela presença).
+    // A lista é guardada por canal: depois de recarregar, o palco volta com o
+    // último ganhador (e, se ainda não se resolveu, a espera pela presença) —
+    // mas só se ele saiu nesta live. Ganhador de outra live fica só na lista.
     const h = (historico || [])[0];
-    if (h && !girando && !esperandoSorteio) { restaurarUltimo(h); return; }
+    if (h && h.showId && h.showId === liveDoPalco && !girando && !esperandoSorteio) { restaurarUltimo(h); return; }
     const alvo = limpar($('resultado'));
-    alvo.appendChild(vazioSimples('Nenhum sorteio ainda neste canal. A urna ao lado mostra quem está dentro e com que chance.'));
+    alvo.appendChild(vazioSimples('Nenhum sorteio nesta live ainda. A urna abaixo mostra quem está dentro e com que chance.'));
   }
 
   function restaurarUltimo(h) {

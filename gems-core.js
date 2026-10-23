@@ -861,8 +861,10 @@
     for (const r of lista) { n -= r.bilhetes; if (n <= 0) { vencedor = r; break; } }
     const tipo = o.tipo === 'compradores' ? 'compradores' : 'gemas';
     jaGanharam.add(chaveGanhou(tipo, vencedor.id));
+    const lv = live();
     historico.unshift({
       t: Date.now(), id: vencedor.id, usuario: vencedor.usuario,
+      showId: (lv && lv.showId) || '',   // de qual live: o palco só traz de volta o ganhador desta
       tipo,
       modo: o.modo === 'pessoa' ? 'pessoa' : 'peso',
       escopo: o.escopo || (tipo === 'compradores' ? 'live' : escopo),
