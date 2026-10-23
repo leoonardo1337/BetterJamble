@@ -2623,7 +2623,7 @@
     const caixa = limpar($('historico'));
     $('limparHistorico').hidden = !(historico || []).length;
     if (!(historico || []).length) {
-      caixa.appendChild(vazioSimples('Ninguém ganhou sorteio neste canal ainda. A lista fica guardada até você limpar.'));
+      caixa.appendChild(vazioSimples('Ninguém foi sorteado neste canal ainda. A lista fica guardada até você limpar.'));
       return;
     }
     // o histórico guarda o id da gema; quem lê quer o nome
