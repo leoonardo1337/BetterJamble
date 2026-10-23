@@ -39,12 +39,13 @@
   window.fetch = async function (input, init) {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input && input.url) || '';
     const isLive = url.includes('/api/live/');
-    let section = null, reqShow = null;
+    let section = null, reqShow = null, comCursor = false;
     if (isLive) {
       try {
         const q = new URLSearchParams(url.split('?')[1] || '');
         section = q.get('section');
         reqShow = q.get('show_id');
+        comCursor = !!(q.get('after') || q.get('cursor'));
         if (reqShow && q.get('seller_id')) sellers.set(reqShow, q.get('seller_id'));
       } catch {}
       const h = toObj(init && init.headers) || (input instanceof Request ? toObj(input.headers) : null);
@@ -59,7 +60,10 @@
           schedule(0);
         }
         // Se o próprio site buscou a aba "Vendidos", aproveitamos a resposta: zero chamada extra.
-        if (section === 'sold' && Array.isArray(j.items) && !j.hasNextPage) {
+        // Só quando ela é a lista inteira: primeira página (sem cursor) e sem próxima. A última
+        // página de uma lista paginada também vem sem próxima, mas traz só o resto das vendas;
+        // aceitá-la gravava um total menor (o site faz isso com a aba em segundo plano).
+        if (section === 'sold' && !comCursor && Array.isArray(j.items) && !j.hasNextPage) {
           vendidosChegaramEm = Date.now();
           const sum = summarize(j.items);
           store(reqShow, sum);
