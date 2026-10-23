@@ -169,7 +169,7 @@
         break;
       case 'painel-audiencia':
         audiencia = payload || null;
-        if (paneAtivo === 'insights') { desenharAudiencia(); desenharFeedViewers(); }
+        if (paneAtivo === 'insights') { desenharAudiencia(); desenharFeedViewers(); desenharLances(); }
         break;
       case 'painel-resgate':
         resgate = payload || null;
@@ -552,96 +552,69 @@
       )));
     }
 
-    // Só recalcula as leituras se elas estiverem à vista.
-    if (paneAtivo === 'insights') desenharLeituras();
   }
 
-  // ------------------------------------------------------------- leituras
-  // Insights = o que os números já dizem mas ninguém lê sozinho. Tudo sai do que
-  // já está no snapshot: nenhuma chamada nova à Jamble.
-  function desenharLeituras() {
-    const d = dados;
-    if (!d) return;
-    const alvo = limpar($('leituras'));
-    // só a live aberta, sem filtro (ver dadosDaLive)
-    const v = dadosDaLive();
-    const t = v.totais || {};
-    const rank = v.ranking || [];
-    const tempos = v.tempos || [];
-    const compradores = d.compradores || [];
-    const linhas = [];
-
-    const total = t.gemas || 0;
-
-    if (rank.length && total) {
-      const topo = rank[0];
-      const pct = Math.round((topo.gemas / total) * 1000) / 10;
-      linhas.push([pct.toLocaleString('pt-BR') + '%', [
-        ['b', '@' + topo.usuario], [null, ' sozinho responde por essa fatia das gemas.'],
-        [null, rank.length > 2
-          ? ' O top 3 junto dá ' + Math.round((rank.slice(0, 3).reduce((a, r) => a + r.gemas, 0) / total) * 100) + '%.'
-          : ''],
-      ]]);
+  // ------------------------------------------------------- produtos e lances
+  // O mesmo card do BetterJamble Panel: qual produto puxou mais lances
+  // (somando os leilões dele) e quais leilões foram mais disputados. Vem pronto
+  // do audiencia.js (audiencia.leiloes), que lê os leilões do WebSocket.
+  let vistaLances = (() => { try { return localStorage.getItem('bj-lances-vista') === 'leilao' ? 'leilao' : 'produto'; } catch { return 'produto'; } })();
+  function desenharLances() {
+    const L = (audiencia && audiencia.leiloes) || { produtos: [], leiloes: [], total: 0, lances: 0 };
+    $('tagLances').textContent = nf(L.total) + ' ' + plural(L.total, 'leilão', 'leilões') + ' · ' + nf(L.lances) + ' lances';
+    document.querySelectorAll('[data-vista-lances]').forEach((b) => b.setAttribute('aria-checked', b.dataset.vistaLances === vistaLances ? 'true' : 'false'));
+    const topo = L.produtos[0];
+    const dest = limpar($('destaqueLance'));
+    dest.hidden = !topo;
+    if (topo) {
+      dest.append(frase(
+        [null, 'O produto com mais lances foi '], ['b', topo.titulo || 'sem título'],
+        [null, ': ' + nf(topo.lances) + ' ' + plural(topo.lances, 'lance', 'lances')
+          + (topo.leiloes > 1 ? ' em ' + nf(topo.leiloes) + ' leilões' : '')
+          + (topo.media != null ? ', saindo em média por ' + brl(topo.media) : '') + '.'],
+      ));
     }
-
-    if (t.pessoas) {
-      linhas.push([nf(Math.round(total / t.pessoas)), [
-        [null, 'é a média de gemas por pessoa. '],
-        ['b', nf(t.pessoas) + ' ' + plural(t.pessoas, 'pessoa mandou', 'pessoas mandaram')],
-        [null, ' até agora, em ' + nf(t.envios) + ' ' + plural(t.envios, 'envio', 'envios') + '.'],
-      ]]);
-    }
-
-    // Gema que mais rendeu: envios x preço de cada tipo.
-    const porTipo = (v.catalogo || []).filter((c) => c.envios > 0)
-      .map((c) => ({ nome: c.nome, total: c.envios * c.preco, envios: c.envios }))
-      .sort((a, b) => b.total - a.total);
-    if (porTipo.length) {
-      const g = porTipo[0];
-      linhas.push([nf(g.total), [
-        [null, 'gemas vieram de '], ['b', g.nome],
-        [null, ' — ' + nf(g.envios) + ' ' + plural(g.envios, 'envio', 'envios')
-          + (porTipo.length > 1 ? ', mais que qualquer outra das ' + nf(porTipo.length) + ' usadas.' : '.')],
-      ]]);
-    }
-
-    // Ritmo: o feed guarda o horário de cada envio.
-    if (tempos.length > 1) {
-      const agora = Date.now();
-      const ultimos = tempos.filter((tt) => agora - tt < 300000);
-      const janela = Math.max(1, Math.min(5, Math.round((agora - tempos[0]) / 60000)));
-      linhas.push([nf(ultimos.length), [
-        [null, ultimos.length
-          ? 'envios nos últimos ' + janela + ' ' + plural(janela, 'minuto', 'minutos') + '. '
-          : 'envios nos últimos minutos — '],
-        ['b', ultimos.length ? 'a live está ativa agora.' : 'esfriou desde o último envio.'],
-      ]]);
-    }
-
-    // Cruzamento: quem compra também manda gema?
-    if (compradores.length && rank.length) {
-      const nomes = new Set(rank.map((r) => String(r.usuario || '').toLowerCase()));
-      const ambos = compradores.filter((c) => nomes.has(String(c.usuario || c.u || '').toLowerCase()));
-      linhas.push([nf(ambos.length) + '/' + nf(compradores.length), [
-        [null, 'dos compradores desta live também mandaram gema'],
-        [null, ambos.length ? ': ' + ambos.slice(0, 3).map((c) => '@' + (c.usuario || c.u)).join(', ') + '.' : '.'],
-      ]]);
-    }
-
-    if (!linhas.length) {
-      alvo.appendChild(vazioSimples('As leituras aparecem quando chegarem as primeiras gemas.'));
+    const alvo = limpar($('lances'));
+    const lista = vistaLances === 'produto' ? L.produtos : L.leiloes;
+    if (!lista.length) {
+      alvo.appendChild(vazioSimples('Os leilões desta live aparecem aqui assim que alguém der o primeiro lance.'));
       return;
     }
-
-    linhas.forEach(([valor, partes]) => {
-      const l = el('div', 'leitura');
-      l.appendChild(el('div', 'lv', valor));
-      const txt = el('div', 'lt');
-      txt.appendChild(frase(...partes));
-      l.appendChild(txt);
+    const maior = lista[0].lances || 1;
+    lista.forEach((x, i) => {
+      const l = el('div', 'linha linha-prod');
+      l.appendChild(el('div', 'pos', String(i + 1)));
+      const foto = el('div', 'prod-img');
+      if (x.img) {
+        const img = el('img');
+        img.src = x.img; img.alt = ''; img.loading = 'lazy'; img.width = 40; img.height = 40;
+        img.onerror = () => img.remove();
+        foto.appendChild(img);
+      }
+      l.appendChild(foto);
+      const q = el('div', 'quem');
+      q.appendChild(el('span', 'prod-nome', x.titulo || 'sem título'));
+      q.appendChild(el('span', 'prod-sub', vistaLances === 'produto'
+        ? nf(x.leiloes) + ' ' + plural(x.leiloes, 'leilão', 'leilões')
+          + (x.vendidos ? ' · média ' + brl(x.media) + (x.vendidos > 1 ? ' · maior ' + brl(x.maior) : '') : '')
+        : (x.status === 'FINISHED' ? 'saiu por ' + brl(x.final) + (x.vencedor ? ' para @' + x.vencedor : '')
+          : x.status === 'CANCELED' ? 'cancelado' : 'em andamento' + (x.final != null ? ' · ' + brl(x.final) : ''))
+          + (x.quem ? ' · ' + nf(x.quem) + ' ' + plural(x.quem, 'pessoa deu lance', 'pessoas deram lance') : '')));
+      l.appendChild(q);
+      l.appendChild(el('div', 'val', nf(x.lances) + ' ' + plural(x.lances, 'lance', 'lances')));
+      const barra = el('span', 'barra-lance');
+      barra.style.width = Math.max(3, Math.round(((x.lances || 0) / maior) * 100)) + '%';
+      l.appendChild(barra);
       alvo.appendChild(l);
     });
   }
+  document.querySelectorAll('[data-vista-lances]').forEach((b) => {
+    b.onclick = () => {
+      vistaLances = b.dataset.vistaLances;
+      try { localStorage.setItem('bj-lances-vista', vistaLances); } catch {}
+      desenharLances();
+    };
+  });
 
   // ------------------------------------------------------------- audiência
   // Vem pronto do audiencia.js (na aba da live): amostras de quantas pessoas
@@ -2752,7 +2725,7 @@
     const duas = document.querySelector('#tela-vivo .duas');
     if (duas) duas.classList.toggle('sorteio', nome === 'sorteio');
     if (nome !== 'sorteio') pararPalco();
-    if (nome === 'insights') { desenharLeituras(); desenharAudiencia(); }
+    if (nome === 'insights') { desenharLances(); desenharAudiencia(); }
     modoFeedViewers(nome === 'insights');
     if (nome === 'sorteio') desenharSorteio();
   }

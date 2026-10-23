@@ -535,16 +535,21 @@
   .pane[hidden]{display:none}
   .conf-titulo{font:600 14px/20px var(--bj-ui);color:var(--bj-texto);margin-bottom:14px;flex:none}
 
-  /* --------------------------------------------------------------- leituras */
-  .leituras{display:flex;flex-direction:column;margin-top:6px}
-  .leitura{
-    display:flex;align-items:baseline;gap:14px;padding:12px 0;min-width:0;
-    background:transparent;border:0;border-bottom:1px solid var(--bj-borda);border-radius:0;
-  }
-  .leitura:last-child{border-bottom:0}
-  .leitura .lv{font-size:20px;font-weight:600;flex:none;font-variant-numeric:tabular-nums;min-width:80px}
-  .leitura .lt{font-size:13.5px;color:var(--bj-texto2);line-height:1.5;min-width:0}
-  .leitura .lt b{color:var(--bj-texto)}
+  /* ------------------------------------------------------ produtos e lances */
+  /* como no Panel: foto do produto, nome e o resumo embaixo, lances à direita
+     e o fundo da linha é a barra (proporcional ao mais disputado) */
+  .destaque-lance{margin:4px 0 0;font-size:14px;color:var(--bj-texto2)}
+  .destaque-lance b{color:var(--bj-texto);font-weight:600}
+  .lista-lances{max-height:520px;overflow:auto;margin-top:12px}
+  .linha-prod{position:relative;overflow:hidden;min-height:52px}
+  .linha-prod > *:not(.barra-lance){position:relative;z-index:1}
+  .barra-lance{position:absolute;inset:0 auto 0 0;z-index:0;background:rgba(76,179,240,.12);border-radius:10px}
+  .prod-img{width:40px;height:40px;flex:none;border-radius:8px;overflow:hidden;background:var(--bj-borda2)}
+  .prod-img img{width:100%;height:100%;object-fit:cover;display:block}
+  .linha-prod .quem{display:flex;flex-direction:column;line-height:18px}
+  .prod-nome,.prod-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prod-sub{font-size:12px;font-weight:400;color:var(--bj-texto3)}
+  .linha-prod .val{color:var(--bj-texto2);font-size:13px}
 
   /* ------------------------------------------------------------------ sorteio */
   .card-urna{overflow:hidden}
@@ -1270,9 +1275,17 @@
 
             </div>
 
+            <!-- produtos e lances: o mesmo card do BetterJamble Panel -->
             <div class="bloco">
-            <h2>Leituras desta live</h2>
-            <div class="leituras" id="leituras"></div>
+            <h2>Produtos e lances <span class="tag" id="tagLances"></span></h2>
+            <p class="destaque-lance" id="destaqueLance" hidden></p>
+            <div class="aud-topo">
+              <div class="aud-janelas" role="radiogroup" aria-label="Ver por">
+                <button type="button" role="radio" data-vista-lances="produto" aria-checked="true">Por produto</button>
+                <button type="button" role="radio" data-vista-lances="leilao" aria-checked="false">Por leilão</button>
+              </div>
+            </div>
+            <div class="lista lista-lances" id="lances"></div>
             </div>
 
             <div class="bloco">

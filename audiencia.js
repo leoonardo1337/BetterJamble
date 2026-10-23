@@ -6,6 +6,8 @@
 //     WebSocket a cada poucos segundos);
 //   - interações por minuto: mensagens no chat, entradas ("entrou 👋"), gemas
 //     e lances — tudo do mesmo WebSocket;
+//   - leilões: produto, lances, quem deu lance, preço inicial e final (card
+//     "Produtos e lances", o mesmo do BetterJamble Panel);
 //   - quem está assistindo: a lista da aba "Espectadores" (/api/live/viewers),
 //     consultada a cada ~30s. Comparando uma consulta com a anterior sabemos
 //     quando cada pessoa entrou e saiu — é daí que sai o tempo de cada uma.
@@ -41,7 +43,7 @@
 
   // ------------------------------------------------------------ estado
   // showId -> {seller, inicio, amostras:[[t,n]], min:{minuto:[chat,gemas,entradas,lances]},
-  //            pessoas:{id:{u,a,r,s:[[ini,fim]],v,c,g}}, lanceDe:{saleId:n}}
+  //            pessoas:{id:{u,a,r,s:[[ini,fim]],v,c,g}}, lanceDe:{saleId:n}, leiloes:{saleId:{...}}}
   let db = {};
   try { db = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch { db = {}; }
 
@@ -120,7 +122,7 @@
       sock.addEventListener('message', (ev) => {
         if (typeof ev.data !== 'string') return;
         const d = ev.data;
-        if (d.indexOf('"show"') < 0 && d.indexOf('"messages"') < 0 && d.indexOf('"LIKE"') < 0 && d.indexOf('sale_entry_count') < 0) return;
+        if (d.indexOf('"show"') < 0 && d.indexOf('"messages"') < 0 && d.indexOf('"LIKE"') < 0 && d.indexOf('sale_entry_count') < 0 && d.indexOf('"sale_product"') < 0) return;
         try { ingerir(JSON.parse(d)); } catch {}
       });
     }
@@ -197,6 +199,7 @@
       salvar();
     }
 
+    if (d.sale && d.sale.id && ingerirLeilao(sh, id, d, agora)) salvar();
     // lances: a Jamble manda o total do leilão; contamos a diferença
     if (d.sale && d.sale.id && typeof d.sale_entry_count === 'number') {
       const antes = sh.lanceDe[d.sale.id] || 0;
@@ -208,6 +211,69 @@
         salvar();
       }
     }
+  }
+
+  // Leilões: cada venda chega pela conexão com o produto, o número de lances
+  // (sale_entry_count), quem deu lance (sale_entry_user_ids) e o melhor lance.
+  // O mesmo produto pode ir a leilão várias vezes (cada vez é uma venda).
+  function fotoDoProduto(prod) {
+    const im = prod && Array.isArray(prod.images) ? prod.images[0] : null;
+    if (!im) return '';
+    if (typeof im === 'string') return im;
+    const chaves = Object.keys(im).sort((a, b) => (/thumb|low|small/i.test(b) ? 1 : 0) - (/thumb|low|small/i.test(a) ? 1 : 0));
+    for (const k of chaves) if (typeof im[k] === 'string' && /^https?:/.test(im[k])) return im[k];
+    return '';
+  }
+  function ingerirLeilao(sh, showId, d, agora) {
+    const sale = d.sale;
+    if (sale.show_id && sale.show_id !== showId) return false;
+    const L = sh.leiloes || (sh.leiloes = {});
+    const x = L[sale.id] || (L[sale.id] = { titulo: '', img: '', produto: '', lances: 0, quem: 0, inicial: null, final: null, vencedor: '', status: '', em: agora });
+    const antes = JSON.stringify(x);
+    const prod = d.sale_product || {};
+    if (prod.title) x.titulo = String(prod.title);
+    const foto = fotoDoProduto(prod);
+    if (foto) x.img = foto;
+    x.produto = sale.product_id || prod.id || x.produto;
+    if (typeof d.sale_entry_count === 'number') x.lances = Math.max(x.lances, d.sale_entry_count);
+    if (Array.isArray(d.sale_entry_user_ids)) x.quem = Math.max(x.quem, new Set(d.sale_entry_user_ids).size);
+    const conf = sale.settings || prod.show_sale_settings || {};
+    if (conf.starting_price != null) x.inicial = Number(conf.starting_price);
+    const best = d.sale_best_entry;
+    if (best && best.price != null) {
+      x.final = Number(best.price);
+      if ((best.buyer_profile || {}).username) x.vencedor = best.buyer_profile.username;
+    }
+    if (sale.sold_price != null) x.final = Number(sale.sold_price);
+    if (sale.status) x.status = sale.status;
+    if (sale.is_canceled) x.status = 'CANCELED';
+    if (sale.created_at) x.em = Math.round(Number(sale.created_at) * 1000);
+    const ids = Object.keys(L);
+    if (ids.length > 300) ids.sort((a, b) => L[a].em - L[b].em).slice(0, ids.length - 300).forEach((k) => delete L[k]);
+    return JSON.stringify(x) !== antes;
+  }
+  // Ranking de produtos por lances: soma os leilões do mesmo produto
+  function resumoLeiloes(sh) {
+    const lista = Object.entries(sh.leiloes || {}).map(([id, x]) => Object.assign({ id }, x)).filter((x) => x.lances > 0 || x.status === 'FINISHED');
+    const porProduto = new Map();
+    for (const x of lista) {
+      if (!x.produto && !x.titulo) continue;   // leilão sem produto identificado não entra no ranking de produtos
+      const k = x.produto || x.titulo;
+      const p = porProduto.get(k) || { id: k, titulo: x.titulo, img: x.img, leiloes: 0, lances: 0, quem: 0, vendidos: 0, somaFinal: 0, maior: 0 };
+      p.titulo = x.titulo || p.titulo;
+      if (x.img) p.img = x.img;
+      p.leiloes++; p.lances += x.lances; p.quem += x.quem;
+      if (x.status === 'FINISHED' && x.final != null) { p.vendidos++; p.somaFinal += x.final; p.maior = Math.max(p.maior, x.final); }
+      porProduto.set(k, p);
+    }
+    const produtos = [...porProduto.values()].map((p) => Object.assign(p, { media: p.vendidos ? p.somaFinal / p.vendidos : null }))
+      .sort((a, b) => b.lances - a.lances || b.leiloes - a.leiloes);
+    return {
+      total: lista.length,
+      lances: lista.reduce((t, x) => t + x.lances, 0),
+      produtos: produtos.slice(0, 40),
+      leiloes: lista.sort((a, b) => b.lances - a.lances || (b.final || 0) - (a.final || 0)).slice(0, 40),
+    };
   }
 
   function avatarDe(p, uid) {
@@ -401,6 +467,7 @@
       minutos: min,
       pessoas,
       eventos: (sh.eventos || []).slice(-250),
+      leiloes: resumoLeiloes(sh),
       // logo depois de recarregar a aba ainda não consultou, mas os dados gravados estão em dia
       status: sh.encerradaEm ? 'encerrada'
         : fresca && (consulta.status === 'aguardando' || consulta.status === 'sem-token') ? 'ok' : consulta.status,
