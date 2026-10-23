@@ -1860,7 +1860,7 @@
       if (col) col.scrollTop = 0;
       const topoFinal = pal.getBoundingClientRect().top - alturas.conf;
       const limite = (col || card).getBoundingClientRect().bottom;
-      const livre = Math.round(limite - topoFinal - 14);
+      const livre = Math.round(limite - topoFinal - 36);   // 14 de folga + 22 do padding do card
       blocos.forEach((b) => { b.style.height = b.scrollHeight + 'px'; b.style.overflow = 'hidden'; });
       // o quadro seguinte é o que torna a transição possível: sem ele o
       // navegador junta as duas alturas num valor só e nada anima

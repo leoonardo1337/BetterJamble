@@ -509,13 +509,29 @@
      topo e a parte de "Audiência" para baixo tem o próprio olho. Por isso,
      ali, o borrão vai nos filhos do painel, e não no painel inteiro. */
   #pane-insights.privado > :not(.secao-priv){filter:blur(7px)}
-  #pane-insights > *, .secao-priv > *{transition:filter .2s ease}
-  .secao-priv{display:flex;flex-direction:column;min-height:0}
-  .secao-priv.privado > :not(.cab-priv){filter:blur(7px)}
+  #pane-insights > *, .secao-priv .bloco > *{transition:filter .2s ease}
+  .secao-priv{display:flex;flex-direction:column;gap:var(--bj-gap);min-height:0}
+  .secao-priv.privado > .bloco > :not(.cab-priv){filter:blur(7px)}
   .cab-priv{display:flex;align-items:center;gap:10px}
   .cab-priv h2{margin:0;font-size:16px}
   .cab-priv .navc-olho{margin-bottom:0}
-  .pane{display:flex;flex-direction:column;min-height:0;flex:1 0 auto;padding-top:18px}
+  .pane{display:flex;flex-direction:column;min-height:0;flex:1 0 auto}
+
+  /* Como no Panel: as abas ficam no fundo preto e o conteúdo vem em cards
+     (#111) separados por 14px. O card do Ranking e o do Sorteio são o próprio
+     painel da aba; nos Insights cada assunto é um .bloco. */
+  #cardRanking{background:transparent;padding:0;border-radius:0}
+  #cardRanking > .navc{margin:0;padding:0 var(--bj-pad)}
+  #pane-ranking,#pane-sorteio{
+    margin-top:var(--bj-gap);background:var(--bj-fundo2);border-radius:var(--bj-raio);padding:18px var(--bj-pad) var(--bj-pad);
+  }
+  #pane-insights{margin-top:var(--bj-gap);gap:var(--bj-gap)}
+  #indicadores{gap:var(--bj-gap)}
+  .bloco{background:var(--bj-fundo2);border-radius:var(--bj-raio);padding:18px var(--bj-pad) var(--bj-pad);min-width:0}
+  .indicadores.bloco{padding:18px var(--bj-pad)}
+  .bloco > h2{font-size:16px;line-height:22px;margin-bottom:6px}
+  /* o feed começa na altura do primeiro card, e não na das abas */
+  #tela-vivo .col-b{padding-top:calc(53px + var(--bj-gap))}
   .pane[hidden]{display:none}
   .conf-titulo{font:600 14px/20px var(--bj-ui);color:var(--bj-texto);margin-bottom:14px;flex:none}
 
@@ -584,14 +600,19 @@
   .op.sel .marca-radio{grid-column:2;grid-row:1;margin:0}
   .op.sel[aria-disabled="true"]{opacity:.38;cursor:not-allowed}
   /* Ranking: dois grupos lado a lado (sem divisória nem coluna de botão) */
+  /* Ranking: dois grupos lado a lado; os cards dividem as linhas do grid de
+     fora (subgrid), então o card de cima de um grupo tem a altura do de cima
+     do outro, mesmo com o seletor de métrica dentro de Compradores */
   .sel-linha.sem-botao{
-    display:grid;column-gap:18px;row-gap:0;align-items:stretch;
-    grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ra rb" "ca cb";
+    display:grid;column-gap:16px;row-gap:6px;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto;
   }
-  .sel-rot-a{grid-area:ra}
-  .sel-rot-b{grid-area:rb}
-  .sel-cards-a{grid-area:ca}
-  .sel-cards-b{grid-area:cb}
+  .sel-linha.sem-botao .sel-rot{margin-bottom:2px}
+  .sel-rot-a{grid-column:1;grid-row:1}
+  .sel-rot-b{grid-column:2;grid-row:1}
+  .sel-linha.sem-botao .sel-cards{display:grid;grid-template-rows:subgrid;grid-row:2 / span 2;gap:6px}
+  .sel-cards-a{grid-column:1}
+  .sel-cards-b{grid-column:2}
   .sel-div{display:none}
 
   /* Sorteio: 2x2 de seletores e a coluna das opções com o botão embaixo.
@@ -642,7 +663,7 @@
   }
   /* ranking em card estreito: os dois grupos empilham */
   @container (max-width:520px){
-    .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb"}
+    .sel-linha.sem-botao,.sel-linha.sem-botao .sel-cards{display:flex;flex-direction:column;gap:6px}
     .sel-linha.sem-botao .sel-rot-b{margin-top:14px}
   }
 
@@ -898,6 +919,7 @@
     .uma{height:auto;overflow:visible}
     .col-a{overflow:visible}
     .col-b{grid-template-rows:auto auto}
+    #tela-vivo .col-b{padding-top:0}
     .feed{max-height:320px;flex:none}
   }
   @media (max-width:820px){
@@ -1197,13 +1219,13 @@
           <div class="pane" id="pane-insights" role="tabpanel" hidden>
             <!-- primeira linha: gemas; segunda: vendas -->
             <div id="indicadores">
-            <div class="indicadores ind-gemas">
+            <div class="indicadores ind-gemas bloco">
             <div class="ind"><div class="ind-v" id="iGemas">0</div><span class="ind-r" id="rGemas">gemas</span></div>
             <div class="ind"><div class="ind-v" id="iEnvios">0</div><span class="ind-r" id="rEnvios">envios</span></div>
             <!-- pontos da loja no ranking mensal de vendedores da Jamble (aba "Ranking" da live) -->
             <div class="ind" id="cardPontosLoja"><div class="ind-v" id="iPontosLoja">—</div><span class="ind-r" id="rPontosLoja">Ranking geral</span></div>
             </div>
-            <div class="indicadores ind-vendas">
+            <div class="indicadores ind-vendas bloco">
             <div class="ind destaque"><div class="ind-v" id="iVendido">R$ 0,00</div><span class="ind-r" id="rVendido">vendido</span></div>
             <div class="ind"><div class="ind-v" id="iCompradores">0</div><span class="ind-r" id="rCompradores">compradores únicos</span></div>
             <div class="ind destaque"><div class="ind-v" id="iTicketCliente">R$ 0,00</div><span class="ind-r">ticket médio por cliente</span></div>
@@ -1211,9 +1233,10 @@
             </div>
             </div>
 
-            <div class="regua"></div>
-            <!-- segunda área do modo privado: tudo daqui para baixo tem o próprio olho -->
+            <!-- segunda área do modo privado: tudo daqui para baixo tem o próprio olho.
+                 Cada assunto é um card (.bloco), como no Panel -->
             <div class="secao-priv" id="secaoAudiencia">
+            <div class="bloco">
             <div class="cab-priv">
               <h2>Audiência</h2>
               <button class="navc-olho" id="btnPrivadoB" type="button" aria-pressed="false" title="Esconder números desta parte (modo privado)">
@@ -1237,24 +1260,30 @@
               <div class="aud-legenda" id="legAudiencia"></div>
               <div class="aud-svg" id="grafAudiencia"></div>
             </div>
+            </div>
             <div class="aud-dica" id="audDica" hidden></div>
 
-            <h2 class="aud-h">Quem mais ficou na live</h2>
+            <div class="bloco">
+            <h2>Quem mais ficou na live</h2>
             <div class="lista" id="audPessoas"></div>
             <p class="nota"><span class="emj">&#9432;</span><span>O tempo de cada pessoa sai da lista da aba <b>Espectadores</b>, consultada a cada ~30s com o painel aberto. Ela só mostra quem está <b>logado</b>; quem assiste sem conta entra só no número total.</span></p>
 
-            <div class="regua"></div>
+            </div>
+
+            <div class="bloco">
             <h2>Leituras desta live</h2>
             <div class="leituras" id="leituras"></div>
+            </div>
 
-            <div class="regua"></div>
+            <div class="bloco">
             <h2>Compradores desta live</h2>
             <p class="sub" id="subCompradores"></p>
             <div class="lista" id="compradores" style="overflow:auto;min-height:0;margin-top:8px;max-height:230px"></div>
             <p class="nota" id="notaCompradores" hidden>
             <span class="emj">&#9432;</span>
-            <span>Vendas existem só para a <b>live aberta</b>. A Jamble não dá histórico de vendas por live, então o que você escolheu em &ldquo;Somando&rdquo; não muda esta lista.</span>
+            <span>Vendas existem só para a <b>live aberta</b>. A Jamble não dá histórico de vendas por live, então o que você escolheu em &ldquo;Período&rdquo; não muda esta lista.</span>
             </p>
+            </div>
             </div>
           </div>
 
