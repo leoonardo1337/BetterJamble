@@ -6,11 +6,12 @@
 <title>Painel — BetterJamble</title>
 <style>
   /* ==========================================================================
-     Painel do BetterJamble.
+     Painel do BetterJamble — no visual do BetterJamble Panel (2.0).
 
-     Paleta monocromática: preto, branco e cinzas. Nada de roxo.
-     A hierarquia é feita por peso, tamanho e contraste — nunca por cor.
-     A única "cor" da interface são os emojis, e isso é de propósito.
+     Estilo true-black-flat: fundo preto, superfícies separadas só por um passo
+     de luminosidade (#000 fundo, #111 card, #1a1a1a/#222 dentro do card), sem
+     borda nem sombra em repouso. O botão principal é o branco invertido.
+     A única cor de interface é o azul da gema, e só em dado (valores, barras).
 
      Regra que não se negocia: toda superfície clara usa --bj-sobreClaro como
      cor de texto. Nunca #fff sobre fundo claro.
@@ -22,13 +23,16 @@
 
   :root{
     color-scheme:dark;
-    --bj-fundo:#0a0a0a;  --bj-fundo2:#111;    --bj-fundo3:#161616;  --bj-fundo4:#1e1e1e;
-    --bj-borda:#272727;  --bj-borda2:#343434; --bj-borda3:#454545;
-    --bj-texto:#f2f2f2;  --bj-texto2:#a0a0a0; --bj-texto3:#6e6e6e;
-    --bj-claro:#f2f2f2;  --bj-sobreClaro:#101018;
-    --bj-ui:system-ui,-apple-system,"Segoe UI",sans-serif;
-    --bj-mono:ui-monospace,SFMono-Regular,Consolas,monospace;
-    --bj-raio:14px;
+    --bj-fundo:#000;     --bj-fundo2:#111;    --bj-fundo3:#1a1a1a;  --bj-fundo4:#222;
+    --bj-borda:#1f1f1f;  --bj-borda2:#2a2a2a; --bj-borda3:#444;
+    --bj-texto:#fff;     --bj-texto2:#b4b4b4; --bj-texto3:#949494;
+    --bj-claro:#fff;     --bj-sobreClaro:#000;
+    --bj-acento:#4cb3f0;                       /* azul da gema: só em dados */
+    --bj-positivo:#3fc07a;
+    --bj-ui:"Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+    --bj-raio:20px;
+    --bj-gap:14px;       --bj-pad:22px;
+    --bj-feed:340px;                           /* largura da coluna dos feeds, igual em todas as abas */
   }
 
   *{box-sizing:border-box}
@@ -36,12 +40,13 @@
   /* Sem isto, qualquer classe com `display:` ganha do [hidden] do navegador
      e a faixa/o pódio/as fichas ficam visíveis mesmo escondidos. */
   [hidden]{display:none !important}
+  :focus-visible{outline:2px solid var(--bj-texto);outline-offset:2px;border-radius:6px}
 
   html,body{height:100%}
   body{
     margin:0;overflow:hidden;
     background:var(--bj-fundo);color:var(--bj-texto);
-    font:13.5px/1.5 var(--bj-ui);
+    font:400 14px/20px var(--bj-ui);
     display:flex;flex-direction:column;
     -webkit-font-smoothing:antialiased;
   }
@@ -49,130 +54,131 @@
   /* barras de rolagem discretas, no tom do painel */
   *::-webkit-scrollbar{width:9px;height:9px}
   *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:#2b2b2b;border-radius:99px;border:2px solid var(--bj-fundo2)}
+  *::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:99px;border:2px solid var(--bj-fundo2)}
   *::-webkit-scrollbar-thumb:hover{background:#3d3d3d}
 
   /* --------------------------------------------------------------- tipografia */
   .num,.val,.ind-v,.pos,.pct,.hora,td.n{font-variant-numeric:tabular-nums}
-  b,strong{font-weight:700}
+  b,strong{font-weight:600}
 
   /* ----------------------------------------------------------------- cabeçalho */
-  /* tres colunas de larguras iguais nas pontas: so assim as abas ficam no centro
-     da janela, e nao no centro do espaco que sobrou das pontas */
+  /* três colunas de larguras iguais nas pontas: só assim as abas ficam no centro
+     da janela, e não no centro do espaço que sobrou das pontas */
   .topo{
-    flex:none;height:56px;display:grid;align-items:center;gap:14px;padding:0 14px;
+    flex:none;height:56px;display:grid;align-items:center;gap:16px;padding:0 var(--bj-pad);
     grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
-    background:var(--bj-fundo2);border-bottom:1px solid var(--bj-borda);
+    background:var(--bj-fundo);border-bottom:1px solid var(--bj-borda);
   }
   .topo-esq{display:flex;align-items:center;gap:14px;min-width:0}
   .topo-dir{display:flex;align-items:center;gap:10px;justify-self:end}
-  .topo>.abas{justify-self:center}
-  .marca{font-size:15px;letter-spacing:.01em;white-space:nowrap}
-  .marca b{font-weight:700}
+  .topo>.abas{justify-self:center;align-self:stretch}
+  .marca{display:flex;align-items:center;gap:9px;font-size:15px;color:var(--bj-texto2);white-space:nowrap}
+  .marca b{color:var(--bj-texto);font-weight:600}
+  .marca-gema{width:20px;height:20px;flex:none}
+  .marca-gema path{fill:none;stroke:var(--bj-acento);stroke-width:1.4;stroke-linejoin:round}
   .contexto{
-    font-size:12px;color:var(--bj-texto2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-size:13px;color:var(--bj-texto2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     padding-left:14px;border-left:1px solid var(--bj-borda2);min-width:0;
   }
   .contexto .viva{color:var(--bj-texto)}
-  .contexto .ctx-aovivo{color:#3fbf8f}
+  .contexto .ctx-aovivo{color:var(--bj-positivo)}
   .contexto .ctx-encerrada{color:var(--bj-texto3)}
   .espaco{flex:1;min-width:0}
 
   .sinal{
-    display:flex;align-items:center;gap:7px;flex:none;
-    font:500 11.5px var(--bj-ui);color:var(--bj-texto2);
-    background:transparent;border:1px solid transparent;border-radius:999px;
-    padding:5px 10px;cursor:pointer;white-space:nowrap;
+    display:flex;align-items:center;gap:8px;flex:none;height:36px;
+    font:500 12px var(--bj-ui);color:var(--bj-texto3);
+    background:transparent;border:0;border-radius:999px;
+    padding:0 10px;cursor:pointer;white-space:nowrap;
   }
-  .sinal:hover{border-color:var(--bj-borda2);color:var(--bj-texto)}
-  .ponto{width:7px;height:7px;border-radius:50%;background:var(--bj-texto3);flex:none}
-  .ponto.on{background:var(--bj-claro);box-shadow:0 0 0 3px rgba(242,242,242,.14);animation:pulsar 2.4s ease-in-out infinite}
-  .ponto.off{background:#5a5a5a}
-  @keyframes pulsar{0%,100%{box-shadow:0 0 0 3px rgba(242,242,242,.14)}50%{box-shadow:0 0 0 5px rgba(242,242,242,.05)}}
+  .sinal:hover{background:var(--bj-fundo4);color:var(--bj-texto)}
+  .ponto{width:8px;height:8px;border-radius:50%;background:var(--bj-borda3);flex:none}
+  .ponto.on{background:var(--bj-positivo)}
+  .ponto.off{background:#e5484d}
 
   /* ------------------------------------------------------------------- botões */
-  button{font:600 12px var(--bj-ui);cursor:pointer;color:var(--bj-texto)}
+  button{font:500 13px var(--bj-ui);cursor:pointer;color:var(--bj-texto)}
   .btn{
-    padding:7px 13px;border-radius:999px;border:1px solid var(--bj-borda2);
-    background:var(--bj-fundo3);transition:border-color .14s,background .14s,transform .08s;
+    height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--bj-borda3);
+    background:transparent;white-space:nowrap;transition:background .16s,transform .08s;
   }
-  .btn:hover{border-color:var(--bj-borda3);background:var(--bj-fundo4)}
+  .btn:hover{background:var(--bj-fundo4)}
   .btn:active{transform:translateY(1px)}
   /* Superfície clara => texto escuro. Sempre. */
-  .btn-claro{background:var(--bj-claro);color:var(--bj-sobreClaro);border-color:transparent}
-  .btn-claro:hover{background:#fff;color:var(--bj-sobreClaro);border-color:transparent}
+  .btn-claro{background:var(--bj-claro);color:var(--bj-sobreClaro);border-color:transparent;font-weight:600}
+  .btn-claro:hover{background:#fff;color:var(--bj-sobreClaro)}
   .btn:disabled,.btn-claro:disabled{opacity:.4;cursor:default;transform:none}
   .btn-fantasma{
-    background:transparent;border:1px solid var(--bj-borda2);color:var(--bj-texto2);
-    padding:5px 11px;border-radius:999px;font-size:11.5px;
+    height:32px;background:transparent;border:1px solid var(--bj-borda3);color:var(--bj-texto2);
+    padding:0 12px;border-radius:999px;font-size:12.5px;font-weight:500;
   }
-  .btn-fantasma:hover{color:var(--bj-texto);border-color:var(--bj-borda3)}
+  .btn-fantasma:hover{color:var(--bj-texto);background:var(--bj-fundo4)}
 
-  /* menu do CSV */
+  /* menus do topo (CSV, resgate) */
   .menu-csv{position:relative;flex:none}
   .menu{
-    position:absolute;right:0;top:calc(100% + 7px);z-index:40;width:258px;
-    background:var(--bj-fundo3);border:1px solid var(--bj-borda2);border-radius:12px;
-    box-shadow:0 18px 40px rgba(0,0,0,.6);padding:6px;animation:cair .14s ease-out;
+    position:absolute;right:0;top:calc(100% + 8px);z-index:40;width:270px;
+    background:var(--bj-fundo3);border:1px solid var(--bj-borda3);border-radius:14px;
+    box-shadow:0 12px 32px rgba(0,0,0,.6);padding:6px;animation:cair .14s ease-out;
   }
   @keyframes cair{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
   .menu button{
     display:block;width:100%;text-align:left;background:transparent;border:0;
-    padding:9px 10px;border-radius:8px;font-weight:500;font-size:12.5px;
+    padding:10px 12px;border-radius:10px;font-weight:500;font-size:13px;
   }
   .menu button:hover{background:var(--bj-fundo4)}
-  .menu button b{display:block;font-weight:600;font-size:12.5px}
-  .menu button span{display:block;color:var(--bj-texto3);font-size:11px;line-height:1.4}
+  .menu button b{display:block;font-weight:600;font-size:13.5px}
+  .menu button span{display:block;color:var(--bj-texto3);font-size:12px;line-height:1.4;margin-top:1px}
   /* auto resgate: botão no topo + detalhes */
-  .chip-resgate{display:inline-flex;align-items:center;gap:7px;font-variant-numeric:tabular-nums}
-  .ponto-r{width:7px;height:7px;border-radius:50%;background:var(--bj-texto3);flex:none}
-  .chip-resgate.agendado .ponto-r{background:#3987e5}
-  .chip-resgate.pronto .ponto-r{background:#199e70;box-shadow:0 0 0 3px rgba(25,158,112,.25)}
-  .chip-resgate.calibrando .ponto-r{background:#c98500}
-  .menu-resgate{width:290px;padding:12px}
+  .chip-resgate{display:inline-flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+  .ponto-r{width:8px;height:8px;border-radius:50%;background:var(--bj-borda3);flex:none}
+  .chip-resgate.agendado .ponto-r{background:var(--bj-acento)}
+  .chip-resgate.pronto .ponto-r{background:var(--bj-positivo)}
+  .chip-resgate.calibrando .ponto-r{background:#e5a93b}
+  .menu-resgate{width:300px;padding:14px}
   .res-cab{display:flex;align-items:center;justify-content:space-between}
-  .res-cab b{font-size:13px}
-  .res-sub{margin:4px 0 10px;font-size:11px;color:var(--bj-texto3);line-height:1.45}
-  .res-linhas{display:grid;gap:6px}
-  .res-linhas div{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+  .res-cab b{font-size:14px;font-weight:600}
+  .res-sub{margin:4px 0 12px;font-size:12.5px;color:var(--bj-texto3);line-height:1.45}
+  .res-linhas{display:grid;gap:8px}
+  .res-linhas div{display:flex;justify-content:space-between;gap:10px;font-size:13px}
   .res-linhas span{color:var(--bj-texto3)}
   .res-linhas b{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
-  .res-hist{list-style:none;margin:6px 0 0;padding:0;max-height:140px;overflow:auto;font-size:11.5px;color:var(--bj-texto2)}
-  .res-hist li{padding:3px 0;border-bottom:1px solid var(--bj-borda)}
+  .res-hist{list-style:none;margin:6px 0 0;padding:0;max-height:140px;overflow:auto;font-size:12.5px;color:var(--bj-texto2)}
+  .res-hist li{padding:5px 0;border-bottom:1px solid var(--bj-borda2)}
   .res-hist li:last-child{border-bottom:0}
   /* chave liga/desliga */
   .chave{position:relative;width:36px;height:20px;flex:none;cursor:pointer}
   .chave input{position:absolute;opacity:0;width:0;height:0}
   .chave span{position:absolute;inset:0;border-radius:999px;background:var(--bj-fundo4);border:1px solid var(--bj-borda3);transition:background .15s}
   .chave span::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--bj-texto2);transition:transform .15s,background .15s}
-  .chave input:checked + span{background:#199e70;border-color:#199e70}
-  .chave input:checked + span::after{transform:translateX(16px);background:#fff}
+  .chave input:checked + span{background:var(--bj-claro);border-color:var(--bj-claro)}
+  .chave input:checked + span::after{transform:translateX(16px);background:var(--bj-sobreClaro)}
   .menu-nota{
-    margin:4px 4px 2px;padding-top:7px;border-top:1px solid var(--bj-borda);
-    font-size:10.5px;color:var(--bj-texto3);line-height:1.5;
+    margin:6px 4px 2px;padding-top:8px;border-top:1px solid var(--bj-borda2);
+    font-size:12px;color:var(--bj-texto3);line-height:1.5;
   }
 
   /* --------------------------------------------------------------- navegação */
-  .abas{position:relative;flex:none;display:flex;align-items:center;gap:6px}
-  /* mesmo princípio do menu do card: um fundo só, que desliza */
-  .aba-fundo{
-    position:absolute;left:0;top:0;height:0;width:0;border-radius:999px;
-    background:var(--bj-claro);pointer-events:none;opacity:0;
+  /* abas do topo e do card: rótulo cinza, o escolhido branco com um traço de
+     2px embaixo. O traço é um elemento só, que desliza (o JS copia a caixa do
+     botão escolhido para ele) */
+  .abas{position:relative;flex:none;display:flex;align-items:stretch;gap:24px}
+  .aba-fundo,.navc-fundo{
+    position:absolute;left:0;top:0;height:0;width:0;border-radius:0;
+    background:transparent;border-bottom:2px solid var(--bj-texto);pointer-events:none;opacity:0;
     transition:transform .34s cubic-bezier(.4,0,.2,1), width .34s cubic-bezier(.4,0,.2,1), opacity .18s ease;
   }
-  .aba-fundo.pronto{opacity:1}
-  .aba{position:relative;z-index:1}
+  .aba-fundo.pronto,.navc-fundo.pronto{opacity:1}
   .aba{
-    display:flex;align-items:center;gap:7px;height:30px;padding:0 14px;
-    border-radius:999px;border:1px solid transparent;background:transparent;
-    color:var(--bj-texto2);font-weight:600;font-size:12.5px;white-space:nowrap;
-    transition:background .14s,color .14s;
+    position:relative;z-index:1;display:flex;align-items:center;gap:8px;height:56px;padding:0;
+    border:0;background:transparent;
+    color:#bbb;font-weight:500;font-size:14px;white-space:nowrap;transition:color .16s;
   }
-  .aba:hover{background:var(--bj-fundo3);color:var(--bj-texto)}
-  .aba[aria-selected="true"]{background:transparent;color:var(--bj-sobreClaro)}
-  .aba:disabled{opacity:.35;cursor:default;background:transparent;color:var(--bj-texto3)}
-  /* ponto de gravacao: vermelho de proposito, e a unica cor do painel. Pulsa
-     enquanto existe live aberta e fica apagado e parado quando nao existe. */
+  .aba:hover{color:var(--bj-texto)}
+  .aba[aria-selected="true"]{color:var(--bj-texto)}
+  .aba:disabled{opacity:.35;cursor:default;color:var(--bj-texto3)}
+  /* ponto de gravação: vermelho de propósito. Pulsa enquanto existe live
+     aberta e fica apagado e parado quando não existe. */
   .rec{
     width:7px;height:7px;border-radius:50%;flex:none;background:#ff4a4a;
     opacity:.26;transition:opacity .2s ease;
@@ -182,208 +188,191 @@
     0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,74,74,.55)}
     50%{opacity:.45;box-shadow:0 0 0 4px rgba(255,74,74,0)}
   }
-
   .aba .emj{font-size:13px;line-height:1}
 
   /* ------------------------------------------------------- faixa de desconexão */
   .faixa{
-    flex:none;display:flex;align-items:flex-start;gap:9px;padding:10px 16px;
-    background:#1a1a1a;border-bottom:1px solid var(--bj-borda2);
-    font-size:12px;color:var(--bj-texto2);line-height:1.5;
+    flex:none;display:flex;align-items:flex-start;gap:10px;padding:10px var(--bj-pad);
+    background:var(--bj-fundo2);border-bottom:1px solid var(--bj-borda);
+    font-size:13px;color:var(--bj-texto2);line-height:1.5;
     animation:cair .2s ease-out;
   }
   .faixa .emj{flex:none;font-size:13px}
   .faixa b{color:var(--bj-texto)}
   /* buraco na captura: mais forte que a de desconexão, porque isto é dado perdido */
-  .faixa.lacuna{background:#232323;border-left:3px solid var(--bj-claro)}
+  .faixa.lacuna{background:var(--bj-fundo3);box-shadow:inset 3px 0 0 var(--bj-claro)}
   .faixa.lacuna #lacunaTexto{flex:1;min-width:0}
   .lacuna-x{
     flex:none;align-self:center;background:none;border:0;cursor:pointer;
-    color:var(--bj-texto3);font:600 17px/1 var(--bj-ui);padding:2px 4px;border-radius:5px;
+    color:var(--bj-texto3);font:600 17px/1 var(--bj-ui);padding:4px 6px;border-radius:6px;
   }
-  .lacuna-x:hover{color:var(--bj-texto);background:var(--bj-fundo3)}
+  .lacuna-x:hover{color:var(--bj-texto);background:var(--bj-fundo4)}
 
   /* ------------------------------------------------------------------- telas */
   main{flex:1;min-height:0;position:relative}
   .tela{display:none;height:100%}
   .tela.ativa{display:block}
 
-  /* duas colunas: a de consulta (ranking) e a de fluxo (feed) */
+  /* duas colunas: o conteúdo da aba e, à direita, o feed com largura fixa
+     (a mesma em todas as abas, para o feed não mudar de tamanho ao trocar) */
   .duas{
-    height:100%;display:grid;gap:13px;padding:13px;
-    grid-template-columns:minmax(0,1.42fr) minmax(300px,1fr);
+    height:100%;display:grid;gap:var(--bj-gap);padding:var(--bj-gap);
+    grid-template-columns:minmax(0,1fr) var(--bj-feed);
     align-items:stretch;
   }
-  /* na aba de sorteio o card da esquerda cresce e o feed encolhe */
-  .duas.sorteio{grid-template-columns:minmax(0,2.7fr) minmax(220px,1fr)}
-  .col-a{min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:13px;padding-right:2px}
+  .col-a{min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:var(--bj-gap);padding-right:2px}
   /* o card cresce para ocupar a coluna: sem os indicadores em cima, um card de
      altura de conteúdo deixaria um vão feio ao lado do feed, que é inteiro */
   .col-a>.card{flex:1 0 auto}
-  /* uma linha só declarada: com o card de compradores fora da tela não sobra um
-     trilho vazio comendo 13px de gap e desalinhando o feed do card ao lado.
-     Quando ele voltar, cai numa linha implícita e o gap volta junto. */
-  .col-b{min-width:0;min-height:0;display:grid;gap:13px;grid-template-rows:minmax(0,1fr);grid-auto-rows:auto}
+  .col-b{min-width:0;min-height:0;display:grid;gap:var(--bj-gap);grid-template-rows:minmax(0,1fr);grid-auto-rows:auto}
 
   .card{
-    background:var(--bj-fundo2);border:1px solid var(--bj-borda);border-radius:var(--bj-raio);
-    padding:13px 15px;min-width:0;display:flex;flex-direction:column;min-height:0;
+    background:var(--bj-fundo2);border:0;border-radius:var(--bj-raio);
+    padding:18px var(--bj-pad) var(--bj-pad);min-width:0;display:flex;flex-direction:column;min-height:0;
   }
-  .card>h2{
-    margin:0;font:700 10px var(--bj-ui);letter-spacing:.1em;text-transform:uppercase;
-    color:var(--bj-texto3);display:flex;align-items:center;gap:9px;flex:none;
+  /* títulos: em frase, sem caixa alta. O do card é a seção; os de dentro, sub-seção */
+  .card h2{margin:0;font:600 14px/20px var(--bj-ui);color:var(--bj-texto);display:flex;align-items:baseline;gap:10px;flex:none}
+  .card>h2{font-size:16px;line-height:22px}
+  .card h2 .tag,.tag{
+    margin-left:auto;font-weight:400;font-size:12px;color:var(--bj-texto3);white-space:nowrap;
   }
-  .card>h2 .tag{
-    margin-left:auto;font-weight:600;letter-spacing:.04em;text-transform:none;
-    font-size:10.5px;color:var(--bj-texto3);
-    border:1px solid var(--bj-borda2);border-radius:999px;padding:2px 8px;
-  }
-  .sub{margin:5px 0 0;font-size:11.5px;color:var(--bj-texto2);flex:none}
+  .sub{margin:6px 0 0;font-size:12.5px;line-height:18px;color:var(--bj-texto2);flex:none}
   .sub .forte{color:var(--bj-texto);font-weight:600}
-  .regua{height:1px;background:var(--bj-borda);margin:11px 0;flex:none}
+  .regua{height:1px;background:var(--bj-borda);margin:18px 0;flex:none}
 
   .nota{
-    margin:11px 0 0;display:flex;gap:8px;font-size:11px;line-height:1.55;color:var(--bj-texto3);
-    background:var(--bj-fundo3);border:1px solid var(--bj-borda);border-radius:10px;padding:9px 11px;flex:none;
+    margin:12px 0 0;display:flex;gap:8px;font-size:12.5px;line-height:1.55;color:var(--bj-texto2);
+    background:var(--bj-fundo3);border:0;border-radius:12px;padding:10px 14px;flex:none;
   }
   .nota .emj{flex:none}
-  .nota b{color:var(--bj-texto2)}
+  .nota b{color:var(--bj-texto);font-weight:600}
 
   /* -------------------------------------------------------------- indicadores */
-  .indicadores{
-    flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;
-  }
-  /* topo dos Insights em duas linhas: gemas (2) e vendas (4) */
-  #indicadores{flex:none;display:flex;flex-direction:column;gap:13px}
+  /* como no Panel: uma faixa dividida em colunas iguais por réguas de 1px,
+     rótulo acima do valor (o DOM tem o valor antes: column-reverse) */
+  .indicadores{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:16px}
+  /* topo dos Insights em duas linhas: gemas (3) e vendas (4) */
+  #indicadores{flex:none;display:flex;flex-direction:column;gap:20px}
   .ind-gemas{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ind-vendas{grid-template-columns:repeat(4,minmax(0,1fr))}
-  #indicadores .ind-r{white-space:normal;line-height:1.35}
   .ind{
-    background:var(--bj-fundo2);border:1px solid var(--bj-borda);border-radius:var(--bj-raio);
-    padding:11px 13px;min-width:0;
+    display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:6px;
+    background:transparent;border:0;border-left:1px solid var(--bj-borda2);border-radius:0;
+    padding:2px 16px;min-width:0;
   }
-  .ind-v{font-size:25px;font-weight:700;line-height:1.15;letter-spacing:-.015em;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ind-r{display:block;margin-top:2px;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
-    color:var(--bj-texto3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ind.destaque .ind-v{font-size:22px}
+  .ind:first-child{border-left:0;padding-left:0}
+  .ind-v{font-size:24px;font-weight:500;line-height:30px;overflow-wrap:anywhere}
+  .ind-r{display:block;font-size:13px;line-height:18px;color:var(--bj-texto2);font-weight:400;
+    overflow-wrap:anywhere}
+  .ind-r::first-letter{text-transform:uppercase}
+  .ind.destaque .ind-v{font-size:24px}
 
   /* ---------------------------------------------------------------- audiência */
-  /* cores das 4 séries de interação: paleta categórica validada para fundo
+  /* cores das séries de interação: paleta categórica validada para fundo
      escuro (daltonismo e contraste) — ver skill de dataviz */
   :root{--serie-pessoas:#3987e5;--serie-chat:#d95926;--serie-gemas:#199e70;--serie-entradas:#c98500;--serie-lances:#d55181}
-  .aud-ind{margin-top:10px;grid-template-columns:repeat(5,minmax(0,1fr))}
+  .aud-ind{margin-top:14px;grid-template-columns:repeat(5,minmax(0,1fr))}
   .aud-ind .ind-v{font-size:21px}
   .aud-ind .ind[title]{cursor:help}
-  /* com 5 indicadores o rótulo não cabe numa linha em janela média: quebra em vez de cortar */
-  .aud-ind .ind-r{white-space:normal;line-height:1.35;margin-top:6px}
-  .aud-explica{margin-top:9px;line-height:1.55}
+  .aud-explica{margin-top:14px;line-height:1.55}
   .aud-explica b{color:var(--bj-texto)}
-  .aud-topo{display:flex;align-items:center;gap:10px;margin-top:14px;flex:none}
-  .aud-janelas{display:flex;gap:4px;padding:3px;border-radius:999px;background:var(--bj-fundo3);border:1px solid var(--bj-borda)}
-  .aud-janelas button{border:0;background:transparent;color:var(--bj-texto2);padding:4px 11px;border-radius:999px;font-size:11.5px}
-  .aud-janelas button[aria-checked="true"]{background:var(--bj-claro);color:var(--bj-sobreClaro)}
+  .aud-topo{display:flex;align-items:center;gap:10px;margin-top:16px;flex:none}
+  .aud-janelas{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--bj-fundo3)}
+  .aud-janelas button{height:28px;border:0;background:transparent;color:#bbb;padding:0 12px;border-radius:999px;font-size:12.5px;font-weight:500}
+  .aud-janelas button:hover{color:var(--bj-texto)}
+  .aud-janelas button[aria-checked="true"]{background:var(--bj-fundo4);color:var(--bj-texto)}
   .aud-graf{margin-top:12px;flex:none;position:relative}
-  .aud-graf-tit{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--bj-texto3);font-weight:700}
-  .aud-graf-tit span{text-transform:none;letter-spacing:0;font-weight:500;margin-left:6px}
+  .aud-graf-tit{font-size:12.5px;color:var(--bj-texto3);font-weight:400}
+  .aud-graf-tit span{margin-left:6px}
   .aud-svg{margin-top:6px}
   .aud-svg svg{display:block;width:100%;height:220px;overflow:visible}
-  .aud-svg .eixo{fill:var(--bj-texto3);font:10.5px var(--bj-ui)}
-  .aud-svg .grade{stroke:var(--bj-borda);stroke-width:1}
-  /* linha neon: traço de 2px por cima de um halo borrado da mesma cor */
-  .aud-svg .linha-halo{fill:none;stroke-width:6;opacity:.35;filter:url(#neon)}
+  .aud-svg .eixo{fill:var(--bj-texto3);font:11px var(--bj-ui)}
+  .aud-svg .grade{stroke:var(--bj-borda2);stroke-width:1}
+  /* sem halo: a linha sólida basta (o estilo não usa brilho) */
+  .aud-svg .linha-halo{display:none}
   .aud-svg .linha{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .aud-svg .mira{stroke:var(--bj-texto3);stroke-width:1;stroke-dasharray:3 3}
-  .aud-svg .ponto{stroke:#111;stroke-width:2}
-  .aud-legenda{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px;font-size:11.5px}
-  .aud-legenda button{display:inline-flex;align-items:center;border:1px solid transparent;background:transparent;
-    color:var(--bj-texto2);padding:3px 8px;border-radius:999px;font-size:11.5px;font-weight:500}
-  .aud-legenda button:hover{border-color:var(--bj-borda2)}
+  .aud-svg .ponto{stroke:var(--bj-fundo2);stroke-width:2}
+  .aud-legenda{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}
+  .aud-legenda button{display:inline-flex;align-items:center;border:0;background:transparent;
+    color:var(--bj-texto2);padding:2px 0;font-size:12.5px;font-weight:500}
   .aud-legenda button[aria-pressed="false"]{opacity:.4}
-  .aud-legenda i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:7px}
+  .aud-legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
   .aud-dica{
-    position:fixed;z-index:50;pointer-events:none;padding:8px 10px;border-radius:9px;
-    background:var(--bj-fundo4);border:1px solid var(--bj-borda3);box-shadow:0 10px 26px rgba(0,0,0,.55);
-    font-size:11.5px;color:var(--bj-texto2);line-height:1.5;white-space:nowrap;
+    position:fixed;z-index:50;pointer-events:none;padding:8px 12px;border-radius:10px;
+    background:var(--bj-fundo3);border:1px solid var(--bj-borda3);box-shadow:0 10px 26px rgba(0,0,0,.55);
+    font-size:12.5px;color:var(--bj-texto2);line-height:1.5;white-space:nowrap;
   }
   .aud-dica b{color:var(--bj-texto)}
   .aud-dica i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
-  .aud-vazio{font-size:11.5px;color:var(--bj-texto3);padding:18px 0;text-align:center;border:1px dashed var(--bj-borda2);border-radius:10px}
-  .aud-h{margin-top:16px}
-  .linha .ativo{display:inline-block;width:7px;height:7px;border-radius:50%;background:#199e70;margin-left:7px;vertical-align:1px}
-  .linha .calado{margin-left:7px;font-size:10px;color:var(--bj-texto3);border:1px solid var(--bj-borda2);border-radius:999px;padding:0 6px}
+  .aud-vazio{font-size:13px;color:var(--bj-texto2);padding:14px 16px;text-align:center;border:1px dashed #333;border-radius:12px}
+  .aud-h{margin-top:18px}
+  .linha .ativo{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--bj-positivo);margin-left:7px;vertical-align:1px}
+  .linha .calado{margin-left:7px;font-size:11px;color:var(--bj-texto3);background:var(--bj-fundo4);border-radius:999px;padding:1px 7px}
 
   /* ------------------------------------------------------------------- escopo */
-  /* Escopo mora em cima do que ele muda (o ranking) e é escrito por extenso. */
   .escopo{flex:none;margin-top:12px}
-  .escopo-rot{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--bj-texto3);font-weight:700}
-  .opcoes{display:flex;gap:8px;margin-top:7px;flex-wrap:wrap}
+  .escopo-rot{font-size:12.5px;color:var(--bj-texto2);font-weight:500}
+  .opcoes{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  /* cards de opção (como no Panel): título, apoio e o marcador à direita */
   .op{
-    flex:1 1 210px;min-width:0;display:flex;align-items:flex-start;gap:9px;
-    text-align:left;padding:9px 12px;border-radius:11px;
-    border:1px solid var(--bj-borda);background:var(--bj-fundo3);
-    color:var(--bj-texto2);font-weight:500;font-size:12.5px;line-height:1.35;
-    transition:border-color .14s,color .14s,background .14s;
+    flex:1 1 210px;min-width:0;display:flex;align-items:center;gap:10px;
+    text-align:left;padding:10px 12px;border-radius:12px;
+    border:1px solid var(--bj-borda);background:transparent;
+    color:var(--bj-texto);font-weight:600;font-size:13.5px;line-height:1.35;
+    transition:border-color .16s,background .16s;
   }
-  .op:hover{border-color:var(--bj-borda3);color:var(--bj-texto)}
-  .op[aria-checked="true"]{border-color:var(--bj-claro);background:var(--bj-fundo4);color:var(--bj-texto);font-weight:600}
+  .op:hover{border-color:var(--bj-borda3)}
+  .op[aria-checked="true"]{border-color:var(--bj-texto);background:var(--bj-fundo4)}
   .op .marca-radio{
-    flex:none;width:13px;height:13px;border-radius:50%;border:1.5px solid var(--bj-borda3);
-    margin-top:2px;display:grid;place-items:center;
+    flex:none;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--bj-borda3);margin-left:auto;
   }
-  .op[aria-checked="true"] .marca-radio{border-color:var(--bj-claro)}
-  .op[aria-checked="true"] .marca-radio::after{
-    content:"";width:6px;height:6px;border-radius:50%;background:var(--bj-claro);
-  }
+  .op[aria-checked="true"] .marca-radio{border:5px solid var(--bj-texto)}
   .op .txt{min-width:0}
-  .op .txt small{display:block;font-weight:400;font-size:11px;color:var(--bj-texto3);margin-top:1px}
-  .op[aria-checked="true"] .txt small{color:var(--bj-texto2)}
-  /* Ranking: título com o resumo e o olho (no formato do título do sorteio)
-     e os seletores com as classes do sorteio */
-  .rk-titulo{display:flex;align-items:center;gap:10px;margin:13px 0 13px}
+  .op .txt small{display:block;font-weight:400;font-size:12px;line-height:16px;color:var(--bj-texto3);margin-top:1px}
+  /* Ranking: título com o resumo e o olho */
+  .rk-titulo{display:flex;align-items:center;gap:10px;margin:0 0 14px}
   .rk-resumo{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rk-titulo .navc-olho{margin:0 0 0 auto}
-  .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);grid-template-areas:"ra dv rb" "ca dv cb"}
   #pane-ranking.rk-oculto .rk-conf,#pane-ranking.rk-oculto .fichas{display:none}
 
   /* ----------------------------------------------------------------- fichas */
-  .fichas{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;flex:none}
+  .fichas{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;flex:none}
   .ficha{
-    display:flex;align-items:center;gap:6px;padding:5px 11px 5px 8px;border-radius:999px;
-    border:1px solid var(--bj-borda2);background:var(--bj-fundo3);
-    color:var(--bj-texto2);font-weight:600;font-size:11.5px;white-space:nowrap;
-    transition:border-color .14s,background .14s,color .14s;
+    display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px 0 9px;border-radius:999px;
+    border:1px solid var(--bj-borda2);background:transparent;
+    color:var(--bj-texto2);font-weight:500;font-size:12.5px;white-space:nowrap;
+    transition:border-color .16s,background .16s,color .16s;
   }
   .ficha:hover{border-color:var(--bj-borda3);color:var(--bj-texto)}
-  .ficha[aria-pressed="true"]{background:var(--bj-claro);color:var(--bj-sobreClaro);border-color:transparent}
+  .ficha[aria-pressed="true"]{background:var(--bj-claro);color:var(--bj-sobreClaro);border-color:var(--bj-claro)}
   .ficha[aria-pressed="true"] .ficha-n{color:var(--bj-sobreClaro);opacity:.62}
   .ficha.zerada{opacity:.42}
   .ficha.zerada:hover{opacity:.8}
   /* gema que acabou de aparecer na faixa (primeiro envio dela neste escopo) */
   .ficha.nova{animation:cair .26s ease-out}
   /* tamanho fixo obrigatório: o ícone vem do CDN da Jamble, sem resize */
-  .gema-ico{width:16px;height:16px;flex:none;object-fit:contain;display:block}
+  .gema-ico{width:18px;height:18px;flex:none;object-fit:contain;display:block}
   .ficha .emj{font-size:13px;line-height:1}
-  .ficha-n{font-weight:500;color:var(--bj-texto3);font-variant-numeric:tabular-nums}
+  .ficha-n{font-weight:500;font-size:11.5px;color:var(--bj-texto3);font-variant-numeric:tabular-nums}
 
   /* ------------------------------------------------------------------ avatar */
   /* O tamanho padrão vive na regra base — nunca só nas regras de contexto. */
   .av{
-    width:28px;height:28px;flex:none;border-radius:50%;overflow:hidden;background:#242424;
-    display:grid;place-items:center;font:700 10px var(--bj-ui);color:var(--bj-texto2);
-    border:1px solid var(--bj-borda2);
+    width:28px;height:28px;flex:none;border-radius:50%;overflow:hidden;background:var(--bj-borda2);
+    display:grid;place-items:center;font:600 11px var(--bj-ui);color:var(--bj-texto2);border:0;
   }
   .av img{width:100%;height:100%;object-fit:cover;display:block}
-  .av-p{width:18px;height:18px;font-size:7.5px}
-  .av-m{width:34px;height:34px;font-size:11px}
-  .av-g{width:46px;height:46px;font-size:14px}
-  .av-xg{width:58px;height:58px;font-size:17px}
+  .av-p{width:20px;height:20px;font-size:8px}
+  .av-m{width:36px;height:36px;font-size:12px}
+  .av-g{width:44px;height:44px;font-size:14px}
+  .av-xg{width:64px;height:64px;font-size:20px}
   img{max-width:100%}
 
   /* ------------------------------------------------------------------- pódio */
   .podio{
-    flex:none;display:grid;grid-template-columns:1fr 1.14fr 1fr;gap:9px;align-items:end;
-    margin-top:10px;
+    flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:end;
+    margin-top:14px;
   }
   .degrau{
     display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;text-align:center;
@@ -394,127 +383,121 @@
   .degrau.p3{animation-delay:.08s}
   @keyframes subir{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   .medalha{font-size:16px;line-height:1}
-  .degrau.p1 .medalha{font-size:21px}
+  .degrau.p1 .medalha{font-size:20px}
   .degrau .quem{
     max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    font-size:12.5px;font-weight:600;color:var(--bj-texto);
+    font-size:13px;font-weight:600;color:var(--bj-texto);flex:none;
   }
-  .degrau.p1 .quem{font-size:13.5px}
-  .degrau .gem{font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
-  .degrau.p1 .gem{font-size:25px}
-  .degrau .det{font-size:10.5px;color:var(--bj-texto3)}
+  .degrau .gem{font-size:12.5px;font-weight:500;color:var(--bj-texto2);line-height:1.3}
+  .degrau.p1 .gem{font-size:14px;color:var(--bj-texto)}
+  .degrau .det{font-size:11.5px;color:var(--bj-texto3)}
   .pedestal{
-    width:100%;border-radius:8px 8px 0 0;background:var(--bj-fundo3);
-    border:1px solid var(--bj-borda);border-bottom:0;
-    display:grid;place-items:center;font:700 13px var(--bj-ui);color:var(--bj-texto3);
-    margin-top:3px;
+    width:100%;border-radius:10px 10px 4px 4px;background:var(--bj-borda2);border:0;
+    display:grid;place-items:center;font:600 14px var(--bj-ui);color:var(--bj-texto2);
+    margin-top:4px;
   }
-  .degrau.p1 .pedestal{background:var(--bj-fundo4);border-color:var(--bj-borda3);color:var(--bj-texto2)}
-  .degrau.p1 .av{border-color:var(--bj-claro)}
+  .degrau.p1 .pedestal{background:#2f3a42;color:var(--bj-texto)}
 
   /* ------------------------------------------------------------------ listas */
-  .lista{min-width:0}
+  .lista{min-width:0;margin-top:6px}
   .linha{
-    display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:9px;min-width:0;
+    display:flex;align-items:center;gap:10px;min-height:44px;padding:4px 12px;border-radius:10px;min-width:0;
   }
+  .linha + .linha{margin-top:2px}
   .linha:hover{background:var(--bj-fundo3)}
-  .pos{width:19px;flex:none;text-align:right;font-size:11.5px;color:var(--bj-texto3);font-weight:600}
-  .quem{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
-  .quem .det{color:var(--bj-texto3);font-size:11px;margin-left:7px}
-  .val{flex:none;font-weight:700;font-size:12.5px;white-space:nowrap}
-  .val .u{font-weight:500;color:var(--bj-texto3);font-size:11px;margin-left:3px}
-  .mais{align-self:center;margin-top:8px;flex:none}
+  .pos{width:22px;flex:none;text-align:right;font-size:13px;color:var(--bj-texto3);font-weight:400}
+  .quem{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500}
+  .quem .det{color:var(--bj-texto3);font-size:12px;font-weight:400;margin-left:8px}
+  .val{flex:none;font-weight:500;font-size:13.5px;white-space:nowrap}
+  .val .u{font-weight:400;color:var(--bj-texto3);font-size:12px;margin-left:4px}
+  .mais{align-self:center;margin-top:10px;flex:none}
 
   /* -------------------------------------------------------------------- feed */
+  /* Linha do feed como no Panel: hora | foto | nome em cima e o que houve
+     embaixo | valor. Fonte normal (nada de console), foto e ícone maiores. */
   .card-feed{position:relative;overflow:hidden}
   .feed{
-    flex:1;min-height:90px;overflow:auto;margin-top:10px;padding-right:2px;
-    font:11.5px/1.65 var(--bj-mono);
+    flex:1;min-height:90px;overflow:auto;margin-top:12px;margin-right:-8px;padding-right:6px;
+    display:flex;flex-direction:column;gap:2px;
   }
-  .fl{display:flex;align-items:center;gap:8px;padding:1px 4px;border-radius:6px;min-width:0}
+  .fl{
+    flex:none;display:grid;grid-template-columns:auto 32px minmax(0,1fr) auto;align-items:center;gap:10px;
+    min-height:48px;padding:4px 8px;border-radius:10px;min-width:0;font-size:14px;
+  }
   .fl:hover{background:var(--bj-fundo3)}
-  .fl .hora{flex:none;color:var(--bj-texto3);font-size:11px}
-  .fl .av{width:17px;height:17px;font-size:7px;border-width:0}
-  /* largura fixa no nome: é ela que faz a coluna das gemas começar sempre no mesmo x.
-     Com largura de conteúdo, cada linha empurrava a gema para um lugar diferente. */
-  .fl .nome{flex:0 0 136px;max-width:34%;color:var(--bj-texto);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .fl .gema{flex:1;min-width:0;color:var(--bj-texto2);display:flex;align-items:center;gap:5px;overflow:hidden}
+  .fl .hora{color:var(--bj-texto3);font-size:12px}
+  .fl .av{width:32px;height:32px;font-size:11px}
+  .fl-main{display:flex;flex-direction:column;min-width:0;line-height:18px}
+  .fl .nome{font-weight:500;color:var(--bj-texto);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fl .gema{min-width:0;color:var(--bj-texto2);font-size:12.5px;display:flex;align-items:center;gap:6px;overflow:hidden}
   .fl .gema span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .fl .mais-g{flex:none;min-width:58px;text-align:right;font-weight:700;color:var(--bj-texto)}
+  .fl .gema .gema-ico{width:20px;height:20px}
+  .fl .gema .emj{font-size:15px;line-height:1}
+  .fl .mais-g{text-align:right;font-size:14px;font-weight:600;color:var(--bj-acento);white-space:nowrap}
   /* 'forwards' e não 'both': se algum ambiente ligar a animação sem rodá-la, a linha
      fica no estado normal em vez de congelar invisível no 0% (opacity:0). */
   .fl.chegou{animation:chegar 1.1s ease-out forwards}
   .fl.chegou .gema-ico{animation:bater .42s ease-out .06s forwards}
   @keyframes chegar{
-    0%{background:rgba(237,237,243,.16);box-shadow:inset 2px 0 0 var(--bj-claro);transform:translateX(-7px);opacity:0}
+    0%{background:rgba(255,255,255,.12);box-shadow:inset 2px 0 0 var(--bj-claro);transform:translateX(-7px);opacity:0}
     14%{opacity:1;transform:none}
-    55%{background:rgba(237,237,243,.05);box-shadow:inset 2px 0 0 rgba(237,237,243,.45)}
+    55%{background:rgba(255,255,255,.04);box-shadow:inset 2px 0 0 rgba(255,255,255,.45)}
     100%{background:transparent;box-shadow:inset 2px 0 0 transparent}
   }
-  /* feed de espectadores: mesma linha do feed de envios, com "entrou"/"saiu" */
-  .fl .acao{flex:1;min-width:0;display:flex;align-items:center;gap:6px;color:var(--bj-texto2);white-space:nowrap}
-  .fl .acao i{width:6px;height:6px;border-radius:50%;flex:none}
-  .fl .acao.entrou{color:#3fbf8f}
-  .fl .acao.entrou i{background:#199e70}
+  /* feed de espectadores: mesma linha, com "entrou"/"saiu" embaixo do nome */
+  .fl .acao{min-width:0;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--bj-texto3);white-space:nowrap}
+  .fl .acao i{width:7px;height:7px;border-radius:50%;flex:none}
+  .fl .acao.entrou{color:var(--bj-positivo)}
+  .fl .acao.entrou i{background:var(--bj-positivo)}
   .fl .acao.saiu i{background:var(--bj-texto3)}
-  .fl .ficou{flex:none;min-width:58px;text-align:right;color:var(--bj-texto3)}
-  .fl.inicio{color:var(--bj-texto3);font-style:italic;justify-content:center;padding:4px}
+  .fl .ficou{text-align:right;font-size:12.5px;color:var(--bj-texto2);white-space:nowrap}
+  .fl.inicio{display:block;min-height:0;color:var(--bj-texto2);font-size:13px;text-align:center;padding:10px 8px}
   .feed[hidden],.sub[hidden]{display:none}
   .novas{
-    position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
-    background:var(--bj-claro);color:var(--bj-sobreClaro);border:0;border-radius:999px;
-    padding:5px 13px;font:700 11.5px var(--bj-ui);box-shadow:0 7px 20px rgba(0,0,0,.6);
+    position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+    height:30px;padding:0 12px;background:var(--bj-claro);color:var(--bj-sobreClaro);border:0;border-radius:999px;
+    font:600 12px var(--bj-ui);box-shadow:0 6px 18px rgba(0,0,0,.5);
     animation:cair .16s ease-out;
   }
   .novas:hover{background:#fff;color:var(--bj-sobreClaro)}
 
   /* --------------------------------------------------------------- vazios */
   .vazio{
-    display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;
-    padding:20px 14px;color:var(--bj-texto3);font-size:12px;line-height:1.6;
+    display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;
+    padding:22px 16px;color:var(--bj-texto2);font-size:13.5px;line-height:1.6;
   }
-  .vazio .emj-g{font-size:30px;line-height:1;filter:grayscale(.15)}
-  .vazio .tit{font-size:14.5px;font-weight:700;color:var(--bj-texto)}
+  .vazio .emj-g{font-size:30px;line-height:1}
+  .vazio .tit{font-size:16px;font-weight:600;color:var(--bj-texto)}
   .vazio .txt{max-width:420px}
-  .vazio .atalhos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:5px}
-  .vazio-p{padding:14px 10px;font-size:11.5px}
+  .vazio .atalhos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+  .vazio-p{padding:12px 16px;font-size:13px;border:1px dashed #333;border-radius:12px;margin-top:6px}
   .vazio .nota{text-align:left;max-width:440px}
 
   /* ------------------------------------------- menu de dentro do card */
-  /* O fundo claro é um elemento só, que desliza de um item para o outro.
-     Fosse um fundo por botão, a troca seria um corte seco. */
   .navc{
-    position:relative;flex:none;display:flex;align-items:center;gap:2px;
-    margin:-3px -4px 0;padding:0 4px;
+    position:relative;flex:none;display:flex;align-items:stretch;gap:24px;
+    margin:-18px 0 0;border-bottom:1px solid var(--bj-borda);
   }
-  /* sem altura nem topo fixos: o JS copia a caixa do botão escolhido, senão o
-     fundo fica alguns pixels abaixo do texto */
-  .navc-fundo{
-    position:absolute;left:0;top:0;height:0;width:0;border-radius:999px;
-    background:var(--bj-claro);pointer-events:none;opacity:0;
-    transition:transform .34s cubic-bezier(.4,0,.2,1), width .34s cubic-bezier(.4,0,.2,1), opacity .18s ease;
-  }
-  .navc-fundo.pronto{opacity:1}
   .navc-i{
     position:relative;z-index:1;background:none;border:0;cursor:pointer;
-    height:28px;padding:0 15px;margin-bottom:6px;border-radius:0;
-    font:700 12.5px var(--bj-ui);color:var(--bj-texto3);white-space:nowrap;
-    transition:color .2s ease;
+    height:52px;padding:0;
+    font:500 14px var(--bj-ui);color:#bbb;white-space:nowrap;
+    transition:color .16s ease;
   }
   .navc-i:hover{color:var(--bj-texto)}
-  .navc-i[aria-selected="true"]{color:var(--bj-sobreClaro)}
-  .navc-tag{margin-left:auto;margin-bottom:6px}
+  .navc-i[aria-selected="true"]{color:var(--bj-texto)}
+  .navc-tag{margin-left:auto;align-self:center}
   /* olho do modo privado: fica na ponta direita do menu do card */
   .navc-olho{
-    margin-left:auto;margin-bottom:6px;width:30px;height:28px;display:grid;place-items:center;
-    background:none;border:1px solid transparent;border-radius:999px;color:var(--bj-texto2);cursor:pointer;
+    margin-left:auto;align-self:center;width:36px;height:36px;display:grid;place-items:center;flex:none;
+    background:none;border:0;border-radius:999px;color:var(--bj-texto2);cursor:pointer;
   }
   .navc-tag:not([hidden]) + .navc-olho{margin-left:8px}
-  .navc-olho:hover{border-color:var(--bj-borda2);color:var(--bj-texto)}
+  .navc-olho:hover{background:var(--bj-fundo4);color:var(--bj-texto)}
   .navc-olho svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .navc-olho .olho-fechado,.navc-olho[aria-pressed="true"] .olho-aberto{display:none}
   .navc-olho[aria-pressed="true"] .olho-fechado{display:block}
-  .navc-olho[aria-pressed="true"]{color:var(--bj-claro);border-color:var(--bj-borda3)}
+  .navc-olho[aria-pressed="true"]{color:var(--bj-texto);background:var(--bj-fundo4)}
   /* Modo privado por aba: o olho do menu vale só para a aba aberta, e cada
      aba guarda o seu (ligar no Sorteio não esconde os Insights). O menu nunca
      borra, para dar para desligar e trocar de aba. O Ranking tem o olho dele. */
@@ -530,220 +513,189 @@
   .secao-priv{display:flex;flex-direction:column;min-height:0}
   .secao-priv.privado > :not(.cab-priv){filter:blur(7px)}
   .cab-priv{display:flex;align-items:center;gap:10px}
-  .cab-priv h2{margin:0}
+  .cab-priv h2{margin:0;font-size:16px}
   .cab-priv .navc-olho{margin-bottom:0}
-  .pane{display:flex;flex-direction:column;min-height:0;flex:1 0 auto;padding-top:13px}
+  .pane{display:flex;flex-direction:column;min-height:0;flex:1 0 auto;padding-top:18px}
   .pane[hidden]{display:none}
-  .conf-titulo{
-    font:700 10px var(--bj-ui);letter-spacing:.1em;text-transform:uppercase;
-    color:var(--bj-texto3);margin-bottom:13px;flex:none;
-  }
+  .conf-titulo{font:600 14px/20px var(--bj-ui);color:var(--bj-texto);margin-bottom:14px;flex:none}
 
   /* --------------------------------------------------------------- leituras */
-  .leituras{display:flex;flex-direction:column;gap:7px;margin-top:9px}
+  .leituras{display:flex;flex-direction:column;margin-top:6px}
   .leitura{
-    display:flex;align-items:baseline;gap:10px;padding:9px 11px;min-width:0;
-    background:var(--bj-fundo3);border:1px solid var(--bj-borda);border-radius:10px;
+    display:flex;align-items:baseline;gap:14px;padding:12px 0;min-width:0;
+    background:transparent;border:0;border-bottom:1px solid var(--bj-borda);border-radius:0;
   }
-  .leitura .lv{font-size:17px;font-weight:700;letter-spacing:-.01em;flex:none;
-    font-variant-numeric:tabular-nums;min-width:68px}
-  .leitura .lt{font-size:11.5px;color:var(--bj-texto2);line-height:1.5;min-width:0}
+  .leitura:last-child{border-bottom:0}
+  .leitura .lv{font-size:20px;font-weight:600;flex:none;font-variant-numeric:tabular-nums;min-width:80px}
+  .leitura .lt{font-size:13.5px;color:var(--bj-texto2);line-height:1.5;min-width:0}
   .leitura .lt b{color:var(--bj-texto)}
 
   /* ------------------------------------------------------------------ sorteio */
   .card-urna{overflow:hidden}
   /* cresce com o conteúdo e só rola quando não cabe: assim o aviso de
      concentração fica colado na lista, e não no fundo do card */
-  .urna{flex:0 1 auto;min-height:0;overflow:auto;margin-top:10px}
-  .ul{display:flex;align-items:center;gap:9px;padding:4px 5px;border-radius:9px;min-width:0}
+  .urna{flex:0 1 auto;min-height:0;overflow:auto;margin-top:10px;display:flex;flex-direction:column;gap:2px}
+  .ul{display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 8px;border-radius:10px;min-width:0}
   .ul:hover{background:var(--bj-fundo3)}
-  .ul .quem{font-size:12px}
-  .ul .gem{flex:none;font-size:11.5px;color:var(--bj-texto2);font-variant-numeric:tabular-nums;width:62px;text-align:right}
-  .ul .pct{flex:none;width:50px;text-align:right;font-weight:700;font-size:12px}
-  .ul .trilha{flex:none;width:58px;height:5px;border-radius:99px;background:var(--bj-fundo4);overflow:hidden}
-  .ul .trilha i{display:block;height:100%;background:var(--bj-texto2);border-radius:99px}
+  .ul .quem{font-size:13.5px}
+  .ul .gem{flex:none;font-size:12.5px;color:var(--bj-texto2);font-variant-numeric:tabular-nums;width:72px;text-align:right}
+  .ul .pct{flex:none;width:52px;text-align:right;font-weight:600;font-size:13px}
+  .ul .trilha{flex:none;width:64px;height:4px;border-radius:99px;background:var(--bj-borda2);overflow:hidden}
+  .ul .trilha i{display:block;height:100%;background:var(--bj-acento);border-radius:99px}
   .ul.fora{opacity:.4}
   .ul.fora .pct{text-decoration:line-through}
 
-  .conf-rot{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--bj-texto3);font-weight:700;margin-top:13px}
+  .conf-rot{font-size:12.5px;color:var(--bj-texto2);font-weight:500;margin-top:14px}
   .conf-rot:first-of-type{margin-top:0}
-  .caixa{display:flex;align-items:center;gap:9px;margin-top:11px;font-size:12.5px;color:var(--bj-texto2);cursor:pointer}
-  .caixa input{appearance:none;width:15px;height:15px;border-radius:4px;border:1.5px solid var(--bj-borda3);
-    background:var(--bj-fundo3);display:grid;place-items:center;cursor:pointer;flex:none;margin:0}
+  .caixa{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;color:var(--bj-texto2);cursor:pointer}
+  .caixa input{appearance:none;width:16px;height:16px;border-radius:5px;border:1.5px solid var(--bj-borda3);
+    background:transparent;display:grid;place-items:center;cursor:pointer;flex:none;margin:0}
   .caixa input:checked{background:var(--bj-claro);border-color:var(--bj-claro)}
-  .caixa input:checked::after{content:"✓";color:var(--bj-sobreClaro);font:900 11px var(--bj-ui);line-height:1}
+  .caixa input:checked::after{content:"";width:9px;height:5px;margin-top:-2px;border:solid var(--bj-sobreClaro);border-width:0 0 2px 2px;transform:rotate(-45deg)}
   .caixa b{color:var(--bj-texto)}
-  /* as duas opções do sorteio lado a lado; quebram de linha se faltar espaço */
   .caixas-linha{display:flex;flex-wrap:wrap;column-gap:24px}
 
   .so-gemas{
-    display:flex;align-items:center;gap:9px;margin-top:12px;padding:9px 12px;border-radius:11px;
-    background:var(--bj-fundo3);border:1px solid var(--bj-borda2);font-size:12px;color:var(--bj-texto2);
+    display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 14px;border-radius:12px;
+    background:var(--bj-fundo3);border:0;font-size:13px;color:var(--bj-texto2);
   }
   .so-gemas b{color:var(--bj-texto)}
   .so-gemas .espaco{flex:1}
 
-  /* ------------------------------------------------- sorteio: configuracao */
-  /* seletores de um lado, botao do outro, ocupando a altura dos dois grupos */
-  /* Entre | Chance lado a lado, com divisória, e o botão na coluna da direita
-     ocupando só a linha dos cards (não a dos rótulos): fica da altura deles. */
-  .sorteio-conf{container-type:inline-size}
-  .sel-linha{
-    display:grid;column-gap:12px;row-gap:9px;align-items:stretch;
-    grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr) minmax(130px,170px);
-    grid-template-areas:"ra dv rb ." "ca dv cb bt";
+  /* ------------------------------------------------ seletores (cards) */
+  /* título do grupo com ícone, em cima dos cards empilhados */
+  .sel-rot{
+    display:flex;align-items:center;gap:6px;margin-bottom:8px;
+    font:500 12.5px/18px var(--bj-ui);color:var(--bj-texto2);
+  }
+  .sel-rot svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sel-rot svg .ch{fill:currentColor;stroke:none}
+  .sel-cards{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .sel-cards > .op{flex:none}   /* .op tem flex-basis de 210px para as linhas de opções; empilhado, viraria altura */
+  /* o card: título e apoio à esquerda, marcador à direita (sem o ícone) */
+  .op.sel{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;
+    padding:10px 12px;border-radius:12px;font-size:13.5px;line-height:1.3;cursor:pointer;
+  }
+  .op.sel .sel-ico{display:none}
+  .op.sel .txt{display:flex;flex-direction:column;min-width:0}
+  .op.sel .txt .rot{display:block;font-weight:600}
+  .op.sel .txt small{font-size:12px;line-height:16px;margin-top:1px}
+  .op.sel .marca-radio{grid-column:2;grid-row:1;margin:0}
+  .op.sel[aria-disabled="true"]{opacity:.38;cursor:not-allowed}
+  /* Ranking: dois grupos lado a lado (sem divisória nem coluna de botão) */
+  .sel-linha.sem-botao{
+    display:grid;column-gap:18px;row-gap:0;align-items:stretch;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ra rb" "ca cb";
   }
   .sel-rot-a{grid-area:ra}
   .sel-rot-b{grid-area:rb}
   .sel-cards-a{grid-area:ca}
   .sel-cards-b{grid-area:cb}
-  .sel-div{grid-area:dv;background:var(--bj-borda);margin:2px 4px}
-  .sel-linha .botao-sortear{grid-area:bt;height:100%;margin:0;padding:12px;letter-spacing:.14em}
-  .sel-rot{
-    display:flex;align-items:center;gap:8px;
-    font:700 11.5px var(--bj-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--bj-texto2);
+  .sel-div{display:none}
+
+  /* Sorteio: 2x2 de seletores e a coluna das opções com o botão embaixo.
+     Cada grupo ocupa 3 linhas (título e dois cards) do grid de fora via
+     subgrid: os cards de uma mesma linha têm a mesma altura mesmo com o
+     filtro de gema dentro de um deles. */
+  .sorteio-conf,.rk-conf{container-type:inline-size}
+  .sorteio-grade{
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(6,auto);
+    column-gap:16px;row-gap:6px;
   }
-  .sel-rot svg,.sel-ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-  .sel-rot svg .ch,.sel-ico svg .ch{fill:currentColor;stroke:none}
-  .sel-cards{display:grid;grid-template-columns:1fr 1fr;gap:9px;min-width:0}
-  /* ícone, título e marcador na primeira linha; a descrição (e o filtro de
-     gema) ocupa a largura toda embaixo. Antes ela ficava espremida na coluna do
-     título e, em tela de notebook, virava uma tira de 3–4 linhas com o card
-     cheio de espaço vazio. */
-  .op.sel{
-    display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:10px;align-items:center;align-content:start;
-    padding:12px 13px 13px;border-radius:13px;font-size:13.5px;line-height:1.3;
+  .sorteio-grade > .sel-grupo{display:grid;grid-template-rows:subgrid;grid-row:span 3;min-width:0}
+  .sorteio-grade > .sel-grupo > .sel-rot{margin-bottom:2px}
+  .sorteio-grade > .sel-grupo:nth-child(n+4) > .sel-rot{padding-top:14px}
+  .sorteio-grade > .sel-grupo > .sel-cards{display:grid;grid-template-rows:subgrid;grid-row:span 2;gap:6px}
+  .sorteio-grade > .sorteio-lado{grid-column:3;grid-row:1 / -1;display:flex;flex-direction:column}
+  .sorteio-lado .sel-rot{margin-bottom:8px}
+  .sortear-col{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;margin-top:auto;padding-top:14px}
+  /* opções liga/desliga no mesmo formato dos cards, com marcador quadrado */
+  .sel-toggles{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .sel-toggle{
+    display:flex;align-items:center;gap:10px;min-width:0;padding:10px 12px;border-radius:12px;cursor:pointer;
+    border:1px solid var(--bj-borda);background:transparent;font-size:13.5px;line-height:1.3;color:var(--bj-texto);
+    transition:border-color .16s,background .16s;
   }
-  .op.sel .txt{display:contents}
-  .op.sel .txt small,.op.sel .filtro-gema{grid-column:1 / -1}
-  .op.sel .sel-ico{grid-area:1 / 1}
-  .op.sel .marca-radio{grid-area:1 / 3}
-  .op.sel .sel-ico{color:var(--bj-texto3);display:flex;margin-top:1px;transition:color .14s}
-  .op.sel .sel-ico svg{width:21px;height:21px}
-  .op.sel[aria-checked="true"] .sel-ico,.op.sel:hover .sel-ico{color:var(--bj-texto)}
-  .op.sel .txt .rot{display:block;font-weight:700}
-  .op.sel .txt small{font-size:11.5px;line-height:1.4;margin-top:7px}
-  .op.sel .txt .rot{grid-area:1 / 2;min-width:0}
-  /* notebook (card de ~180px): sem o ícone, o título cabe numa linha só */
-  /* notebook (card de ~180px): um pouco menos de respiro para o título caber */
-  @container (min-width:861px) and (max-width:1100px){
-    .op.sel{column-gap:8px;padding:11px 12px 12px}
+  .sel-toggle:hover{border-color:var(--bj-borda3)}
+  .sel-toggle:has(input:checked){border-color:var(--bj-texto);background:var(--bj-fundo4)}
+  .sel-toggle .txt{flex:1;min-width:0;display:flex;flex-direction:column}
+  .sel-toggle .rot{font-weight:600}
+  .sel-toggle small{font-size:12px;line-height:16px;color:var(--bj-texto3);margin-top:1px}
+  .sel-toggle input{order:2;appearance:none;width:16px;height:16px;border-radius:5px;border:1.5px solid var(--bj-borda3);
+    background:transparent;display:grid;place-items:center;cursor:pointer;flex:none;margin:0}
+  .sel-toggle input:checked{background:var(--bj-claro);border-color:var(--bj-claro)}
+  .sel-toggle input:checked::after{content:"";width:8px;height:4px;margin-top:-2px;border:solid var(--bj-sobreClaro);border-width:0 0 2px 2px;transform:rotate(-45deg)}
+  .sel-extra{margin-top:0}
+  .sel-extra .conf-rot{margin-top:0}
+  /* card médio: dois grupos por linha e as opções numa linha inteira embaixo */
+  @container (max-width:720px){
+    .sorteio-grade{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(6,auto) auto}
+    .sorteio-grade > .sorteio-lado{grid-column:1 / -1;grid-row:auto;order:1;margin-top:14px}
   }
-  .op.sel .marca-radio{width:18px;height:18px;border-width:2px;margin-top:0}
-  .op.sel[aria-checked="true"] .marca-radio{background:var(--bj-claro)}
-  .op.sel[aria-checked="true"] .marca-radio::after{width:7px;height:7px;background:var(--bj-sobreClaro)}
-  .sel-linha-2{margin-top:14px}
-  /* Sorteio: as duas linhas num grid só. Largo: as opções (checkboxes) numa
-     linha embaixo dos seletores e o botão Sortear ocupando a coluna da direita
-     inteira. Empilhado: as opções ficam logo acima do botão. */
-  .sel-grade{
-    display:grid;column-gap:12px;row-gap:9px;align-items:stretch;
-    grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr) minmax(130px,170px);
-    grid-template-areas:"ra dv rb bt" "ca dv cb bt" "ra2 dv2 rb2 bt" "ca2 dv2 cb2 bt" "tg tg tg bt";
+  /* card estreito: tudo numa coluna */
+  @container (max-width:460px){
+    .sorteio-grade{display:flex;flex-direction:column;gap:14px}
+    .sorteio-grade > .sel-grupo,.sorteio-grade > .sel-grupo > .sel-cards{display:flex;flex-direction:column;gap:6px}
+    .sorteio-grade > .sel-grupo > .sel-rot{padding-top:0 !important}
+    .sorteio-grade > .sorteio-lado{margin-top:0}
   }
-  .sel-grade .sel-toggles{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:5px}
-  .sel-grade > .sel-linha{display:contents}
-  .sel-grade .sel-linha-2 .sel-rot-a{grid-area:ra2;margin-top:5px}
-  .sel-grade .sel-linha-2 .sel-rot-b{grid-area:rb2;margin-top:5px}
-  .sel-grade .sel-linha-2 .sel-cards-a{grid-area:ca2}
-  .sel-grade .sel-linha-2 .sel-cards-b{grid-area:cb2}
-  .sel-grade .sel-linha-2 .sel-div{grid-area:dv2}
-  .sel-grade .sel-toggles{grid-area:tg}
+  /* ranking em card estreito: os dois grupos empilham */
+  @container (max-width:520px){
+    .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb"}
+    .sel-linha.sem-botao .sel-rot-b{margin-top:14px}
+  }
+
   /* filtro de gema dentro do card Gemas */
   .filtro-gema{
-    display:flex;align-items:center;gap:8px;width:100%;margin-top:9px;padding:6px 9px;
-    border:1px solid var(--bj-borda2);border-radius:9px;background:var(--bj-fundo2);
-    color:var(--bj-texto);font:600 12px var(--bj-ui);text-align:left;cursor:pointer;
+    display:flex;align-items:center;gap:7px;width:100%;height:32px;margin-top:8px;padding:0 10px;
+    border:1px solid var(--bj-borda3);border-radius:8px;background:var(--bj-borda2);
+    color:var(--bj-texto);font:500 12.5px var(--bj-ui);text-align:left;cursor:pointer;
   }
-  .filtro-gema:hover{border-color:var(--bj-borda3)}
+  .filtro-gema:hover{border-color:var(--bj-texto3)}
   .filtro-gema .nome-g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .filtro-gema .seta{flex:none;color:var(--bj-texto3);font-size:10px}
+  .filtro-gema .seta{flex:none;color:var(--bj-texto2);font-size:10px}
   .filtro-gema img,.menu-gemas img{width:18px;height:18px;object-fit:contain;flex:none}
   .filtro-gema .emj,.menu-gemas .emj{width:18px;text-align:center;flex:none}
   .menu-gemas{
-    position:fixed;z-index:60;max-height:300px;overflow:auto;padding:5px;border-radius:12px;
-    background:var(--bj-fundo3);border:1px solid var(--bj-borda3);box-shadow:0 18px 40px rgba(0,0,0,.6);
+    position:fixed;z-index:60;max-height:300px;overflow:auto;padding:4px;border-radius:12px;
+    background:var(--bj-fundo3);border:1px solid var(--bj-borda3);box-shadow:0 12px 32px rgba(0,0,0,.6);
   }
   .menu-gemas button{
-    display:flex;align-items:center;gap:9px;width:100%;padding:6px 9px;border:0;border-radius:8px;
+    display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:0 10px;border:0;border-radius:8px;
     background:none;color:var(--bj-texto2);font:500 12.5px var(--bj-ui);text-align:left;cursor:pointer;
   }
   .menu-gemas button:hover,.menu-gemas button:focus-visible{background:var(--bj-fundo4);color:var(--bj-texto);outline:none}
-  .menu-gemas button[aria-selected="true"]{color:var(--bj-texto);font-weight:700}
+  .menu-gemas button[aria-selected="true"]{background:var(--bj-borda2);color:var(--bj-texto)}
   .menu-gemas .nome-g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .menu-gemas .info-g{flex:none;color:var(--bj-texto3);font-size:11px;font-variant-numeric:tabular-nums}
+  .menu-gemas .info-g{flex:none;color:var(--bj-texto3);font-size:11.5px;font-variant-numeric:tabular-nums}
   .menu-gemas .sep{height:1px;background:var(--bj-borda2);margin:4px 2px}
-  /* as duas opções do sorteio como cards, empilhadas na coluna do botão:
-     juntas têm a altura dos cards ao lado */
-  .sel-toggles{grid-area:bt;display:grid;grid-auto-rows:1fr;gap:6px;min-width:0}
-  .sel-toggle{
-    display:flex;align-items:center;gap:9px;min-width:0;padding:8px 11px;border-radius:12px;cursor:pointer;
-    border:1px solid var(--bj-borda);background:var(--bj-fundo3);
-    font-size:12px;line-height:1.3;color:var(--bj-texto2);
-    transition:border-color .14s,color .14s,background .14s;
-  }
-  .sel-toggle:hover{border-color:var(--bj-borda3);color:var(--bj-texto)}
-  .sel-toggle:has(input:checked){border-color:var(--bj-claro);background:var(--bj-fundo4);color:var(--bj-texto);font-weight:600}
-  .sel-toggle input{appearance:none;width:15px;height:15px;border-radius:4px;border:1.5px solid var(--bj-borda3);
-    background:var(--bj-fundo3);display:grid;place-items:center;cursor:pointer;flex:none;margin:0}
-  .sel-toggle input:checked{background:var(--bj-claro);border-color:var(--bj-claro)}
-  .sel-toggle input:checked::after{content:"✓";color:var(--bj-sobreClaro);font:900 11px var(--bj-ui);line-height:1}
-  /* card que não vale para o tipo de sorteio escolhido (ex.: "qualquer live" em compradores) */
-  .op.sel[aria-disabled="true"]{opacity:.38;cursor:not-allowed}
-  .sel-extra{margin-top:0}   /* só sobrou o aviso de filtro, que já tem margem própria */
-  .sel-extra .conf-rot{margin-top:0}
-  /* card estreito: os grupos empilham e o botão desce para baixo deles.
-     Em uma linha só, cada card precisa de ~150px (ícone, texto e marcador):
-     abaixo de 860px eles ficavam com ~110px e o texto quebrava palavra por palavra. */
-  @container (max-width:860px){
-    .sel-linha{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb" "bt"}
-    .sel-grade{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb" "ra2" "ca2" "rb2" "cb2" "tg" "bt"}
-    .sel-grade .sel-toggles{grid-template-columns:minmax(0,1fr);margin-top:0}
-    .sel-grade .sel-div{display:none}
-    /* o Ranking (sem a coluna do botão) continua numa linha até 620px */
-    .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);grid-template-areas:"ra dv rb" "ca dv cb"}
-    .sel-linha.sem-botao .sel-div{display:block}
-    .sel-linha.sem-botao .sel-rot-b{margin-top:0}
-    .sel-linha.sem-botao{column-gap:9px}
-    .sel-linha.sem-botao .sel-cards{gap:7px}
-    .sel-linha.sem-botao .op.sel{column-gap:7px;padding:10px 10px 11px;font-size:13px}
-    .sel-linha.sem-botao .op.sel .txt small{font-size:11px}
-    .sel-div{display:none}
-    .sel-rot-b{margin-top:6px}
-    .sel-linha .botao-sortear{height:auto;padding:15px;margin-top:4px}
-  }
-
-  @container (max-width:620px){
-    .sel-linha.sem-botao{grid-template-columns:minmax(0,1fr);grid-template-areas:"ra" "ca" "rb" "cb"}
-    .sel-linha.sem-botao .sel-div{display:none}
-    .sel-linha.sem-botao .sel-rot-b{margin-top:6px}
-  }
 
   /* --------------------------------------------------------- palco do sorteio */
-  /* a altura e controlada em px pelo JS: so assim o easing vale a pena */
+  /* a altura é controlada em px pelo JS: só assim o easing vale a pena */
   .palco{
     position:relative;flex:none;margin-top:14px;height:250px;border-radius:16px;overflow:hidden;
-    border:1px solid var(--bj-borda2);
-    background:radial-gradient(120% 120% at 50% 0%, #1b1b1b 0%, #121212 55%, #0d0d0d 100%);
+    border:0;background:#0b0b0b;
     transition:height .46s cubic-bezier(.4,0,.2,1);
   }
   .palco canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .palco-conteudo{position:absolute;inset:0;z-index:1;display:grid;place-items:center;padding:20px}
-  /* enquanto sorteia, a configuracao sai de cena e o palco ocupa o lugar dela */
+  /* enquanto sorteia, a configuração sai de cena e o palco ocupa o lugar dela */
   .sorteio-conf{
     transition:height .46s cubic-bezier(.4,0,.2,1), opacity .26s ease, transform .3s ease;
   }
   .sorteio-conf.saindo{opacity:0;transform:translateY(-10px);pointer-events:none}
-  /* o que fica abaixo do palco recolhe junto: a animacao toma o card inteiro */
+  /* o que fica abaixo do palco recolhe junto: a animação toma o card inteiro */
   .pos-palco{transition:height .46s cubic-bezier(.4,0,.2,1), opacity .26s ease, transform .3s ease}
   .pos-palco.saindo{opacity:0;transform:translateY(10px);pointer-events:none}
   .palco .resultado{margin-top:0}
   .palco .vazio{padding:0}
+  .palco .vazio-p{border:0}
 
   .botao-sortear{
-    margin-top:15px;width:100%;padding:15px;border-radius:12px;border:0;
+    width:100%;padding:16px;border-radius:12px;border:0;
     background:var(--bj-claro);color:var(--bj-sobreClaro);
-    font:800 14px var(--bj-ui);letter-spacing:.18em;text-transform:uppercase;
+    font:700 14px var(--bj-ui);
     transition:background .14s,transform .08s;
   }
   .botao-sortear:hover:not(:disabled){background:#fff;color:var(--bj-sobreClaro)}
@@ -755,13 +707,14 @@
   .resultado{display:flex;align-items:center;gap:14px;margin-top:10px;min-width:0}
   .resultado .caixa-av{
     position:relative;flex:none;padding:5px;border-radius:50%;
-    border:1px solid var(--bj-borda2);background:var(--bj-fundo3);
+    border:1px solid var(--bj-borda3);background:var(--bj-borda2);
   }
   .resultado.ganhou .caixa-av{border-color:var(--bj-claro);animation:bater .5s ease-out both}
   @keyframes bater{0%{transform:scale(.82)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
   /* vencedor: card de ouro (degradê metálico + reflexo passando) com uma aura
-     dourada respirando atrás. Sem z-index/isolation no card de propósito: assim
-     a aura (::before, z-index -1) fica ATRÁS do fundo dourado, e não por cima. */
+     dourada respirando atrás. Foi pedido assim e fica de fora da regra de
+     gradiente. Sem z-index/isolation no card de propósito: assim a aura
+     (::before, z-index -1) fica ATRÁS do fundo dourado, e não por cima. */
   .resultado.card-ouro{
     position:relative;padding:14px 26px 14px 16px;border-radius:18px;max-width:100%;
     border:1px solid #fff0b0;
@@ -831,7 +784,7 @@
   @keyframes entrarMsg{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
   .resultado .info{min-width:0}
   .resultado .nome{font-size:21px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .resultado .det{font-size:12px;color:var(--bj-texto2);margin-top:2px}
+  .resultado .det{font-size:12.5px;color:var(--bj-texto2);margin-top:2px}
   .resultado .trofeu{font-size:19px;flex:none}
   .girando-nome{color:var(--bj-texto2)}
 
@@ -850,78 +803,80 @@
   @keyframes ebSobe{0%,100%{transform:scaleY(.86)}50%{transform:scaleY(1)}}
   @keyframes ebPisca{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
   .em-breve-tag{padding:3px 11px;border:1.5px solid #e3a80f;border-radius:999px;color:#f6cf5a;
-    font:700 11px var(--bj-ui);letter-spacing:.12em;text-transform:uppercase}
-  .card.em-breve .em-breve-tit{margin:4px 0 0;font:700 21px/1.25 var(--bj-ui);letter-spacing:-.01em;text-transform:none;color:var(--bj-texto)}
-  .em-breve-txt{margin:0;max-width:440px;color:var(--bj-texto2);font-size:13.5px;line-height:1.55}
-  .hist{margin-top:9px;max-height:300px;overflow-y:auto}
-  .hl-remover{flex:none;width:22px;height:22px;display:grid;place-items:center;margin-left:auto;padding:0;border:0;border-radius:6px;
-    background:none;color:var(--bj-texto3);font:600 16px/1 var(--bj-ui);cursor:pointer;opacity:.55;transition:opacity .15s,color .15s,background .15s}
+    font:600 12px var(--bj-ui)}
+  .card.em-breve .em-breve-tit{margin:4px 0 0;font:600 20px/28px var(--bj-ui);color:var(--bj-texto);display:block}
+  .em-breve-txt{margin:0;max-width:440px;color:var(--bj-texto2);font-size:14px;line-height:1.55}
+
+  /* histórico de ganhadores */
+  .hist{margin-top:8px;max-height:300px;overflow-y:auto}
+  .hl-remover{flex:none;width:26px;height:26px;display:grid;place-items:center;margin-left:auto;padding:0;border:0;border-radius:50%;
+    background:none;color:var(--bj-texto3);font:500 16px/1 var(--bj-ui);cursor:pointer;opacity:.55;transition:opacity .15s,color .15s,background .15s}
   .hl:hover .hl-remover{opacity:1}
   .hl-remover:hover,.hl-remover:focus-visible{color:#ff5252;background:rgba(255,82,82,.14);opacity:1;outline:none}
-  .hl{display:flex;align-items:center;gap:10px;padding:4px 5px;border-radius:8px;font-size:11.5px;min-width:0}
-  .hl:hover{background:var(--bj-fundo3)}
-  .hl .hora{flex:none;color:var(--bj-texto3);font-family:var(--bj-mono);font-size:11px}
-  .hl .quem{font-weight:600;flex:none;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .hl .motivo{flex:none;padding:1px 7px;border:1px solid #f5c518;border-radius:999px;color:#f5c518;
-    font-size:10.5px;font-weight:700;line-height:1.4}
-  .hl .motivo.vermelho{border-color:#ff5252;color:#ff5252}
-  .hl .motivo.verde{border-color:#3ddc84;color:#3ddc84}
-  .hl .como{flex:1;min-width:0;color:var(--bj-texto3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hl{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 4px;border-bottom:1px solid var(--bj-borda);font-size:13px;min-width:0}
+  .hl:last-child{border-bottom:0}
+  .hl .hora{flex:none;color:var(--bj-texto3);font-size:12px}
+  .hl .quem{font-weight:600;flex:none;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+  .hl .motivo{flex:none;padding:2px 8px;border:0;border-radius:999px;color:#f5c518;background:rgba(245,197,24,.14);
+    font-size:11.5px;font-weight:700;line-height:1.4}
+  .hl .motivo.vermelho{color:#ff5252;background:rgba(255,82,82,.14)}
+  .hl .motivo.verde{color:var(--bj-positivo);background:#172a1d}
+  .hl .como{flex:1;min-width:0;color:var(--bj-texto3);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* -------------------------------------------------------------- tela lives */
-  .uma{height:100%;overflow:auto;padding:13px}
+  .uma{height:100%;overflow:auto;padding:var(--bj-gap)}
   /* a tabela não se estica até a borda da janela: números longe do rótulo
      deixam de ser uma linha e viram duas coisas soltas */
-  .tabela{width:100%;max-width:860px;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+  .tabela{width:100%;max-width:860px;border-collapse:collapse;margin-top:12px;font-size:13.5px}
   .tabela th{
-    text-align:right;padding:7px 10px;font:700 9.5px var(--bj-ui);letter-spacing:.1em;text-transform:uppercase;
+    text-align:right;padding:8px 12px;font:400 12.5px var(--bj-ui);
     color:var(--bj-texto3);border-bottom:1px solid var(--bj-borda2);white-space:nowrap;
   }
   .tabela th:first-child,.tabela td:first-child{text-align:left}
   .tabela th:last-child,.tabela td:last-child{text-align:left}
-  .tabela td{padding:8px 10px;border-bottom:1px solid var(--bj-borda);text-align:right;white-space:nowrap}
+  .tabela td{height:40px;padding:0 12px;border-bottom:1px solid var(--bj-borda);text-align:right;white-space:nowrap}
   .tabela td.n{font-variant-numeric:tabular-nums}
   .tabela tr:hover td{background:var(--bj-fundo3)}
   .tabela tr.agora td{background:var(--bj-fundo4);color:var(--bj-texto)}
-  .tabela tr.agora td:first-child{font-weight:700}
+  .tabela tr.agora td:first-child{font-weight:600}
   .selo{
-    display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;
-    background:var(--bj-claro);color:var(--bj-sobreClaro);font:800 9px var(--bj-ui);letter-spacing:.11em;
+    display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;
+    background:var(--bj-claro);color:var(--bj-sobreClaro);font:600 11px var(--bj-ui);
     vertical-align:1px;
   }
-  .tabela .fraco{color:var(--bj-texto3);font-weight:500}
+  .tabela .fraco{color:var(--bj-texto3);font-weight:400}
   .rodape-lives{display:flex;justify-content:flex-end;margin-top:14px}
 
   /* ------------------------------------------------------------------- toast */
-  .toasts{position:fixed;right:14px;bottom:14px;z-index:60;display:flex;flex-direction:column;gap:7px;align-items:flex-end}
+  .toasts{position:fixed;right:16px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
   .toast{
-    display:flex;align-items:center;gap:9px;max-width:330px;
-    background:var(--bj-fundo3);border:1px solid var(--bj-borda2);border-radius:11px;
-    padding:8px 13px;font-size:12px;color:var(--bj-texto);
+    display:flex;align-items:center;gap:10px;max-width:340px;
+    background:var(--bj-fundo3);border:1px solid var(--bj-borda3);border-radius:12px;
+    padding:10px 14px;font-size:13px;color:var(--bj-texto);
     box-shadow:0 12px 32px rgba(0,0,0,.65);animation:entrarToast .22s ease-out both;
   }
   .toast.saindo{animation:sairToast .25s ease-in both}
-  .toast b{font-weight:700}
-  .toast .v{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;flex:none}
+  .toast b{font-weight:600}
+  .toast .v{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums;flex:none;color:var(--bj-acento)}
   @keyframes entrarToast{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
   @keyframes sairToast{to{opacity:0;transform:translateX(18px)}}
 
   /* -------------------------------------------------------------- diagnóstico */
   .diag{
     position:fixed;right:12px;bottom:12px;z-index:50;width:430px;max-width:calc(100vw - 24px);
-    background:var(--bj-fundo2);border:1px solid var(--bj-borda2);border-radius:12px;
+    background:var(--bj-fundo3);border:1px solid var(--bj-borda3);border-radius:14px;
     box-shadow:0 18px 44px rgba(0,0,0,.7);overflow:hidden;
   }
   .diag-topo{
-    display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid var(--bj-borda);
-    font:700 10px var(--bj-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--bj-texto3);
+    display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--bj-borda2);
+    font:600 13px var(--bj-ui);color:var(--bj-texto);
   }
   .diag-topo .espaco{flex:1}
   .diag pre{
-    margin:0;max-height:230px;overflow:auto;padding:9px 11px;
-    font:10.5px/1.6 var(--bj-mono);color:var(--bj-texto2);white-space:pre-wrap;word-break:break-word;
+    margin:0;max-height:230px;overflow:auto;padding:10px 12px;
+    font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--bj-texto2);white-space:pre-wrap;word-break:break-word;
   }
-  .diag .dica{margin:0;padding:7px 11px;border-top:1px solid var(--bj-borda);font-size:10px;color:var(--bj-texto3)}
+  .diag .dica{margin:0;padding:8px 12px;border-top:1px solid var(--bj-borda2);font-size:12px;color:var(--bj-texto3)}
 
   /* números esmaecidos quando não há sinal: nada que pareça ao vivo */
   body.sem-sinal .ind-v,
@@ -943,16 +898,17 @@
     .uma{height:auto;overflow:visible}
     .col-a{overflow:visible}
     .col-b{grid-template-rows:auto auto}
-    .feed{max-height:290px;flex:none}
+    .feed{max-height:320px;flex:none}
   }
   @media (max-width:820px){
-    .indicadores{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .indicadores,.ind-vendas,.aud-ind{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .ind:nth-child(odd){border-left:0;padding-left:0}
     .contexto{display:none}
-    .podio{grid-template-columns:1fr 1fr 1fr}
   }
   @media (max-width:640px){
-    .topo{height:auto;padding:9px 12px;flex-wrap:wrap;gap:9px}
-    .aba{padding:0 11px}
+    .topo{height:auto;min-height:56px;padding:8px 16px;gap:10px;grid-template-columns:1fr auto}
+    .topo>.abas{grid-column:1 / -1;grid-row:2;justify-self:start}
+    .aba{height:44px}
     .duas,.uma{padding:10px}
     .op{flex:1 1 100%}
   }
@@ -962,11 +918,11 @@
     *,*::before,*::after{animation:none !important;transition:none !important}
   }
 
-  /* ---- duas exceções à regra acima ----------------------------------------
+  /* ---- exceções à regra acima --------------------------------------------
      O Windows com "efeitos de animação" desligado faz o Chrome pedir menos
      movimento, e a regra de cima apagava TODAS as animações do painel. Estas
-     duas foram pedidas explicitamente e não piscam nem chamam atenção à toa:
-     o fundo do menu deslizando e a linha nova entrando no feed. O resto
+     foram pedidas explicitamente e não piscam nem chamam atenção à toa:
+     o traço das abas deslizando e a linha nova entrando no feed. O resto
      continua obedecendo a preferência do sistema. */
   .navc-fundo,.aba-fundo{
     transition:transform .34s cubic-bezier(.4,0,.2,1), width .34s cubic-bezier(.4,0,.2,1), opacity .18s ease !important;
@@ -991,13 +947,13 @@
 <!-- ========================================================== cabeçalho -->
 <header class="topo">
   <div class="topo-esq">
-    <div class="marca">&#128142; <b>BetterJamble</b></div>
+    <div class="marca"><svg class="marca-gema" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h8l3.5 4.5L10 17 2.5 7.5z"/><path d="M2.5 7.5h15M7.5 3 6 7.5l4 9.5 4-9.5L12.5 3"/></svg><span><b>BetterJamble</b></span></div>
     <div class="contexto" id="contexto">conectando&hellip;</div>
   </div>
   <nav class="abas" role="tablist" aria-label="Seções do painel">
     <span class="aba-fundo" id="abaFundo" aria-hidden="true"></span>
     <button class="aba" id="aba-vivo" role="tab" data-tela="vivo" aria-selected="true"><span class="rot">Ao vivo</span><span class="rec" aria-hidden="true"></span></button>
-    <button class="aba" id="aba-lives" role="tab" data-tela="lives" aria-selected="false"><span class="emj">&#128197;</span><span class="rot">Resumo das Lives</span></button>
+    <button class="aba" id="aba-lives" role="tab" data-tela="lives" aria-selected="false"><span class="rot">Resumo das Lives</span></button>
   </nav>
   <div class="topo-dir">
   <!-- auto resgate da "Recompensa por assistir" (resgate.js na aba da live) -->
@@ -1085,7 +1041,7 @@
                  com divisória, sem a coluna do botão -->
             <div class="sorteio-conf rk-conf" id="rkConf">
               <div class="sel-linha sem-botao">
-                <div class="sel-rot sel-rot-a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5v1.5A3.5 3.5 0 0 0 8 11M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11"/></svg>Ranking</div>
+                <div class="sel-rot sel-rot-a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 3.5 8l8.5 4.5L20.5 8z"/><path d="M3.5 12.5 12 17l8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></svg>Tipo</div>
                 <div class="sel-cards sel-cards-a" id="opcoesRkTipo" role="radiogroup" aria-label="Ranking de">
                 <button class="op sel" type="button" role="radio" data-rtipo="gemas" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l4 5-9 11L3 9z"/><path d="M3 9h18M9.5 4L8 9l4 11 4-11-1.5-5"/></svg></span>
@@ -1102,7 +1058,7 @@
                 </div>
                 </div>
                 <div class="sel-div" aria-hidden="true"></div>
-                <div class="sel-rot sel-rot-b"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Somando</div>
+                <div class="sel-rot sel-rot-b"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Período</div>
                 <div class="sel-cards sel-cards-b" id="opcoesEscopo" role="radiogroup" aria-label="O que somar no ranking">
                 <button class="op sel" type="button" role="radio" data-escopo="live" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
@@ -1129,50 +1085,12 @@
           <!-- ............................................... SORTEIO -->
           <div class="pane" id="pane-sorteio" role="tabpanel" hidden>
             <div class="sorteio-conf">
-              <!-- as duas linhas num grid só (sel-grade): no estreito, as opções
-                   (checkboxes) descem para logo acima do botão Sortear -->
-              <div class="sel-grade">
-              <!-- dois grupos lado a lado, divisória no meio e o botão na altura dos cards -->
-              <div class="sel-linha">
-                <div class="sel-rot sel-rot-a"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.2a3 3 0 0 1 0 5.6M17.5 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>Entre</div>
-                <div class="sel-cards sel-cards-a" id="opcoesSorteioEscopo" role="radiogroup" aria-label="Entre quem sortear">
-                <button class="op sel" type="button" role="radio" data-sesc="live" aria-checked="true">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioLive">Nesta live</span><small id="subSorteioLive">Só a live aberta agora</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                <button class="op sel" type="button" role="radio" data-sesc="vendedor" aria-checked="false">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioVendedor">Todas as lives</span><small id="subSorteioVendedor">Todas as lives do canal</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                </div>
-                <div class="sel-div" aria-hidden="true"></div>
-                <div class="sel-rot sel-rot-b"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.1" class="ch"/><circle cx="15" cy="15" r="1.1" class="ch"/><circle cx="15" cy="9" r="1.1" class="ch"/><circle cx="9" cy="15" r="1.1" class="ch"/></svg>Chance</div>
-                <div class="sel-cards sel-cards-b" id="opcoesModo" role="radiogroup" aria-label="Como calcular a chance">
-                <button class="op sel" type="button" role="radio" data-modo="peso" aria-checked="true">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="4" rx="1.5"/><rect x="13" y="10" width="7" height="10" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade</span><small id="subModoPeso">Cada gema vale uma chance</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                <button class="op sel" type="button" role="radio" data-modo="pessoa" aria-checked="false">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot">1 por pessoa</span><small>Todo mundo com a mesma chance</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                </div>
-                <!-- coluna da direita, primeira linha: as duas opções empilhadas em cards -->
-                <div class="sel-toggles">
-                  <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span id="rotSemRepetir">Não repetir quem já ganhou neste sorteio</span></label>
-                  <label class="sel-toggle"><input type="checkbox" id="exigirPresenca"><span>Confirmar presença no chat</span></label>
-                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span>Não repetir ganhadores entre gemas e compradores</span></label>
-                </div>
-              </div>
-
-              <!-- segunda linha, no mesmo grid: tipo de sorteio | animação | botão -->
-              <div class="sel-linha sel-linha-2">
-                <div class="sel-rot sel-rot-a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>Sortear</div>
-                <div class="sel-cards sel-cards-a" id="opcoesTipo" role="radiogroup" aria-label="Tipo de sorteio">
+              <!-- 2x2 de seletores e, à direita, as opções com o botão embaixo; cada
+                   grupo ocupa 3 linhas (título e dois cards) do grid de fora via
+                   subgrid, então os cards de uma mesma linha têm a mesma altura -->
+              <div class="sorteio-grade">
+              <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 3.5 8l8.5 4.5L20.5 8z"/><path d="M3.5 12.5 12 17l8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></svg>Tipo</div>
+                <div class="sel-cards" id="opcoesTipo" role="radiogroup" aria-label="Tipo de sorteio">
                 <!-- div e não button: o card tem um botão dentro (o filtro de gema),
                      e botão dentro de botão não é permitido -->
                 <div class="op sel" role="radio" tabindex="0" data-tipo="gemas" aria-checked="true">
@@ -1188,21 +1106,56 @@
                   <span class="marca-radio"></span>
                 </button>
                 </div>
-                <div class="sel-div" aria-hidden="true"></div>
-                <div class="sel-rot sel-rot-b"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>Animação</div>
-                <div class="sel-cards sel-cards-b" id="opcoesAnim" role="radiogroup" aria-label="Animação do sorteio">
+              </div>
+              <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Período</div>
+                <div class="sel-cards" id="opcoesSorteioEscopo" role="radiogroup" aria-label="Entre quem sortear">
+                <button class="op sel" type="button" role="radio" data-sesc="live" aria-checked="true">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
+                  <span class="txt"><span class="rot" id="rotSorteioLive">Nesta live</span><small id="subSorteioLive">Só a live aberta agora</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                <button class="op sel" type="button" role="radio" data-sesc="vendedor" aria-checked="false">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+                  <span class="txt"><span class="rot" id="rotSorteioVendedor">Todas as lives</span><small id="subSorteioVendedor">Todas as lives do canal</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                </div>
+              </div>
+              <div class="sel-grupo sorteio-lado"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Opções</div>
+                <div class="sel-toggles" role="group" aria-label="Opções do sorteio">
+                  <label class="sel-toggle"><input type="checkbox" id="semRepetir"><span class="txt"><span class="rot" id="rotSemRepetir">Não repetir ganhador</span><small>Quem já ganhou neste sorteio fica fora</small></span></label>
+                  <label class="sel-toggle"><input type="checkbox" id="exigirPresenca"><span class="txt"><span class="rot">Confirmar presença</span><small>O ganhador responde no chat</small></span></label>
+                  <label class="sel-toggle" title="Quem ganhou no sorteio de gemas fica fora do de compradores, e vice-versa"><input type="checkbox" id="entreTipos"><span class="txt"><span class="rot">Não repetir entre tipos</span><small>Vale entre gemas e compradores</small></span></label>
+                </div>
+                <div class="sortear-col"><button class="botao-sortear" id="btnSortear" type="button">Sortear</button></div>
+              </div>
+              <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1" class="ch"/><circle cx="15" cy="15" r="1" class="ch"/><circle cx="15" cy="9" r="1" class="ch"/><circle cx="9" cy="15" r="1" class="ch"/></svg>Chance</div>
+                <div class="sel-cards" id="opcoesModo" role="radiogroup" aria-label="Como calcular a chance">
+                <button class="op sel" type="button" role="radio" data-modo="peso" aria-checked="true">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="4" rx="1.5"/><rect x="13" y="10" width="7" height="10" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/></svg></span>
+                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade</span><small id="subModoPeso">Cada gema vale uma chance</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                <button class="op sel" type="button" role="radio" data-modo="pessoa" aria-checked="false">
+                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
+                  <span class="txt"><span class="rot">1 por pessoa</span><small>Todo mundo com a mesma chance</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                </div>
+              </div>
+              <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.5l1.6 4.4L16 9.5l-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6z"/><path d="M17.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>Animação</div>
+                <div class="sel-cards" id="opcoesAnim" role="radiogroup" aria-label="Animação do sorteio">
                 <button class="op sel" type="button" role="radio" data-anim="subida" aria-checked="true">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></span>
-                  <span class="txt"><span class="rot">Subida</span><small>Nomes sobem por 5 segundos e o vencedor pousa no meio</small></span>
+                  <span class="txt"><span class="rot">Subida</span><small>Os nomes sobem e o vencedor pousa no meio</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 <button class="op sel" type="button" role="radio" data-anim="feixes" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span>
-                  <span class="txt"><span class="rot">Feixes</span><small>Feixes levam os nomes ao centro por 5 segundos</small></span>
+                  <span class="txt"><span class="rot">Feixes</span><small>Feixes levam os nomes ao centro</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 </div>
-                <button class="botao-sortear" id="btnSortear" type="button">&#127922; Sortear</button>
               </div>
               </div>
 

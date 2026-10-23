@@ -1333,12 +1333,15 @@
     const l = el('div', 'fl' + (animar ? ' chegou' : ''));
     l.dataset.id = e.id;
     l.appendChild(el('span', 'hora', hora(e.t)));
-    l.appendChild(avatar(e.avatar, e.usuario, e.userId, 'av-p'));
-    l.appendChild(el('span', 'nome', '@' + e.usuario));
+    l.appendChild(avatar(e.avatar, e.usuario, e.userId));
+    // nome em cima, a gema embaixo (mesma linha em duas camadas do Panel)
+    const m = el('span', 'fl-main');
+    m.appendChild(el('span', 'nome', '@' + e.usuario));
     const g = el('span', 'gema');
     g.appendChild(iconeGema({ iconeUrl: e.iconeUrl }));
     g.appendChild(el('span', null, e.iconeNome || e.iconeId));
-    l.appendChild(g);
+    m.appendChild(g);
+    l.appendChild(m);
     l.appendChild(el('span', 'mais-g', '+' + nf(e.gemas)));
     return l;
   }
@@ -1505,12 +1508,14 @@
     }
     const l = el('div', 'fl' + (animar ? ' chegou' : ''));
     l.appendChild(el('span', 'hora', hora(e.t)));
-    l.appendChild(avatar(e.a, e.u, e.id, 'av-p'));
-    l.appendChild(el('span', 'nome', '@' + (e.u || '?')));
+    l.appendChild(avatar(e.a, e.u, e.id));
+    const m = el('span', 'fl-main');
+    m.appendChild(el('span', 'nome', '@' + (e.u || '?')));
     const acao = el('span', 'acao ' + e.tipo);
     acao.appendChild(el('i'));
     acao.appendChild(el('span', null, e.tipo === 'entrou' ? 'entrou' : 'saiu'));
-    l.appendChild(acao);
+    m.appendChild(acao);
+    l.appendChild(m);
     l.appendChild(el('span', 'ficou', e.tipo === 'saiu' && e.ms ? 'ficou ' + duracaoCurta(e.ms) : ''));
     return l;
   }
@@ -1606,7 +1611,7 @@
     const urna = base ? calcularUrna(base) : null;
 
     const fora = urna ? urna.fora.length : 0;
-    $('rotSemRepetir').textContent = 'Não repetir quem já ganhou neste sorteio'
+    $('rotSemRepetir').textContent = 'Não repetir ganhador'
       + (sorteio.semRepetir && fora ? ' (' + nf(fora) + ' ' + plural(fora, 'fora', 'fora') + ')' : '');
     $('semRepetir').checked = sorteio.semRepetir;
     $('exigirPresenca').checked = sorteio.presenca;

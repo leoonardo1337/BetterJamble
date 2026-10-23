@@ -1,6 +1,7 @@
 // Badge com a soma do que já foi vendido na live, ao lado da aba "Vendidos (n)".
-// Estratégia: nada de polling. Os ids vêm das respostas que o site já busca (feed/produtos),
-// o total é recalculado só quando a contagem da aba muda, e cada live fica em cache.
+// Estratégia: os ids vêm das respostas que o site já busca (feed/produtos), o total é
+// recalculado quando a contagem da aba muda, e cada live fica em cache. A cada minuto o
+// botão de atualizar do card "Anúncios" é clicado, para a contagem não ficar parada.
 (() => {
   if (window.__jambleLiveTotalLoaded) return;
   window.__jambleLiveTotalLoaded = true;
@@ -10,6 +11,7 @@
   let authHeaders = null;
   const inflight = new Map();          // showId -> Promise
   const current = { showId: null, lastCount: null };
+  let vendidosChegaramEm = 0;          // última resposta da aba "Vendidos" que o próprio site buscou
 
   // ---------- cache entre trocas de live ----------
   const SKEY = 'jamble:live-totals:v1';
@@ -58,6 +60,7 @@
         }
         // Se o próprio site buscou a aba "Vendidos", aproveitamos a resposta: zero chamada extra.
         if (section === 'sold' && Array.isArray(j.items) && !j.hasNextPage) {
+          vendidosChegaramEm = Date.now();
           const sum = summarize(j.items);
           store(reqShow, sum);
           if (reqShow) compradoresDaLive(reqShow, j.items);
@@ -296,10 +299,46 @@
   window.addEventListener('popstate', onNav);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(0); });
 
+  // Sincronização: às vezes o site não atualiza a lista de anúncios sozinho e a
+  // contagem de "Vendidos (n)" fica parada. A cada minuto clicamos no botão de
+  // atualizar do card "Anúncios" (o mesmo que a pessoa clicaria); se a aba
+  // Vendidos estiver aberta, a resposta dele já chega pelo fetch acima. Se não
+  // chegar, buscamos as vendas uma vez nós mesmos.
+  function botaoAtualizarAnuncios() {
+    const vendidos = soldButton();
+    let card = vendidos && vendidos.parentElement;
+    for (let i = 0; card && i < 10; i++, card = card.parentElement) {
+      const titulo = [...card.querySelectorAll('h1,h2,h3,h4,p,span,div')]
+        .find((e) => e.childElementCount === 0 && e.textContent.trim() === 'Anúncios');
+      if (!titulo) continue;
+      // o botão de atualizar fica na linha do título: um botão só com ícone
+      let linha = titulo.parentElement;
+      for (let j = 0; linha && j < 3; j++, linha = linha.parentElement) {
+        const b = [...linha.querySelectorAll('button')].find((x) => x.querySelector('svg') && !x.textContent.trim());
+        if (b) return { botao: b, card };
+      }
+      return null;
+    }
+    return null;
+  }
+  function sincronizarAnuncios() {
+    const showId = showIdFromUrl();
+    const achado = showId && botaoAtualizarAnuncios();
+    if (!achado) return;
+    // não atrapalha quem está digitando na busca do card
+    if (achado.card.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    const antes = Date.now();
+    achado.botao.click();
+    setTimeout(() => {
+      if (vendidosChegaramEm < antes && showIdFromUrl() === showId) ensureData(showId, true);
+    }, 4000);
+  }
+
   setInterval(() => { if (!document.hidden) schedule(0); }, 20000);
+  setInterval(sincronizarAnuncios, 60000);
   setInterval(garantirCompradores, 3000);
   garantirCompradores();
-  window.__jambleLiveDebug = { cache, sellers, inflight, run, ensureData, paint, showIdFromUrl, sellerFor, soldButton, countOf, current };
+  window.__jambleLiveDebug = { sincronizarAnuncios, botaoAtualizarAnuncios, cache, sellers, inflight, run, ensureData, paint, showIdFromUrl, sellerFor, soldButton, countOf, current };
   onNav();
   schedule(0);
 })();
