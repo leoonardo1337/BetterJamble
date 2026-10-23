@@ -1070,9 +1070,8 @@
   function desenharSeletoresRanking() {
     const comp = rkTipo === 'compradores';
     document.querySelectorAll('[data-rtipo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.rtipo === rkTipo ? 'true' : 'false'));
-    const m = limpar($('rkMetrica'));
-    m.appendChild(el('span', 'nome-g', METRICAS[rkMetrica]));
-    m.appendChild(el('span', 'seta', '▾'));
+    $('fichasMetrica').hidden = !comp;
+    document.querySelectorAll('[data-rmetrica]').forEach((b) => b.setAttribute('aria-checked', b.dataset.rmetrica === rkMetrica ? 'true' : 'false'));
     $('subEscopoLive').textContent = 'Só a live aberta agora';
     $('pane-ranking').classList.toggle('rk-oculto', rkOculto);
     const olho = $('btnRkOlho');
@@ -2781,7 +2780,7 @@
   }
   document.querySelectorAll('[data-rtipo]').forEach((b) => {
     b.onclick = () => trocarTipoRanking(b.dataset.rtipo);
-    // o card de Compradores é um div (tem o seletor dentro): teclado como num botão
+    // o card de Compradores é um div: teclado como num botão
     b.onkeydown = (e) => {
       if (e.target !== b || (e.key !== 'Enter' && e.key !== ' ')) return;
       e.preventDefault();
@@ -2794,55 +2793,14 @@
     redesenharRanking();
   };
 
-  // menu "Valor total / Quantidade de compras", no mesmo formato do filtro de gema
-  const menuMetrica = $('menuRkMetrica');
-  document.body.appendChild(menuMetrica);
-  function fecharMenuMetrica() {
-    menuMetrica.hidden = true;
-    $('rkMetrica').setAttribute('aria-expanded', 'false');
-  }
-  function abrirMenuMetrica() {
-    limpar(menuMetrica);
-    Object.entries(METRICAS).forEach(([k, nome]) => {
-      const o = el('button');
-      o.type = 'button';
-      o.setAttribute('role', 'option');
-      o.setAttribute('aria-selected', rkMetrica === k ? 'true' : 'false');
-      o.appendChild(el('span', 'nome-g', nome));   // só o nome, sem ícone nem descrição
-      o.onclick = (e) => {
-        e.stopPropagation();
-        fecharMenuMetrica();
-        rkMetrica = k;
-        salvarLS('bj-rk-metrica', k);
-        rkTipo = 'compradores';
-        salvarLS('bj-rk-tipo', rkTipo);
-        redesenharRanking();
-      };
-      menuMetrica.appendChild(o);
-    });
-    const r = $('rkMetrica').getBoundingClientRect();
-    const larg = Math.max(r.width, 190);   // só os nomes: a largura do botão basta
-    menuMetrica.style.width = larg + 'px';
-    menuMetrica.style.left = Math.min(r.left, window.innerWidth - larg - 8) + 'px';
-    menuMetrica.hidden = false;
-    const cabeAbaixo = window.innerHeight - r.bottom - 8 >= menuMetrica.scrollHeight;
-    menuMetrica.style.top = (cabeAbaixo ? r.bottom + 4 : Math.max(8, r.top - menuMetrica.offsetHeight - 4)) + 'px';
-    $('rkMetrica').setAttribute('aria-expanded', 'true');
-  }
-  $('rkMetrica').onclick = (e) => {
-    e.stopPropagation();   // não conta como clique no card
-    if (!menuMetrica.hidden) { fecharMenuMetrica(); return; }
-    trocarTipoRanking('compradores');
-    abrirMenuMetrica();
-  };
-  $('rkMetrica').onkeydown = (e) => e.stopPropagation();
-  document.addEventListener('mousedown', (e) => {
-    if (menuMetrica.hidden || menuMetrica.contains(e.target) || $('rkMetrica').contains(e.target)) return;
-    fecharMenuMetrica();
+  // "Valor total / Quantidade de compras": fichas embaixo dos cards, no lugar das de gema
+  document.querySelectorAll('[data-rmetrica]').forEach((b) => {
+    b.onclick = () => {
+      rkMetrica = b.dataset.rmetrica;
+      salvarLS('bj-rk-metrica', rkMetrica);
+      redesenharRanking();
+    };
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMenuMetrica(); });
-  window.addEventListener('resize', fecharMenuMetrica);
-  document.addEventListener('scroll', (e) => { if (!menuMetrica.contains(e.target)) fecharMenuMetrica(); }, true);
 
   document.querySelectorAll('[data-sesc]').forEach((b) => {
     b.onclick = () => {

@@ -355,6 +355,10 @@
   .gema-ico{width:18px;height:18px;flex:none;object-fit:contain;display:block}
   .ficha .emj{font-size:13px;line-height:1}
   .ficha-n{font-weight:500;font-size:11.5px;color:var(--bj-texto3);font-variant-numeric:tabular-nums}
+  /* fichas da métrica dos compradores: ícone de traço no lugar do da gema */
+  .ficha-svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .ficha[aria-checked="true"]{background:var(--bj-claro);color:var(--bj-sobreClaro);border-color:var(--bj-claro)}
+  #pane-ranking.rk-oculto #fichasMetrica{display:none}
 
   /* ------------------------------------------------------------------ avatar */
   /* O tamanho padrão vive na regra base — nunca só nas regras de contexto. */
@@ -1075,12 +1079,9 @@
                   <span class="txt"><span class="rot">Gemas</span><small>Quem mais mandou gema</small></span>
                   <span class="marca-radio"></span>
                 </button>
-                <!-- div e não button: tem o seletor de métrica dentro -->
                 <div class="op sel" role="radio" tabindex="0" data-rtipo="compradores" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></span>
-                  <span class="txt"><span class="rot">Compradores</span><small>Quem mais comprou</small>
-                    <button class="filtro-gema" id="rkMetrica" type="button" aria-haspopup="listbox" aria-expanded="false" title="Ordenar compradores por"></button>
-                  </span>
+                  <span class="txt"><span class="rot">Compradores</span><small>Quem mais comprou</small></span>
                   <span class="marca-radio"></span>
                 </div>
                 </div>
@@ -1100,9 +1101,12 @@
                 </div>
               </div>
             </div>
-            <div class="menu-gemas" id="menuRkMetrica" role="listbox" aria-label="Ordenar compradores por" hidden></div>
-
             <div class="fichas" id="fichas"></div>
+            <!-- no ranking de compradores, no lugar das fichas de gema: por que ordenar -->
+            <div class="fichas" id="fichasMetrica" role="radiogroup" aria-label="Ordenar compradores por" hidden>
+              <button class="ficha" type="button" role="radio" data-rmetrica="valor" aria-checked="true"><svg class="ficha-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v5M17.5 9.5v5"/></svg><span>Valor total</span></button>
+              <button class="ficha" type="button" role="radio" data-rmetrica="compras" aria-checked="false"><svg class="ficha-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><span>Quantidade de compras</span></button>
+            </div>
             <div class="regua"></div>
             <div id="podio" class="podio" hidden></div>
             <div class="lista" id="ranking"></div>
