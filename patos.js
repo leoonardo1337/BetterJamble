@@ -1,61 +1,87 @@
 // ============================================================================
 // BetterJamble — patos da corrida do sorteio (desenhos próprios, em SVG)
 //
-// Cada pato é montado aqui: corpo de pato de borracha com contorno preto, numa
-// cor, e um acessório na cabeça (chapéu, coroa, capacete...). A mesma pessoa
-// cai sempre no mesmo pato (a combinação sai do id dela), então quem participa
-// de vários sorteios reconhece o seu.
+// Estilo "pato fofo" chapado (sem contorno): cabeça grande e redonda, corpo em
+// pílula, asa/rabo num tom mais claro, olho grande sorrindo (ou aberto), bico
+// em dois tons de laranja e um topetinho. Para cada pessoa se reconhecer no
+// meio de dezenas, cada pato combina:
+//   cor (14) x acessório (20) x olho (3) x bochecha (2) = 1.680 patos.
+// A mesma pessoa cai sempre no mesmo pato (a combinação sai do id dela).
 //
-// O painel pede BJPatos.imagem(id, alturaEmPx) e recebe um canvas pronto para
-// drawImage (o SVG é rasterizado uma vez por pato e por tamanho).
+// Coordenadas: o pato olha para a direita. Cabeça: centro (245,175), raio 75;
+// corpo: 100..320 x 240..370. O painel usa BJPatos.ancora para saber onde
+// ficam o bico, a cabeça e o corpo (nome, número e linha de chegada).
 // ============================================================================
 (() => {
-  // cor do corpo, sombra da asa
+  // [corpo, asa (mais clara), topete de trás (mais escuro)]
   const CORES = [
-    ['#ffd23f', '#e8b10f'], ['#ffd23f', '#e8b10f'], ['#ffd23f', '#e8b10f'],   // amarelo é o clássico: mais vezes
-    ['#ff4d4d', '#d62f3a'], ['#4cb3f0', '#2f8fcc'], ['#6fd36a', '#43a843'],
-    ['#ff8fc7', '#e56aa6'], ['#b388eb', '#8f63cf'], ['#ff9f43', '#e07b1a'],
-    ['#ffffff', '#d9d9d9'], ['#3a3a3a', '#1f1f1f'], ['#2ec4b6', '#1b9e92'],
+    ['#fed72b', '#fef53a', '#fe9711'], ['#fed72b', '#fef53a', '#fe9711'],   // o amarelo clássico, mais vezes
+    ['#f7f3ea', '#ffffff', '#d8cfbd'], ['#ff9ec7', '#ffc4dd', '#e86fa6'],
+    ['#6cc4f5', '#a8e0fb', '#3a9bd6'], ['#7fd66b', '#b4ec9f', '#4fae3e'],
+    ['#b38bff', '#d4bfff', '#8a5fe0'], ['#ffad42', '#ffd08a', '#e8811a'],
+    ['#ff6b6b', '#ffa0a0', '#d94848'], ['#5fe0c4', '#a6f1e1', '#33b39a'],
+    ['#c48a5a', '#e0b48d', '#9a6438'], ['#b9bec7', '#dde0e6', '#8c929c'],
+    ['#4a4a57', '#6b6b7a', '#2a2a33'], ['#ffe08a', '#fff1c2', '#f2b84b'],
   ];
+  const OLHOS = ['feliz', 'aberto', 'piscando'];
 
-  // Acessórios desenhados por cima da cabeça (cabeça: centro 82,36, raio 21)
-  const ACESSORIOS = {
+  // Acessórios por cima da cabeça (topo da cabeça em y=100, centro x=245)
+  const A = {
     nenhum: '',
-    coroa: '<path d="M64 20 L66 4 L74 13 L82 1 L90 13 L98 4 L100 20 Z" fill="#ffcc00" stroke="#000" stroke-width="3" stroke-linejoin="round"/><circle cx="82" cy="12" r="2.6" fill="#ff3b3b" stroke="#000" stroke-width="1.5"/>',
-    cartola: '<rect x="66" y="-6" width="30" height="24" rx="2" fill="#222" stroke="#000" stroke-width="3"/><rect x="66" y="10" width="30" height="5" fill="#d62f3a"/><path d="M58 20 Q82 13 104 20 Q104 25 82 24 Q58 25 58 20 Z" fill="#222" stroke="#000" stroke-width="3" stroke-linejoin="round"/>',
-    festa: '<path d="M70 19 L84 -12 L96 19 Z" fill="#4cb3f0" stroke="#000" stroke-width="3" stroke-linejoin="round"/><path d="M74 10 L92 10 M77 2 L89 2" stroke="#ffd23f" stroke-width="4"/><circle cx="84" cy="-13" r="4.5" fill="#ff4d4d" stroke="#000" stroke-width="2.5"/>',
-    capacete: '<path d="M60 34 Q60 9 84 9 Q106 9 106 32 L106 38 L60 38 Z" fill="#fff" stroke="#000" stroke-width="3" stroke-linejoin="round"/><path d="M78 30 Q92 25 106 30 L106 40 Q92 44 78 40 Z" fill="#9fd8ff" stroke="#000" stroke-width="2.5"/><path d="M70 14 l2 4 4.5 .5 -3.3 3 1 4.4 -4.2 -2.3 -4.2 2.3 1 -4.4 -3.3 -3 4.5 -.5 z" fill="#000"/>',
-    moicano: '<path d="M64 22 L62 4 L71 15 L73 -3 L80 13 L86 -4 L89 14 L97 2 L97 20 Z" fill="#c03bd6" stroke="#000" stroke-width="3" stroke-linejoin="round"/>',
-    bone: '<path d="M62 24 Q62 8 82 8 Q100 8 101 22 Z" fill="#d62f3a" stroke="#000" stroke-width="3" stroke-linejoin="round"/><path d="M96 20 Q112 18 116 24 Q104 27 94 25 Z" fill="#d62f3a" stroke="#000" stroke-width="3" stroke-linejoin="round"/><circle cx="82" cy="8" r="2.5" fill="#fff" stroke="#000" stroke-width="1.5"/>',
-    oculos: '<rect x="76" y="27" width="15" height="11" rx="4" fill="#111" stroke="#000" stroke-width="2"/><rect x="93" y="27" width="12" height="11" rx="4" fill="#111" stroke="#000" stroke-width="2"/><path d="M91 31 L93 31 M70 30 L76 31" stroke="#000" stroke-width="2.5"/><path d="M79 30 l4 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/>',
-    laco: '<path d="M70 15 L60 6 L60 24 Z M70 15 L80 6 L80 24 Z" fill="#ff5fa8" stroke="#000" stroke-width="3" stroke-linejoin="round"/><circle cx="70" cy="15" r="4.5" fill="#ff5fa8" stroke="#000" stroke-width="2.5"/>',
-    cowboy: '<path d="M52 21 Q82 30 112 21 Q110 28 82 30 Q54 28 52 21 Z" fill="#a0682e" stroke="#000" stroke-width="3" stroke-linejoin="round"/><path d="M66 22 Q64 2 74 4 Q82 10 90 4 Q100 2 98 22 Z" fill="#b87a3a" stroke="#000" stroke-width="3" stroke-linejoin="round"/><path d="M66 18 Q82 22 98 18" stroke="#5a3613" stroke-width="3" fill="none"/>',
-    chef: '<path d="M68 20 L68 12 Q60 4 68 -2 Q72 -10 82 -6 Q92 -12 97 -2 Q105 4 96 12 L96 20 Z" fill="#fff" stroke="#000" stroke-width="3" stroke-linejoin="round"/><path d="M68 15 L96 15" stroke="#000" stroke-width="2"/>',
-    fones: '<path d="M62 34 Q62 10 82 10 Q102 10 102 34" fill="none" stroke="#222" stroke-width="5"/><rect x="56" y="28" width="11" height="16" rx="4" fill="#ff4d4d" stroke="#000" stroke-width="2.5"/><rect x="97" y="28" width="11" height="16" rx="4" fill="#ff4d4d" stroke="#000" stroke-width="2.5"/>',
-    flor: '<g transform="translate(66 14)"><circle cx="0" cy="-7" r="5" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="7" cy="0" r="5" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="0" cy="7" r="5" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="-7" cy="0" r="5" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="0" cy="0" r="4" fill="#ffcc00" stroke="#000" stroke-width="2"/></g>',
-    gorro: '<path d="M62 26 Q60 4 82 4 Q104 4 102 26 Z" fill="#2f8fcc" stroke="#000" stroke-width="3" stroke-linejoin="round"/><rect x="60" y="20" width="44" height="9" rx="4" fill="#fff" stroke="#000" stroke-width="2.5"/><circle cx="82" cy="2" r="6" fill="#fff" stroke="#000" stroke-width="2.5"/>',
-    pirata: '<path d="M62 24 Q62 8 82 8 Q102 8 102 24 Z" fill="#d62f3a" stroke="#000" stroke-width="3" stroke-linejoin="round"/><circle cx="70" cy="14" r="2" fill="#fff"/><circle cx="90" cy="12" r="2" fill="#fff"/><path d="M62 22 L54 30 M62 22 L56 18" stroke="#d62f3a" stroke-width="4" stroke-linecap="round"/><path d="M84 25 L100 36" stroke="#000" stroke-width="2"/><ellipse cx="92" cy="31" rx="5.5" ry="5" fill="#111"/>',
-    aureola: '<ellipse cx="82" cy="6" rx="16" ry="5" fill="none" stroke="#ffcc00" stroke-width="4"/>',
+    coroa: '<path d="M192 112 L196 52 L220 82 L245 40 L270 82 L294 52 L298 112 Z" fill="#ffc62b"/><path d="M192 112 L298 112 L298 100 L192 100 Z" fill="#f0a91c"/><circle cx="245" cy="88" r="7" fill="#ff4d6d"/><circle cx="214" cy="96" r="5" fill="#4cb3f0"/><circle cx="276" cy="96" r="5" fill="#7fd66b"/>',
+    cartola: '<rect x="203" y="30" width="80" height="78" rx="6" fill="#2b2b33"/><rect x="203" y="86" width="80" height="14" fill="#e84a5f"/><ellipse cx="243" cy="108" rx="68" ry="12" fill="#2b2b33"/>',
+    festa: '<path d="M208 112 L250 14 L292 112 Z" fill="#4cb3f0"/><path d="M220 84 L280 84 L286 98 L214 98 Z M234 50 L266 50 L272 64 L228 64 Z" fill="#ffd23f"/><circle cx="250" cy="14" r="12" fill="#ff6b9d"/>',
+    bone: '<path d="M178 132 Q178 70 245 70 Q312 70 312 132 Z" fill="#e84a5f"/><path d="M300 118 Q356 112 372 128 Q340 140 296 134 Z" fill="#c93a4d"/><circle cx="245" cy="72" r="8" fill="#fff"/>',
+    laco: '<path d="M212 104 L172 82 L176 132 Z M212 104 L246 78 L250 128 Z" fill="#ff6fae"/><circle cx="212" cy="106" r="12" fill="#ff4f97"/>',
+    oculos: '<rect x="196" y="150" width="62" height="44" rx="14" fill="#1f1f26"/><rect x="262" y="156" width="40" height="36" rx="12" fill="#1f1f26"/><rect x="254" y="164" width="12" height="7" fill="#1f1f26"/><path d="M196 166 L176 160" stroke="#1f1f26" stroke-width="7" stroke-linecap="round"/><path d="M208 162 l14 -4" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".7"/>',
+    coracao: '<path d="M226 196 C192 176 196 146 214 146 C224 146 226 154 226 158 C226 154 230 146 240 146 C258 146 262 176 226 196 Z" fill="#ff3d7f"/><path d="M286 192 C262 178 264 154 278 154 C284 154 286 160 286 162 C286 160 290 154 296 154 C310 154 312 178 286 192 Z" fill="#ff3d7f"/><path d="M256 168 L268 168" stroke="#ff3d7f" stroke-width="5"/>',
+    flor: '<g transform="translate(196 108)"><circle cx="0" cy="-17" r="13" fill="#fff"/><circle cx="17" cy="0" r="13" fill="#fff"/><circle cx="0" cy="17" r="13" fill="#fff"/><circle cx="-17" cy="0" r="13" fill="#fff"/><circle cx="0" cy="0" r="11" fill="#ffc62b"/></g>',
+    gorro: '<path d="M176 130 Q172 56 245 56 Q318 56 314 130 Z" fill="#3a9bd6"/><rect x="170" y="116" width="150" height="24" rx="12" fill="#f5f5f5"/><circle cx="245" cy="52" r="17" fill="#f5f5f5"/>',
+    chef: '<path d="M200 118 L200 92 Q178 82 190 58 Q200 36 226 46 Q240 24 262 40 Q290 34 296 60 Q306 84 290 92 L290 118 Z" fill="#fff"/><rect x="200" y="104" width="90" height="14" fill="#e6e6e6"/>',
+    fones: '<path d="M176 168 Q176 92 245 92 Q314 92 314 168" fill="none" stroke="#2b2b33" stroke-width="13"/><rect x="160" y="148" width="34" height="50" rx="14" fill="#ff5a5f"/><rect x="298" y="148" width="30" height="46" rx="13" fill="#ff5a5f"/>',
+    pirata: '<path d="M176 128 Q176 76 245 76 Q314 76 314 128 Z" fill="#d93b3b"/><circle cx="214" cy="100" r="6" fill="#fff"/><circle cx="250" cy="94" r="6" fill="#fff"/><circle cx="284" cy="102" r="6" fill="#fff"/><path d="M178 122 L150 142 M178 122 L154 112" stroke="#d93b3b" stroke-width="12" stroke-linecap="round"/><path d="M196 140 L262 214" stroke="#1f1f26" stroke-width="5"/><ellipse cx="227" cy="174" rx="30" ry="27" fill="#1f1f26"/>',
+    aureola: '<ellipse cx="240" cy="64" rx="56" ry="15" fill="none" stroke="#ffd23f" stroke-width="10"/>',
+    moicano: '<path d="M184 128 L178 64 L204 96 L210 40 L232 88 L246 30 L258 88 L280 46 L282 96 L304 70 L300 128 Z" fill="#c03bd6"/>',
+    viking: '<path d="M178 132 Q178 68 245 68 Q312 68 312 132 Z" fill="#9aa3ad"/><rect x="176" y="118" width="138" height="18" rx="6" fill="#7b838c"/><path d="M184 102 Q148 92 150 40 Q168 74 196 82 Z" fill="#f4ead2"/><path d="M306 102 Q342 92 340 40 Q322 74 294 82 Z" fill="#f4ead2"/>',
+    cowboy: '<path d="M150 116 Q245 140 340 116 Q336 132 245 136 Q154 132 150 116 Z" fill="#a8672e"/><path d="M190 118 Q184 50 214 56 Q245 74 276 56 Q306 50 300 118 Z" fill="#bf7a3a"/><path d="M190 104 Q245 116 300 104" stroke="#6b3d16" stroke-width="8" fill="none"/>',
+    orelhas: '<path d="M184 120 L190 54 L232 98 Z" fill="#2b2b33"/><path d="M258 98 L300 54 L306 120 Z" fill="#2b2b33"/><path d="M194 106 L198 74 L220 98 Z M270 98 L292 74 L296 106 Z" fill="#ff9ec7"/>',
+    estrela: '<path d="M206 62 l12 24 27 4 -20 18 5 27 -24 -13 -24 13 5 -27 -20 -18 27 -4 z" fill="#ffd23f"/>',
+    mago: '<path d="M184 116 Q230 100 238 8 Q262 70 312 116 Z" fill="#5b4bd6"/><path d="M168 118 Q245 134 322 118 Q318 130 245 132 Q172 130 168 118 Z" fill="#4535b8"/><circle cx="238" cy="62" r="5" fill="#ffd23f"/><circle cx="262" cy="92" r="4" fill="#ffd23f"/><circle cx="214" cy="96" r="4" fill="#ffd23f"/>',
+    tiara: '<path d="M182 120 Q245 70 308 120" fill="none" stroke="#c9a7ff" stroke-width="10" stroke-linecap="round"/><circle cx="245" cy="86" r="11" fill="#ff6fae"/><circle cx="214" cy="98" r="8" fill="#ffd23f"/><circle cx="276" cy="98" r="8" fill="#4cb3f0"/>',
   };
-  const NOMES_ACESS = Object.keys(ACESSORIOS);
+  const ACESS = Object.keys(A);
 
-  function svgDoPato(cor, sombra, acess) {
-    // de frente para a direita, como os patos da corrida
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -18 130 118">'
-      // corpo + rabinho
-      + '<path d="M10 52 Q4 38 14 32 Q20 44 32 47 Q46 43 62 46 Q80 47 92 54 Q106 62 102 76 Q96 94 64 95 Q28 96 15 84 Q6 72 10 52 Z" fill="' + cor + '" stroke="#000" stroke-width="3.2" stroke-linejoin="round"/>'
-      // asa
-      + '<path d="M36 64 Q50 54 68 61 Q66 77 48 79 Q36 77 36 64 Z" fill="' + sombra + '" stroke="#000" stroke-width="2.6" stroke-linejoin="round"/>'
-      // cabeça
-      + '<circle cx="82" cy="36" r="21" fill="' + cor + '" stroke="#000" stroke-width="3.2"/>'
-      // bico
-      + '<path d="M98 35 Q116 32 118 40 Q116 46 98 46 Z" fill="#ff8a1f" stroke="#000" stroke-width="2.8" stroke-linejoin="round"/>'
-      + '<path d="M99 41 Q109 42 117 41" stroke="#000" stroke-width="2" fill="none"/>'
-      // olho
-      + '<circle cx="88" cy="29" r="5" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="89.5" cy="29.5" r="2.6" fill="#000"/>'
-      // brilho do plástico
-      + '<path d="M22 60 Q24 52 32 52" stroke="rgba(255,255,255,.6)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-      + ACESSORIOS[acess]
+  // o topete some debaixo de chapéu
+  const COBRE_TOPETE = { cartola: 1, festa: 1, bone: 1, gorro: 1, chef: 1, pirata: 1, viking: 1, cowboy: 1, mago: 1, coroa: 1 };
+
+  function olho(tipo, cor) {
+    // olho grande: anel branco + pupila; "feliz" cobre a metade de baixo com a
+    // cor do corpo (fica o sorriso de olho fechado)
+    const base = '<circle cx="226" cy="173" r="27" fill="#fefefe"/><circle cx="226" cy="173" r="14" fill="#434453"/><circle cx="231" cy="168" r="4.5" fill="#fff"/>';
+    if (tipo === 'aberto') return base;
+    if (tipo === 'piscando') return '<path d="M200 176 Q226 152 252 176" fill="none" stroke="#434453" stroke-width="9" stroke-linecap="round"/>';
+    return base + '<rect x="198" y="192" width="56" height="22" fill="' + cor + '"/>';
+  }
+
+  function svgDoPato(c, acess, tipoOlho, bochecha) {
+    const [corpo, asa, escuro] = c;
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 10 330 365">'
+      // topete de trás (só a ponta aparece, atrás da cabeça)
+      + (COBRE_TOPETE[acess] ? '' : '<rect x="160" y="120" width="80" height="20" rx="10" fill="' + escuro + '"/>')
+      + '<circle cx="245" cy="175" r="75" fill="' + corpo + '"/>'
+      + '<rect x="100" y="240" width="220" height="130" rx="65" fill="' + corpo + '"/>'
+      // asa + rabinho apontando para trás e para cima
+      + '<path d="M58 218 Q92 226 124 232 L196 236 Q234 250 230 286 Q222 332 150 332 Q90 332 70 300 Q54 268 58 218 Z" fill="' + asa + '"/>'
+      // topete da frente e a sobrancelha clarinha
+      + (COBRE_TOPETE[acess] ? '' : '<rect x="175" y="98" width="70" height="25" rx="12" fill="' + corpo + '"/>')
+      + '<rect x="211" y="131" width="30" height="10" rx="5" fill="' + asa + '"/>'
+      + olho(tipoOlho, corpo)
+      + (bochecha ? '<ellipse cx="262" cy="214" rx="15" ry="9" fill="#ff7aa2" opacity=".55"/>' : '')
+      // bico: parte de cima laranja, de baixo mais escura, e a narina
+      + '<path d="M268 198 L268 166 Q302 156 340 168 Q364 178 360 198 Z" fill="#fe9711"/>'
+      + '<path d="M270 196 L344 196 Q356 199 352 206 Q330 214 270 212 Z" fill="#d55326"/>'
+      + '<rect x="300" y="163" width="15" height="7" rx="3.5" fill="#d45326"/>'
+      + A[acess]
       + '</svg>';
   }
 
@@ -67,18 +93,21 @@
   }
   function escolha(id) {
     const h = hash(String(id || '?'));
-    const [cor, sombra] = CORES[h % CORES.length];
-    const acess = NOMES_ACESS[(h >>> 8) % NOMES_ACESS.length];
-    return { cor, sombra, acess, chave: cor + acess };
+    const cor = CORES[h % CORES.length];
+    const acess = ACESS[Math.floor(h / CORES.length) % ACESS.length];
+    const tipoOlho = OLHOS[Math.floor(h / (CORES.length * ACESS.length)) % OLHOS.length];
+    const bochecha = (h >>> 27) & 1;
+    return { cor, acess, tipoOlho, bochecha, chave: cor[0] + acess + tipoOlho + bochecha };
   }
 
+  const ASPECTO = 330 / 365;
   const imgs = new Map();      // chave -> Image (carregando ou pronta)
   const rasters = new Map();   // chave|altura -> canvas
   function imagemBase(e) {
     let im = imgs.get(e.chave);
     if (!im) {
       im = new Image();
-      im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgDoPato(e.cor, e.sombra, e.acess));
+      im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgDoPato(e.cor, e.acess, e.tipoOlho, e.bochecha));
       imgs.set(e.chave, im);
     }
     return im;
@@ -93,17 +122,27 @@
     let c = rasters.get(k);
     if (!c) {
       c = document.createElement('canvas');
-      const w = Math.round(h * (130 / 118));
+      const w = Math.round(h * ASPECTO);
       c.width = w * dpr; c.height = h * dpr;
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
-      c.larg = w; c.alt = h;
       rasters.set(k, c);
-      if (rasters.size > 400) rasters.delete(rasters.keys().next().value);
+      if (rasters.size > 500) rasters.delete(rasters.keys().next().value);
     }
     return c;
   }
   // começa a carregar os desenhos de quem vai correr
   function preparar(ids) { ids.forEach((id) => imagemBase(escolha(id))); }
 
-  window.BJPatos = { imagem, preparar, svgDoPato, CORES, ACESSORIOS };
+  // onde ficam as partes, em frações da largura/altura da imagem
+  const ancora = {
+    aspecto: ASPECTO,
+    bico: (360 - 50) / 330,          // ponta do bico (linha de chegada)
+    cabecaEsq: (172 - 50) / 330,     // lado de trás da cabeça (o nome fica aí)
+    cabecaTopo: (104 - 10) / 365,
+    corpoX: (112 - 50) / 330,        // número da raia, na asa
+    corpoY: (300 - 10) / 365,
+    agua: (352 - 10) / 365,          // linha d'água
+  };
+
+  window.BJPatos = { imagem, preparar, svgDoPato, escolha, CORES, ACESSORIOS: A, OLHOS, ancora };
 })();

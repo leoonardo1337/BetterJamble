@@ -2270,7 +2270,8 @@
       const yRaia = (r) => (n > 1 ? yPrimeira + dy * r : (yPrimeira + yUltima) / 2);
       const tamNome = Math.max(10, Math.min(20, a * 0.03));
       const tamNum = Math.max(8, Math.min(15, a * 0.022));
-      const w = h * (130 / 118);
+      const AN = BJPatos.ancora;                                 // onde ficam bico, cabeça e corpo no desenho
+      const w = h * AN.aspecto;
       const incl = 0.5;                                          // quanto a raia de cima anda para a direita, por px de altura
       const sx = dy * incl;
       // pato da raia de baixo, na largada; com o bolo espalhado, mais para dentro
@@ -2286,7 +2287,7 @@
       // está em base + (yFundo - y) * incl, a mesma inclinação das raias. Por isso
       // basta comparar a base com o nariz do pato "trazido" para a raia de baixo.
       const yFundoL = yRaia(n - 1) + h * 0.35;
-      const baseNoNariz = (vant) => x0 + w * 0.98 + vant * corpo - h * 0.35 * incl;
+      const baseNoNariz = (vant) => x0 + w * AN.bico + vant * corpo - h * 0.35 * incl;
       // nos últimos CHEGADA_MS a chegada desliza da direita até o nariz do vencedor
       // e continua no mesmo passo, cruzando os outros em ordem
       let xChegada = null;
@@ -2377,7 +2378,7 @@
         }
         const bob = Math.sin(agora / 260 + pt.fase);
         const img = BJPatos.imagem(pt.id, h, dpr);
-        const yTopoPato = y - h * 0.72 + bob * h * 0.025;
+        const yTopoPato = y - h * 0.86 + bob * h * 0.025;   // a raia é a linha d'água
         ctx.save();
         ctx.translate(x + w / 2, yTopoPato + h / 2);
         ctx.rotate(bob * 0.03);
@@ -2388,10 +2389,12 @@
         const tamN = tamNum;
         ctx.font = '700 ' + tamN + 'px ' + fonte;
         const nw = Math.max(tamN * 1.6, ctx.measureText(String(n - pt.raia)).width + tamN);
-        pilula(ctx, x + w * 0.2, yTopoPato + h * 0.6, nw, tamN * 1.35, tamN * 0.3, '#fff', Math.max(1.2, tamN * 0.12));
+        const tagX = x + w * AN.corpoX;
+        const tagY = yTopoPato + h * AN.corpoY - tamN * 0.7;
+        pilula(ctx, tagX, tagY, nw, tamN * 1.35, tamN * 0.3, '#fff', Math.max(1.2, tamN * 0.12));
         ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(String(n - pt.raia), x + w * 0.2 + nw / 2, yTopoPato + h * 0.6 + tamN * 0.7);
-        etiqueta(ctx, x + w * 0.58, yTopoPato + h * 0.12, pt.nome, tamNome, dv > 0 && pt.ganha);
+        ctx.fillText(String(n - pt.raia), tagX + nw / 2, tagY + tamN * 0.7);
+        etiqueta(ctx, x + w * (AN.cabecaEsq + 0.08), yTopoPato + h * AN.cabecaTopo, pt.nome, tamNome, dv > 0 && pt.ganha);
       });
 
       // ---- relógio (HH:MM:SS, como no site)
