@@ -2210,12 +2210,26 @@
     camada.appendChild(el('div', 'corrida-dica', 'Esc pula para o resultado'));
     document.body.appendChild(camada);
     const fonte = getComputedStyle(document.body).fontFamily || 'sans-serif';
-    let med = medirPalco(cv);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // O que pesa é pintar pixels (por isso a janela maior trava mais). Corrida
+    // cheia: desenha em 1x e, em janela grande, numa resolução interna de até
+    // ~1440 px de largura que o navegador estica; com pouca gente, até 2x.
+    const cheia = participantes.length > 40;
+    function medir() {
+      const r = cv.getBoundingClientRect();
+      const k = cheia
+        ? Math.min(1, 1440 / Math.max(1, r.width))
+        : Math.min(window.devicePixelRatio || 1, 2);
+      cv.width = Math.max(1, Math.round(r.width * k));
+      cv.height = Math.max(1, Math.round(r.height * k));
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      return { ctx, l: r.width, a: r.height, k };
+    }
+    let med = medir();
 
     // Como no original, todo mundo da urna entra na água, mesmo que fique tudo
-    // amontoado; o teto é só para não pesar (o vencedor sempre corre)
-    const maxRaias = 200;
+    // amontoado (cada pato é uma imagem pronta, então centenas não pesam)
+    const maxRaias = 2000;
     let corredores = participantes.filter((x) => x.id !== vencedor.id);
     const doVencedor = participantes.find((x) => x.id === vencedor.id) || { id: vencedor.id, usuario: vencedor.usuario };
     embaralhar(corredores);
@@ -2276,6 +2290,88 @@
       ctx.fillStyle = '#000'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
       ctx.fillText(txt, xDir - w + tam * 0.45, yMeio + 0.5);
     }
+    // Cada corredor vira UMA imagem pronta: o pato, o número da raia no corpo e
+    // o nome perto da cabeça. Assim cada quadro faz um drawImage por pato, em
+    // vez de pato + duas pílulas + dois textos (com centenas, era o que pesava).
+    const sprites = new Map();   // id|destaque -> {c, ox, oy}
+    function sprite(pt, h, w, tamNome, tamNum, destaque) {
+      const chave = pt.id + (destaque ? '|d' : '');
+      const pronto = sprites.get(chave);
+      if (pronto && pronto.h === h) return pronto;
+      const dpr = med.k;
+      const img = BJPatos.imagem(pt.id, h, dpr);
+      if (!img) return null;                      // o desenho ainda está carregando
+      const AN = BJPatos.ancora;
+      const medida = document.createElement('canvas').getContext('2d');
+      medida.font = '500 ' + tamNome + 'px ' + fonte;
+      const nomeW = medida.measureText(pt.nome).width + tamNome * 0.9;
+      const nomeH = tamNome * 1.45;
+      const nomeDir = w * (AN.cabecaEsq + 0.08);  // borda direita do nome, a partir da esquerda do pato
+      const ox = Math.max(0, nomeW - nomeDir) + 3; // quanto o nome passa para a esquerda do pato
+      const oy = Math.max(0, nomeH / 2 - h * AN.cabecaTopo) + 3;
+      const W = Math.ceil(ox + w + 3), H = Math.ceil(oy + h + 3);
+      const c = document.createElement('canvas');
+      c.width = W * dpr; c.height = H * dpr;
+      const x = c.getContext('2d');
+      x.scale(dpr, dpr);
+      x.drawImage(img, ox, oy, w, h);
+      x.font = '700 ' + tamNum + 'px ' + fonte;
+      const num = String(n - pt.raia);
+      const nw = Math.max(tamNum * 1.6, x.measureText(num).width + tamNum);
+      const tagX = ox + w * AN.corpoX, tagY = oy + h * AN.corpoY - tamNum * 0.7;
+      pilula(x, tagX, tagY, nw, tamNum * 1.35, tamNum * 0.3, '#fff', Math.max(1.2, tamNum * 0.12));
+      x.fillStyle = '#000'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText(num, tagX + nw / 2, tagY + tamNum * 0.7);
+      etiqueta(x, ox + nomeDir, oy + h * AN.cabecaTopo, pt.nome, tamNome, destaque);
+      const sp = { c, ox, oy, W, H, h };
+      sprites.set(chave, sp);
+      return sp;
+    }
+
+    // Fundo pronto: margem (grama, arbustos, terra) e rio (faixas onduladas e
+    // brilhos) desenhados uma vez numa faixa mais larga que a tela; a cada
+    // quadro só desliza, conforme a câmera anda.
+    const PERIODO = 330;   // a faixa se repete a cada 330 px
+    let fundo = null;
+    function fazerFundo(l, a, rioY) {
+      const dpr = med.k;
+      const W = Math.ceil(l + PERIODO * 2), H = Math.ceil(a);
+      const c = document.createElement('canvas');
+      c.width = W * dpr; c.height = H * dpr;
+      const x = c.getContext('2d');
+      x.scale(dpr, dpr);
+      x.fillStyle = '#5cc93f'; x.fillRect(0, 0, W, rioY);
+      x.fillStyle = '#4bb330';
+      for (let k = 0; k * 66 < W; k++) {
+        const gx = k * 66 + ((k * 37) % 40), gy = rioY * (0.35 + ((k * 53) % 40) / 100);
+        x.beginPath(); x.moveTo(gx, gy); x.lineTo(gx + 4, gy - 9); x.lineTo(gx + 7, gy); x.lineTo(gx + 10, gy - 7); x.lineTo(gx + 13, gy); x.closePath(); x.fill();
+      }
+      const r = Math.max(10, rioY * 0.16);
+      for (let k = 0; k * PERIODO < W; k++) {
+        const bx = k * PERIODO + 90;
+        x.fillStyle = '#3f9e2e'; x.strokeStyle = '#1d4d15'; x.lineWidth = 2;
+        x.beginPath(); x.arc(bx, rioY - 6, r, Math.PI, 0); x.arc(bx + r * 1.3, rioY - 6, r * 0.8, Math.PI, 0); x.arc(bx + r * 2.4, rioY - 6, r * 0.65, Math.PI, 0); x.closePath(); x.fill(); x.stroke();
+      }
+      x.fillStyle = '#8a5a2b'; x.fillRect(0, rioY - 6, W, 8);
+      x.fillStyle = '#3d86ad'; x.fillRect(0, rioY + 2, W, a - rioY);
+      const faixas = 7, onda = PERIODO / (2 * Math.PI);   // seno com período de 330 px
+      for (let f = 0; f < faixas; f++) {
+        const y = rioY + 2 + ((a - rioY) * f) / faixas, alt = (a - rioY) / faixas;
+        x.fillStyle = f % 2 ? '#4797bf' : '#3a80a8';
+        x.beginPath(); x.moveTo(0, y + alt);
+        for (let px = 0; px <= W; px += 10) x.lineTo(px, y + Math.sin(px / onda + f) * alt * 0.12);
+        x.lineTo(W, y + alt); x.closePath(); x.fill();
+      }
+      x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = 2;
+      for (let f = 0; f < faixas * 2; f++) {
+        const y = rioY + 10 + ((a - rioY) * f) / (faixas * 2);
+        x.beginPath();
+        for (let px = (f * 53) % 110; px < W; px += 110) { x.moveTo(px, y); x.quadraticCurveTo(px + 22, y - 4, px + 44, y); }
+        x.stroke();
+      }
+      return { c, W, H, l, a };
+    }
+
     // faixa quadriculada inclinada (paralela à diagonal das raias)
     function linhaXadrez(ctx, xBase, yTopo, yFundo, incl, q) {
       const linhas = Math.ceil((yFundo - yTopo) / q);
@@ -2301,7 +2397,7 @@
       const agora = performance.now();
       const t = agora - p.inicio - LARGADA_MS;
       if (Math.round(cv.clientWidth) !== Math.round(med.l) || Math.round(cv.clientHeight) !== Math.round(med.a)) {
-        med = medirPalco(cv); p.ctx = med.ctx;
+        med = medir(); p.ctx = med.ctx; sprites.clear(); fundo = null;
       }
       const { ctx, l, a } = med;
       p.l = l; p.a = a;
@@ -2354,43 +2450,10 @@
       const dv = Math.max(0, t - fimRelogio - 300);
       const kv = Math.min(1, dv / 1400);
 
-      // ---- margem
-      ctx.fillStyle = '#5cc93f'; ctx.fillRect(0, 0, l, rioY);
-      ctx.fillStyle = '#4bb330';
-      for (let k = Math.floor(cam / 70) - 1; k < (cam + l) / 70 + 1; k++) {
-        const gx = k * 70 - cam * 1 + ((k * 37) % 50 + 50) % 50;
-        const gy = rioY * (0.35 + ((k * 53) % 40) / 100);
-        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + 4, gy - 9); ctx.lineTo(gx + 7, gy); ctx.lineTo(gx + 10, gy - 7); ctx.lineTo(gx + 13, gy); ctx.closePath(); ctx.fill();
-      }
-      for (let k = Math.floor(cam / 330) - 1; k < (cam + l) / 330 + 1; k++) {
-        const bx = k * 330 - cam + ((k * 131) % 160 + 160) % 160;
-        const r = Math.max(10, rioY * 0.16);
-        ctx.fillStyle = '#3f9e2e'; ctx.strokeStyle = '#1d4d15'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(bx, rioY - 6, r, Math.PI, 0); ctx.arc(bx + r * 1.3, rioY - 6, r * 0.8, Math.PI, 0); ctx.arc(bx + r * 2.4, rioY - 6, r * 0.65, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-      ctx.fillStyle = '#8a5a2b'; ctx.fillRect(0, rioY - 6, l, 8);
-
-      // ---- rio: faixas onduladas que passam com a câmera
-      ctx.fillStyle = '#3d86ad'; ctx.fillRect(0, rioY + 2, l, a - rioY);
-      const faixas = 7;
-      for (let f = 0; f < faixas; f++) {
-        const y = rioY + 2 + ((a - rioY) * f) / faixas;
-        const alt = (a - rioY) / faixas;
-        const desl = cam * (0.9 + f * 0.04) + agora * 0.012;
-        ctx.fillStyle = f % 2 ? '#4797bf' : '#3a80a8';
-        ctx.beginPath();
-        ctx.moveTo(0, y + alt);
-        for (let x = 0; x <= l + 20; x += 20) ctx.lineTo(x, y + Math.sin((x + desl) / 46) * alt * 0.12);
-        ctx.lineTo(l, y + alt); ctx.closePath(); ctx.fill();
-      }
-      ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 2;
-      for (let f = 0; f < faixas * 2; f++) {
-        const y = rioY + 10 + ((a - rioY) * f) / (faixas * 2);
-        const desl = (cam * 1.0 + f * 53) % 220;
-        ctx.beginPath();
-        for (let x = -desl; x < l + 220; x += 220) { ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 22, y - 4, x + 44, y); }
-        ctx.stroke();
-      }
+      // ---- margem e rio: a faixa pronta, deslizando com a câmera
+      if (!fundo || fundo.l !== l || fundo.a !== a) fundo = fazerFundo(l, a, rioY);
+      const desl = (cam + agora * 0.012) % PERIODO;
+      ctx.drawImage(fundo.c, 0, 0, fundo.c.width, fundo.c.height, -desl, 0, fundo.W, fundo.H);
 
       // ---- largada (fica para trás) e chegada, inclinadas, com o número das raias
       const q = Math.max(6, Math.min(16, a * 0.02));
@@ -2429,24 +2492,12 @@
           }
         }
         const bob = Math.sin(agora / 260 + pt.fase);
-        const img = BJPatos.imagem(pt.id, h, dpr);
         const yTopoPato = y - h * 0.86 + bob * h * 0.025;   // a raia é a linha d'água
-        ctx.save();
-        ctx.translate(x + w / 2, yTopoPato + h / 2);
-        ctx.rotate(bob * 0.03);
-        if (img) ctx.drawImage(img, -w / 2, -h / 2, w, h);
-        else { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.ellipse(0, h * 0.15, w * 0.42, h * 0.3, 0, 0, Math.PI * 2); ctx.fill(); }
-        ctx.restore();
-        // número da raia no corpo e o nome perto da cabeça
-        const tamN = tamNum;
-        ctx.font = '700 ' + tamN + 'px ' + fonte;
-        const nw = Math.max(tamN * 1.6, ctx.measureText(String(n - pt.raia)).width + tamN);
-        const tagX = x + w * AN.corpoX;
-        const tagY = yTopoPato + h * AN.corpoY - tamN * 0.7;
-        pilula(ctx, tagX, tagY, nw, tamN * 1.35, tamN * 0.3, '#fff', Math.max(1.2, tamN * 0.12));
-        ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(String(n - pt.raia), tagX + nw / 2, tagY + tamN * 0.7);
-        etiqueta(ctx, x + w * (AN.cabecaEsq + 0.08), yTopoPato + h * AN.cabecaTopo, pt.nome, tamNome, dv > 0 && pt.ganha);
+        const sp = sprite(pt, Math.round(h), w, tamNome, tamNum, dv > 0 && pt.ganha);
+        if (!sp) return;
+        const sx0 = Math.round(x - sp.ox), sy0 = Math.round(yTopoPato - sp.oy);
+        if (sx0 > l || sx0 + sp.W < 0) return;               // fora da tela: nem desenha
+        ctx.drawImage(sp.c, 0, 0, sp.c.width, sp.c.height, sx0, sy0, sp.W, sp.H);
       });
 
       // ---- relógio (HH:MM:SS, como no site)
@@ -2502,8 +2553,8 @@
     const tecla = (e) => { if (e.key === 'Escape' && palco === p) encerrar(); };
     document.addEventListener('keydown', tecla);
     p.soltar = () => document.removeEventListener('keydown', tecla);
-    p.raf = setInterval(quadro, 16);
-    quadro();
+    const laco = () => { if (palco !== p) return; quadro(); requestAnimationFrame(laco); };
+    requestAnimationFrame(laco);
     p.rede = setTimeout(() => { if (palco === p) encerrar(); }, LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
   }
 
