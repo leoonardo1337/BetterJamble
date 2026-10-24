@@ -2188,6 +2188,9 @@
   // um); a corrida só é montada para ele cruzar primeiro.
   const CORRIDA_MS = 60000;        // relógio do tiro de largada até zerar (1 minuto)
   const ARRANCADA_MS = 8000;       // nos últimos segundos o vencedor acelera e passa todo mundo
+  const FUGA_MS = 20000;           // aos 20 s o grupo cansa e 4 patos (com o vencedor) disparam
+  const FUGA_DURA = 14000;         // quanto tempo a fuga leva para abrir a distância toda
+  const ZOOM_CORRIDA = 0.9;        // 10% mais afastado: tudo um pouco menor
   const LARGADA_MS = 800;          // patos parados na linha antes do tiro
   const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
   const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
@@ -2262,11 +2265,27 @@
       for (const o of pt.ondas) v += o.a * (Math.sin(o.w * tt + o.f) - Math.sin(o.f));
       return v * suave(tt / 4000);
     }
-    const lider = Math.max(...patos.filter((x) => !x.ganha).map((x) => ondas(x, CORRIDA_MS)), -Infinity);
+    // Aos 20 s: o grupo diminui a velocidade e 4 patos (o vencedor e mais 3)
+    // disparam, abrindo uma distância grande para o resto — a disputa fica
+    // entre eles. O vencedor foge um pouco mais rápido e, no fim, ainda dá a
+    // arrancada que garante o primeiro lugar.
     const gv0 = patos.find((x) => x.ganha);
-    gv0.extra = Math.max(0, (isFinite(lider) ? lider : 0) + 0.6 - ondas(gv0, CORRIDA_MS));
+    const outros = patos.filter((x) => !x.ganha);
+    embaralhar(outros).slice(0, Math.min(3, outros.length)).forEach((x) => { x.fuga = 1; });
+    gv0.fuga = 1.12;
+    const ABRE = 4 + espalha * 1.2;                  // quanto os 4 andam na frente (em corpos)
+    const CANSA = 1.2 + espalha * 0.5;               // quanto o resto perde
+    function base(pt, t) {
+      const k = suave((t - FUGA_MS) / FUGA_DURA);
+      // na fuga as ondas acalmam: os 4 disputam entre si e o resto, cansado,
+      // não chega perto deles (fica uma distância clara entre os dois grupos)
+      const v = ondas(pt, t) * (1 - (pt.fuga ? 0.5 : 0.45) * k);
+      return pt.fuga ? v + ABRE * pt.fuga * k : v - CANSA * k;
+    }
+    const lider = Math.max(...outros.map((x) => base(x, CORRIDA_MS)), -Infinity);
+    gv0.extra = Math.max(0, (isFinite(lider) ? lider : 0) + 0.6 - base(gv0, CORRIDA_MS));
     function vantagem(pt, t) {
-      const v = ondas(pt, t);
+      const v = base(pt, t);
       return pt.ganha ? v + pt.extra * suave((t - (CORRIDA_MS - ARRANCADA_MS)) / (ARRANCADA_MS - 500)) : v;
     }
     const vantFinal = (pt) => vantagem(pt, CORRIDA_MS);
@@ -2410,14 +2429,14 @@
       // altura de referência (a do original) e o pato desenhado no dobro dela;
       // a vantagem entre os patos continua medida na referência, senão o bolo
       // ficaria largo demais para a tela
-      const hRef = a * Math.max(0.11, 0.2 * Math.pow(4 / Math.max(4, n), 0.22));
+      const hRef = a * Math.max(0.11, 0.2 * Math.pow(4 / Math.max(4, n), 0.22)) * ZOOM_CORRIDA;
       const h = Math.min(a * 0.42, hRef * 2);                    // altura do pato
       const yPrimeira = rioY + h * 0.5;                          // raia de trás
       const yUltima = a - h * 0.32;                              // raia da frente
       const dy = n > 1 ? (yUltima - yPrimeira) / (n - 1) : 0;
       const yRaia = (r) => (n > 1 ? yPrimeira + dy * r : (yPrimeira + yUltima) / 2);
-      const tamNome = Math.max(10, Math.min(20, a * 0.03));
-      const tamNum = Math.max(8, Math.min(15, a * 0.022));
+      const tamNome = Math.max(10, Math.min(20, a * 0.03)) * ZOOM_CORRIDA;
+      const tamNum = Math.max(8, Math.min(15, a * 0.022)) * ZOOM_CORRIDA;
       const AN = BJPatos.ancora;                                 // onde ficam bico, cabeça e corpo no desenho
       const w = h * AN.aspecto;
       const incl = 0.5;                                          // quanto a raia de cima anda para a direita, por px de altura
@@ -2435,13 +2454,25 @@
       // está em base + (yFundo - y) * incl, a mesma inclinação das raias. Por isso
       // basta comparar a base com o nariz do pato "trazido" para a raia de baixo.
       const yFundoL = yRaia(n - 1) + h * 0.35;
+      // Ninguém sai da tela pela direita: a posição de corrida (sem a diagonal
+      // da raia) vai sendo comprimida, cada vez mais devagar, até um limite que
+      // deixa até o pato da raia mais alta dentro da tela. Como a compressão é
+      // a mesma para todos, a ordem na chegada não muda.
+      const desvioMax = (n - 1) * sx;
+      const uLim = l - w - 14 - desvioMax;
+      const uSuave = Math.min(l * 0.55, uLim - l * 0.2);
+      const naTela = (u) => (u <= uSuave || uLim <= uSuave ? Math.min(u, Math.max(uSuave, uLim))
+        : uSuave + (uLim - uSuave) * (1 - Math.exp(-(u - uSuave) / (uLim - uSuave))));
+      const xPato = (pt, tt) => naTela(x0 + vantagem(pt, tt) * corpo) + (n - 1 - pt.raia) * sx;
+      // base da linha que encosta no bico deste pato (igual para todas as raias)
+      const baseNoBico = (pt, tt) => naTela(x0 + vantagem(pt, tt) * corpo) + w * AN.bico - h * 0.35 * incl;
       const baseNoNariz = (vant) => x0 + w * AN.bico + vant * corpo - h * 0.35 * incl;
       // nos últimos CHEGADA_MS a chegada desliza da direita até o nariz do vencedor
       // e continua no mesmo passo, cruzando os outros em ordem
       let xChegada = null;
       if (t > fimRelogio - CHEGADA_MS) {
         const k = (t - (fimRelogio - CHEGADA_MS)) / CHEGADA_MS;
-        const alvo = baseNoNariz(vantFinal(patos.find((x) => x.ganha)));
+        const alvo = baseNoBico(patos.find((x) => x.ganha), fimRelogio);
         const de = l * 1.05;
         xChegada = de + (alvo - de) * Math.min(k, 1.7);
       }
@@ -2479,7 +2510,8 @@
       // ---- patos, da raia de trás para a da frente
       const gv = patos.find((x) => x.ganha);
       patos.forEach((pt) => {
-        let x = x0 + (n - 1 - pt.raia) * sx + vantagem(pt, t) * corpo;
+        let x = xPato(pt, t);
+        if (p.ultimas) p.ultimas[pt.raia] = [pt.fuga ? (pt.ganha ? 2 : 1) : 0, Math.round(x - (n - 1 - pt.raia) * sx)];
         let y = yRaia(pt.raia);
         if (dv > 0) {
           if (pt.ganha) {
@@ -2553,6 +2585,9 @@
     const tecla = (e) => { if (e.key === 'Escape' && palco === p) encerrar(); };
     document.addEventListener('keydown', tecla);
     p.soltar = () => document.removeEventListener('keydown', tecla);
+    // posições do último quadro, para depurar pelo console (window.__bjCorrida)
+    p.ultimas = [];
+    window.__bjCorrida = p;
     const laco = () => { if (palco !== p) return; quadro(); requestAnimationFrame(laco); };
     requestAnimationFrame(laco);
     p.rede = setTimeout(() => { if (palco === p) encerrar(); }, LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
