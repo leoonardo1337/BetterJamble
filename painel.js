@@ -1581,7 +1581,6 @@
     // Compradores de outras lives existem só a partir de quando a extensão
     // passou a gravá-los (3.5): o texto do card diz desde quando há registro.
     const comp = deCompradores();
-    document.querySelectorAll('[data-tipo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.tipo === sorteio.tipo ? 'true' : 'false'));
     desenharSeletores();
 
     // O filtro de gema é herdado da tela "Ao vivo" e tem que aparecer por extenso:
@@ -3141,15 +3140,6 @@
   });
 
 
-  document.querySelectorAll('[data-tipo]').forEach((b) => {
-    b.onclick = () => { sorteio.tipo = b.dataset.tipo; desenharSorteio(); };
-    // o card de Gemas é um div (tem o filtro dentro): teclado como num botão
-    b.onkeydown = (e) => {
-      if (e.target !== b || (e.key !== 'Enter' && e.key !== ' ')) return;
-      e.preventDefault();
-      b.click();
-    };
-  });
 
   // ------------------------------------------------ filtro de gema do sorteio
   // O mesmo filtro das fichas do Ranking: escolher uma gema aqui faz o ranking,
@@ -3242,6 +3232,14 @@
   // escolhida (nome e descrição) e um seletor que lista só os nomes. O menu é
   // um só, no body (o container-type da área do sorteio deslocaria o fixed).
   const SELETORES = {
+    tipo: {
+      opcoes: () => ({
+        gemas: { nome: 'Gemas', sub: 'Entre quem mandou gema' },
+        compradores: { nome: 'Compradores', sub: 'Entre quem comprou nesta live' },
+      }),
+      valor: () => sorteio.tipo,
+      escolher: (k) => { sorteio.tipo = k; },
+    },
     escopo: {
       opcoes: () => {
         const desde = registroMaisAntigo(deCompradores());
@@ -3274,8 +3272,10 @@
       const o = ops[sel.valor()] || Object.values(ops)[0];
       c.querySelector('.rot').textContent = o.nome;
       c.querySelector('small').textContent = o.sub;
-      c.querySelector('.nome-g').textContent = o.nome;
+      c.querySelector('.btn-sel .nome-g').textContent = o.nome;
     });
+    // o filtro de gema só vale no sorteio de gemas
+    $('filtroGema').hidden = sorteio.tipo !== 'gemas';
   }
   const menuSel = $('menuSel');
   document.body.appendChild(menuSel);
@@ -3308,7 +3308,7 @@
     botaoAberto = botao;
   }
   document.querySelectorAll('[data-seletor]').forEach((c) => {
-    const botao = c.querySelector('.filtro-gema');
+    const botao = c.querySelector('.btn-sel');
     botao.onclick = (e) => {
       e.stopPropagation();
       const era = botaoAberto;
