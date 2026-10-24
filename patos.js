@@ -34,12 +34,12 @@
     bone: '<path d="M178 132 Q178 70 245 70 Q312 70 312 132 Z" fill="#e84a5f"/><path d="M300 118 Q356 112 372 128 Q340 140 296 134 Z" fill="#c93a4d"/><circle cx="245" cy="72" r="8" fill="#fff"/>',
     laco: '<path d="M212 104 L172 82 L176 132 Z M212 104 L246 78 L250 128 Z" fill="#ff6fae"/><circle cx="212" cy="106" r="12" fill="#ff4f97"/>',
     oculos: '<path d="M196 166 L170 156" stroke="#1f1f26" stroke-width="8" stroke-linecap="round"/><rect x="194" y="150" width="66" height="46" rx="16" fill="#1f1f26"/><path d="M206 162 l16 -5" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".7"/><path d="M258 164 L270 162" stroke="#1f1f26" stroke-width="7" stroke-linecap="round"/>',
-    coracao: '<path d="M196 164 L170 156" stroke="#ff3d7f" stroke-width="7" stroke-linecap="round"/><path d="M226 204 C184 180 188 140 210 140 C222 140 226 150 226 155 C226 150 230 140 242 140 C264 140 268 180 226 204 Z" fill="#ff3d7f"/><path d="M206 154 q6 -6 12 -4" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".7"/>',
+    coracao: '<path d="M226 204 C184 180 188 140 210 140 C222 140 226 150 226 155 C226 150 230 140 242 140 C264 140 268 180 226 204 Z" fill="#ff3d7f"/><path d="M206 154 q6 -6 12 -4" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".7"/>',
     flor: '<g transform="translate(196 108)"><circle cx="0" cy="-17" r="13" fill="#fff"/><circle cx="17" cy="0" r="13" fill="#fff"/><circle cx="0" cy="17" r="13" fill="#fff"/><circle cx="-17" cy="0" r="13" fill="#fff"/><circle cx="0" cy="0" r="11" fill="#ffc62b"/></g>',
     gorro: '<path d="M176 130 Q172 56 245 56 Q318 56 314 130 Z" fill="#3a9bd6"/><rect x="170" y="116" width="150" height="24" rx="12" fill="#f5f5f5"/><circle cx="245" cy="52" r="17" fill="#f5f5f5"/>',
     chef: '<path d="M200 118 L200 92 Q178 82 190 58 Q200 36 226 46 Q240 24 262 40 Q290 34 296 60 Q306 84 290 92 L290 118 Z" fill="#fff"/><rect x="200" y="104" width="90" height="14" fill="#e6e6e6"/>',
     fones: '<path d="M184 160 Q186 94 248 94 Q292 96 302 124" fill="none" stroke="#2b2b33" stroke-width="14" stroke-linecap="round"/><ellipse cx="182" cy="182" rx="24" ry="32" fill="#ff5a5f"/><ellipse cx="188" cy="182" rx="13" ry="21" fill="#d63f45"/>',
-    pirata: '<path d="M176 128 Q176 76 245 76 Q314 76 314 128 Z" fill="#d93b3b"/><circle cx="214" cy="100" r="6" fill="#fff"/><circle cx="250" cy="94" r="6" fill="#fff"/><circle cx="284" cy="102" r="6" fill="#fff"/><path d="M178 122 L150 142 M178 122 L154 112" stroke="#d93b3b" stroke-width="12" stroke-linecap="round"/><path d="M200 164 L172 150 M214 148 L206 126" stroke="#1f1f26" stroke-width="6" stroke-linecap="round"/><ellipse cx="226" cy="174" rx="31" ry="29" fill="#1f1f26"/>',
+    pirata: '<clipPath id="cab"><circle cx="245" cy="175" r="75"/></clipPath><path d="M176 128 Q176 76 245 76 Q314 76 314 128 Z" fill="#d93b3b"/><circle cx="214" cy="100" r="6" fill="#fff"/><circle cx="250" cy="94" r="6" fill="#fff"/><circle cx="284" cy="102" r="6" fill="#fff"/><path d="M178 122 L150 142 M178 122 L154 112" stroke="#d93b3b" stroke-width="12" stroke-linecap="round"/><path d="M170 118 L300 248" stroke="#1f1f26" stroke-width="9" clip-path="url(#cab)"/><ellipse cx="226" cy="174" rx="31" ry="29" fill="#1f1f26"/>',
     aureola: '<ellipse cx="240" cy="64" rx="56" ry="15" fill="none" stroke="#ffd23f" stroke-width="10"/>',
     moicano: '<path d="M184 128 L178 64 L204 96 L210 40 L232 88 L246 30 L258 88 L280 46 L282 96 L304 70 L300 128 Z" fill="#c03bd6"/>',
     viking: '<path d="M178 132 Q178 68 245 68 Q312 68 312 132 Z" fill="#9aa3ad"/><rect x="176" y="118" width="138" height="18" rx="6" fill="#7b838c"/><path d="M184 102 Q148 92 150 40 Q168 74 196 82 Z" fill="#f4ead2"/><path d="M306 102 Q342 92 340 40 Q322 74 294 82 Z" fill="#f4ead2"/>',
@@ -52,6 +52,7 @@
   const ACESS = Object.keys(A);
 
   // o topete some debaixo de chapéu
+  const TAPA_OLHO = { coracao: 1, pirata: 1 };
   const COBRE_TOPETE = { cartola: 1, festa: 1, bone: 1, gorro: 1, chef: 1, pirata: 1, viking: 1, cowboy: 1, mago: 1, coroa: 1 };
 
   function olho(tipo, cor) {
@@ -75,7 +76,8 @@
       // topete da frente e a sobrancelha clarinha
       + (COBRE_TOPETE[acess] ? '' : '<rect x="175" y="98" width="70" height="25" rx="12" fill="' + corpo + '"/>')
       + '<rect x="211" y="131" width="30" height="10" rx="5" fill="' + asa + '"/>'
-      + olho(tipoOlho, corpo)
+      // o coração e o tapa-olho ficam no lugar do olho (o olho não aparece atrás)
+      + (TAPA_OLHO[acess] ? '' : olho(tipoOlho, corpo))
       + (bochecha ? '<ellipse cx="262" cy="214" rx="15" ry="9" fill="#ff7aa2" opacity=".55"/>' : '')
       // bico: parte de cima laranja, de baixo mais escura, e a narina
       + '<path d="M268 198 L268 166 Q302 156 340 168 Q364 178 360 198 Z" fill="#fe9711"/>'
