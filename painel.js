@@ -2191,52 +2191,90 @@
   const FUGA_MS = 20000;           // aos 20 s o grupo cansa e 4 patos (com o vencedor) disparam
   const FUGA_DURA = 14000;         // quanto tempo a fuga leva para abrir a distância toda
   const ZOOM_CORRIDA = 0.9;        // 10% mais afastado: tudo um pouco menor
-  const LARGADA_MS = 800;          // patos parados na linha antes do tiro
+  const LARGADA_MS = 3040;         // contagem 3-2-1 com os patos na linha; o GO é o tiro (= CONTAGEM_GO)
   const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
   const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
 
-  // Sons da corrida, todos gerados na hora com Web Audio (nenhum arquivo):
-  // o tiro de largada, quacks soltos de patos aleatórios e uma torcida de
-  // fundo que cresce na arrancada e explode na chegada. M liga/desliga (fica
-  // lembrado).
+  // Sons da corrida. Se a pasta sons/ existir (contagem, música, torcida e
+  // quack em mp3 — ficam fora do git e do zip da loja), toca os arquivos;
+  // senão, gera tudo na hora com Web Audio. Ordem: contagem 3-2-1-GO, a
+  // música de corrida logo depois, a torcida baixinha de fundo (cresce na
+  // arrancada e explode na chegada) e quacks soltos. M liga/desliga.
+  const SONS = { contagem: 'sons/contagem.mp3', musica: 'sons/musica.mp3', torcida: 'sons/torcida.mp3', quack: 'sons/quack.mp3' };
+  // onde cada coisa acontece nos arquivos (medido nos mp3)
+  const CONTAGEM_BIPES = [40, 1040, 2040];   // ms do 3, do 2 e do 1
+  const CONTAGEM_GO = 3040;                  // ms do GO! (= tiro de largada)
+  const CONTAGEM_FIM = 4050;                 // a contagem termina; entra a música
+  const MUSICA_INICIO = 0;                   // s (o mp3 já vem sem o silêncio do começo)
+  const QUACK_TRECHO = [0, 0.3];             // s: onde está o quack no arquivo
+  const buffersSom = {};
+  let carregandoSons = null;
+  function carregarSons() {
+    if (carregandoSons) return carregandoSons;
+    const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!Off || !window.fetch) return (carregandoSons = Promise.resolve());
+    const dec = new Off(2, 1, 44100);   // só para decodificar (não precisa de clique)
+    carregandoSons = Promise.all(Object.entries(SONS).map(([k, url]) => fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('sem ' + k))))
+      .then((b) => dec.decodeAudioData(b))
+      .then((buf) => { buffersSom[k] = buf; })
+      .catch(() => { /* sem o arquivo: usa o som gerado */ })));
+    return carregandoSons;
+  }
+
   function somDaCorrida() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     let mudo = false;
     try { mudo = localStorage.getItem('bj-som-corrida') === 'mudo'; } catch (e) { /* sem storage */ }
-    const nada = { largada() {}, quack() {}, torcida() {}, chegada() {}, alternar() { return false; }, fechar() {} };
+    const nada = { comecar() {}, quack() {}, torcida() {}, chegada() {}, alternar() { return false; }, fechar() {} };
     if (!Ctx) return nada;
     let ac;
     try { ac = new Ctx(); } catch (e) { return nada; }
     if (ac.state === 'suspended') ac.resume().catch(() => {});
     const mestre = ac.createGain();
-    mestre.gain.value = mudo ? 0 : 0.7;
+    mestre.gain.value = mudo ? 0 : 0.8;
     mestre.connect(ac.destination);
+    const alea = (a, b) => a + Math.random() * (b - a);
+    const panear = (no, v) => {
+      if (!ac.createStereoPanner) { no.connect(mestre); return; }
+      const pan = ac.createStereoPanner(); pan.pan.value = v; no.connect(pan); pan.connect(mestre);
+    };
+    const tocar = (buf, quando, gain, opc = {}) => {
+      const s = ac.createBufferSource(); s.buffer = buf;
+      if (opc.loop) { s.loop = true; if (opc.loopStart != null) { s.loopStart = opc.loopStart; s.loopEnd = opc.loopEnd; } }
+      if (opc.rate) s.playbackRate.value = opc.rate;
+      s.connect(gain);
+      s.start(quando, opc.de || 0, opc.dura);
+      return s;
+    };
 
-    // 2 s de ruído branco, reaproveitado por tudo que precisa de ruído
+    // ruído branco (para a torcida e o tiro gerados)
     const ruido = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
     const dados = ruido.getChannelData(0);
     for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1;
-    const fonteRuido = (loop) => { const s = ac.createBufferSource(); s.buffer = ruido; s.loop = !!loop; return s; };
-    const alea = (a, b) => a + Math.random() * (b - a);
 
-    // torcida: ruído em quatro faixas de voz, cada uma subindo e descendo no
-    // seu ritmo (vira um burburinho de arquibancada)
+    // ---- torcida de fundo
     const torcidaG = ac.createGain();
     torcidaG.gain.value = 0;
     torcidaG.connect(mestre);
-    const fundo = fonteRuido(true);
-    [380, 720, 1250, 2300].forEach((f) => {
-      const bp = ac.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 1.4;
-      const g = ac.createGain(); g.gain.value = 0.5;
-      const lfo = ac.createOscillator(); lfo.frequency.value = alea(0.4, 2.2);
-      const prof = ac.createGain(); prof.gain.value = 0.35;
-      lfo.connect(prof); prof.connect(g.gain); lfo.start();
-      fundo.connect(bp); bp.connect(g); g.connect(torcidaG);
-    });
-    fundo.start();
-
-    // um "uhuu" de alguém da torcida: voz (dente de serra) que sobe de tom
+    const TORCIDA_VOL = buffersSom.torcida ? 0.35 : 0.09;   // o arquivo é bem mais "cheio"
+    if (buffersSom.torcida) {
+      const d = buffersSom.torcida.duration;
+      tocar(buffersSom.torcida, ac.currentTime, torcidaG, { loop: true, loopStart: 1, loopEnd: Math.max(2, d - 1), de: alea(1, d / 2) });
+    } else {
+      // ruído em quatro faixas de voz, cada uma subindo e descendo no seu ritmo
+      const fundo = ac.createBufferSource(); fundo.buffer = ruido; fundo.loop = true;
+      [380, 720, 1250, 2300].forEach((f) => {
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 1.4;
+        const g = ac.createGain(); g.gain.value = 0.5;
+        const lfo = ac.createOscillator(); lfo.frequency.value = alea(0.4, 2.2);
+        const prof = ac.createGain(); prof.gain.value = 0.35;
+        lfo.connect(prof); prof.connect(g.gain); lfo.start();
+        fundo.connect(bp); bp.connect(g); g.connect(torcidaG);
+      });
+      fundo.start();
+    }
+    // um "uhuu" gerado (só quando não há o arquivo da torcida)
     function grito(quando, forca) {
       const o = ac.createOscillator(); o.type = 'sawtooth';
       const f0 = alea(220, 420);
@@ -2248,36 +2286,52 @@
       g.gain.setValueAtTime(0, quando);
       g.gain.linearRampToValueAtTime(0.05 * forca, quando + 0.08);
       g.gain.exponentialRampToValueAtTime(0.001, quando + 0.8);
-      const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
-      o.connect(bp); bp.connect(g);
-      if (pan) { pan.pan.value = alea(-0.8, 0.8); g.connect(pan); pan.connect(mestre); } else g.connect(mestre);
+      o.connect(bp); bp.connect(g); panear(g, alea(-0.8, 0.8));
       o.start(quando); o.stop(quando + 0.85);
     }
+    // bipe gerado da contagem (agudo no GO)
+    function bipe(quando, freq, dura) {
+      const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = freq;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, quando);
+      g.gain.exponentialRampToValueAtTime(0.18, quando + 0.01);
+      g.gain.setValueAtTime(0.18, quando + dura - 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, quando + dura);
+      o.connect(g); g.connect(mestre);
+      o.start(quando); o.stop(quando + dura + 0.02);
+    }
+
+    const musicaG = ac.createGain();
+    musicaG.gain.value = 0.5;
+    musicaG.connect(mestre);
 
     return {
-      // tiro: estalo de ruído que decai rápido + um baque grave
-      largada() {
-        const t = ac.currentTime;
-        const s = fonteRuido(false);
-        const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(6000, t); lp.frequency.exponentialRampToValueAtTime(400, t + 0.35);
-        const g = ac.createGain();
-        g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-        s.connect(lp); lp.connect(g); g.connect(mestre);
-        s.start(t); s.stop(t + 0.5);
-        const o = ac.createOscillator();
-        o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(35, t + 0.25);
-        const go = ac.createGain();
-        go.gain.setValueAtTime(0.8, t); go.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-        o.connect(go); go.connect(mestre);
-        o.start(t); o.stop(t + 0.32);
-        for (let i = 0; i < 5; i++) grito(t + 0.25 + Math.random() * 0.6, 1);
+      // a contagem começa agora: 3-2-1-GO e, logo depois, a música
+      comecar() {
+        const t0 = ac.currentTime + 0.03;
+        if (buffersSom.contagem) {
+          const g = ac.createGain(); g.gain.value = 0.45; g.connect(mestre);
+          tocar(buffersSom.contagem, t0, g);
+        } else {
+          CONTAGEM_BIPES.forEach((ms) => bipe(t0 + ms / 1000, 523, 0.45));
+          bipe(t0 + CONTAGEM_GO / 1000, 1046, 0.9);
+          for (let i = 0; i < 5; i++) grito(t0 + CONTAGEM_GO / 1000 + 0.2 + Math.random() * 0.6, 1);
+        }
+        if (buffersSom.musica) tocar(buffersSom.musica, t0 + CONTAGEM_FIM / 1000, musicaG, { de: MUSICA_INICIO });
       },
-      // quack: voz nasal (dente de serra em filtros de "bico") que cai de tom;
-      // às vezes sai em dobro
+      // quack (o do arquivo, com tom e lado variando; ou um gerado)
       quack() {
         const vezes = Math.random() < 0.3 ? 2 : 1;
-        const f0 = alea(420, 640), panV = alea(-0.9, 0.9), vol = alea(0.18, 0.32);
+        const panV = alea(-0.9, 0.9);
+        if (buffersSom.quack) {
+          const g = ac.createGain(); g.gain.value = alea(0.35, 0.6); panear(g, panV);
+          const rate = alea(0.88, 1.18);
+          for (let k = 0; k < vezes; k++) {
+            tocar(buffersSom.quack, ac.currentTime + k * 0.3, g, { de: QUACK_TRECHO[0], dura: QUACK_TRECHO[1] - QUACK_TRECHO[0], rate });
+          }
+          return;
+        }
+        const f0 = alea(420, 640), vol = alea(0.18, 0.32);
         for (let k = 0; k < vezes; k++) {
           const t = ac.currentTime + k * 0.17;
           const o = ac.createOscillator(); o.type = 'sawtooth';
@@ -2289,29 +2343,29 @@
           g.gain.setValueAtTime(0, t);
           g.gain.linearRampToValueAtTime(vol, t + 0.012);
           g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-          o.connect(f1); f1.connect(f2); f2.connect(g);
-          if (ac.createStereoPanner) { const pan = ac.createStereoPanner(); pan.pan.value = panV; g.connect(pan); pan.connect(mestre); } else g.connect(mestre);
+          o.connect(f1); f1.connect(f2); f2.connect(g); panear(g, panV);
           o.start(t); o.stop(t + 0.17);
         }
       },
       // volume da torcida (0 a 1); muda suave, pode chamar a cada quadro
-      torcida(nivel) { torcidaG.gain.setTargetAtTime(0.09 * nivel, ac.currentTime, 0.4); },
-      // chegada: a torcida explode com vários gritos
+      torcida(nivel) { torcidaG.gain.setTargetAtTime(TORCIDA_VOL * nivel, ac.currentTime, 0.4); },
+      // chegada: a torcida explode e a música abaixa um pouco
       chegada() {
         const t = ac.currentTime;
         torcidaG.gain.cancelScheduledValues(t);
-        torcidaG.gain.setTargetAtTime(0.2, t, 0.05);
-        for (let i = 0; i < 14; i++) grito(t + Math.random() * 1.4, 1.4);
+        torcidaG.gain.setTargetAtTime(TORCIDA_VOL * 2.6, t, 0.08);
+        musicaG.gain.setTargetAtTime(0.3, t, 0.3);
+        if (!buffersSom.torcida) for (let i = 0; i < 14; i++) grito(t + Math.random() * 1.4, 1.4);
       },
       alternar() {
         mudo = !mudo;
         try { localStorage.setItem('bj-som-corrida', mudo ? 'mudo' : 'som'); } catch (e) { /* sem storage */ }
-        mestre.gain.setTargetAtTime(mudo ? 0 : 0.7, ac.currentTime, 0.05);
+        mestre.gain.setTargetAtTime(mudo ? 0 : 0.8, ac.currentTime, 0.05);
         return mudo;
       },
       fechar() {
-        try { mestre.gain.setTargetAtTime(0, ac.currentTime, 0.08); } catch (e) { /* já fechado */ }
-        setTimeout(() => ac.close().catch(() => {}), 400);
+        try { mestre.gain.setTargetAtTime(0, ac.currentTime, 0.12); } catch (e) { /* já fechado */ }
+        setTimeout(() => ac.close().catch(() => {}), 600);
       },
     };
   }
@@ -2333,7 +2387,9 @@
     camada.appendChild(cv);
     camada.appendChild(el('div', 'corrida-dica', 'Segure → para acelerar 2x · M liga/desliga o som · Esc pula para o resultado'));
     document.body.appendChild(camada);
-    const som = somDaCorrida();
+    // o som começa (e o relógio anda) quando os arquivos estiverem prontos,
+    // para a contagem na tela bater com a do áudio
+    let som = { comecar() {}, quack() {}, torcida() {}, chegada() {}, alternar() {}, fechar() {} };
     const alea = (a, b) => a + Math.random() * (b - a);
     const fonte = getComputedStyle(document.body).fontFamily || 'sans-serif';
     // O que pesa é pintar pixels (por isso a janela maior trava mais). Corrida
@@ -2575,7 +2631,8 @@
       const agora = performance.now();
       const dtReal = ultimoQuadro ? Math.min(100, agora - ultimoQuadro) : 0;
       ultimoQuadro = agora;
-      relogio += dtReal * (acelerando ? 2 : 1);
+      // parado até o som ficar pronto; a contagem não acelera (é a do áudio)
+      if (p.somPronto) relogio += dtReal * (acelerando && relogio >= LARGADA_MS ? 2 : 1);
       p.relogio = relogio;
       const t = relogio - LARGADA_MS;
       if (Math.round(cv.clientWidth) !== Math.round(med.l) || Math.round(cv.clientHeight) !== Math.round(med.a)) {
@@ -2669,7 +2726,7 @@
 
       // ---- sons: tiro na largada, quacks soltos, torcida crescendo na
       // arrancada e explodindo na chegada
-      if (!p.tiro && t >= 0) { p.tiro = true; som.largada(); p.proxQuack = agora + alea(600, 1800); }
+      if (!p.tiro && t >= 0) { p.tiro = true; p.proxQuack = agora + alea(600, 1800); }
       if (!p.cruzou && t >= fimRelogio) { p.cruzou = true; som.chegada(); }
       if (!p.cruzou) som.torcida(t < 0 ? 0.25 : 0.45 + 0.55 * suave((t - (fimRelogio - ARRANCADA_MS)) / ARRANCADA_MS));
       if (p.tiro && t < fimRelogio + 2500 && agora >= p.proxQuack) {
@@ -2755,6 +2812,32 @@
         ctx.fillText(n + ' patos · ' + fora + ' da urna não couberam (a chance de todos já contou)', 14, rioY * 0.1 + th + 16);
       }
 
+      // ---- contagem 3-2-1-GO no meio da tela, no tempo dos bipes do áudio
+      if (p.somPronto && relogio < LARGADA_MS + 800) {
+        const marcas = CONTAGEM_BIPES.concat([CONTAGEM_GO]);
+        let i = -1;
+        for (let k = 0; k < marcas.length; k++) if (relogio >= marcas[k]) i = k;
+        if (i >= 0) {
+          const go = i === marcas.length - 1;
+          const desde = relogio - marcas[i];
+          const k = Math.min(1, desde / (go ? 800 : 1000));
+          const escala = 1.35 - 0.35 * Math.min(1, desde / 160);   // pula grande e assenta
+          const tam = Math.max(60, Math.min(200, a * 0.28));
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, go ? 1 - k : k > 0.8 ? (1 - k) / 0.2 : 1);
+          ctx.translate(l / 2, rioY + (a - rioY) * 0.45);
+          ctx.scale(escala, escala);
+          ctx.font = '900 ' + tam + 'px ' + fonte;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+          const txt = go ? 'GO!' : String(marcas.length - 1 - i);
+          ctx.lineWidth = tam * 0.12; ctx.strokeStyle = '#000';
+          ctx.strokeText(txt, 0, 0);
+          ctx.fillStyle = go ? '#4cd964' : ['#ff5a5a', '#ffb02e', '#ffd23f'][i];
+          ctx.fillText(txt, 0, 0);
+          ctx.restore();
+        }
+      }
+
       // ---- faixa do vencedor
       if (kv >= 1) {
         const d = dv - 1400;
@@ -2808,7 +2891,14 @@
     window.__bjCorrida = p;
     const laco = () => { if (palco !== p) return; quadro(); requestAnimationFrame(laco); };
     requestAnimationFrame(laco);
-    p.rede = setTimeout(() => { if (palco === p) encerrar(); }, LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
+    // espera os sons (no máximo 2 s; sem eles, vai com os gerados)
+    Promise.race([carregarSons(), new Promise((r) => setTimeout(r, 2000))]).then(() => {
+      if (palco !== p) return;
+      som = somDaCorrida();
+      som.comecar();
+      p.somPronto = true;
+    });
+    p.rede = setTimeout(() => { if (palco === p) encerrar(); }, 2000 + LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
   }
 
   function embaralhar(v) {
