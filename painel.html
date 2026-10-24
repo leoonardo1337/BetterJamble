@@ -239,6 +239,19 @@
   .sub{margin:6px 0 0;font-size:12.5px;line-height:18px;color:var(--bj-texto2);flex:none}
   .sub .forte{color:var(--bj-texto);font-weight:600}
   .regua{height:1px;background:var(--bj-borda);margin:18px 0;flex:none}
+  /* botão "Copiar nomes" no canto direito, acima do pódio; fica verde ao copiar */
+  .rk-acoes{display:flex;justify-content:flex-end;margin:-6px 0 10px}
+  .btn-copiar{
+    display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:999px;
+    border:1px solid var(--bj-borda3);background:transparent;color:var(--bj-texto2);
+    font-size:12.5px;font-weight:500;white-space:nowrap;transition:background .16s,color .16s,border-color .16s;
+  }
+  .btn-copiar:hover{color:var(--bj-texto);background:var(--bj-fundo4)}
+  .btn-copiar svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .btn-copiar .ico-check{display:none}
+  .btn-copiar.copiado,.btn-copiar.copiado:hover{background:var(--bj-positivo);border-color:var(--bj-positivo);color:#000}
+  .btn-copiar.copiado .ico-copiar{display:none}
+  .btn-copiar.copiado .ico-check{display:block}
 
   .nota{
     margin:12px 0 0;display:flex;gap:8px;font-size:12.5px;line-height:1.55;color:var(--bj-texto2);
@@ -1119,6 +1132,14 @@
               <button class="ficha" type="button" role="radio" data-rmetrica="compras" aria-checked="false"><svg class="ficha-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><span>Itens comprados</span></button>
             </div>
             <div class="regua"></div>
+            <!-- copia os nomes de todo mundo do ranking que está na tela -->
+            <div class="rk-acoes">
+              <button class="btn-copiar" id="btnCopiarNomes" type="button" hidden>
+                <svg class="ico-copiar" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>
+                <svg class="ico-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>
+                <span>Copiar nomes</span>
+              </button>
+            </div>
             <div id="podio" class="podio" hidden></div>
             <div class="lista" id="ranking"></div>
             <button class="btn btn-fantasma mais" id="maisRanking" type="button" hidden>mostrar mais</button>

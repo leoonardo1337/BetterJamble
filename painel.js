@@ -1224,6 +1224,7 @@
     const podio = $('podio');
     const alvo = limpar($('ranking'));
     const btnMais = $('maisRanking');
+    $('btnCopiarNomes').hidden = !rk || !rk.length;
 
     if (!rk || !rk.length) {
       podio.hidden = true;
@@ -1254,6 +1255,36 @@
     const faltam = resto.length - limiteRanking;
     btnMais.hidden = faltam <= 0;
     if (faltam > 0) btnMais.textContent = 'mostrar mais ' + Math.min(PASSO_RANKING, faltam);
+  }
+
+  // "Copiar nomes": todo mundo do ranking que está na tela (com o tipo, o
+  // período e o filtro escolhidos, inclusive quem está escondido no "mostrar
+  // mais"), um @nome por linha. O botão fica verde com um check por 2 s.
+  let timerCopiado = 0;
+  async function copiarNomes() {
+    const rk = (rkTipo === 'compradores' ? rankingCompradores() : dados.ranking) || [];
+    const texto = rk.map((r) => '@' + r.usuario).join('\n');
+    if (!texto) return;
+    let ok = false;
+    try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {
+      // sem permissão da área de transferência: o jeito antigo
+      const t = el('textarea');
+      t.value = texto; t.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.appendChild(t); t.select();
+      try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+      t.remove();
+    }
+    if (!ok) return;
+    const b = $('btnCopiarNomes');
+    b.classList.add('copiado');
+    b.querySelector('span').textContent = 'Copiado';
+    b.title = rk.length + ' ' + plural(rk.length, 'nome copiado', 'nomes copiados');
+    clearTimeout(timerCopiado);
+    timerCopiado = setTimeout(() => {
+      b.classList.remove('copiado');
+      b.querySelector('span').textContent = 'Copiar nomes';
+      b.title = '';
+    }, 2000);
   }
 
   let assinaturaPodio = '';
@@ -3796,6 +3827,7 @@
   };
   $('limparFiltroSorteio').onclick = () => trocarFiltro('');
   $('maisRanking').onclick = () => { limiteRanking += PASSO_RANKING; desenharRanking(); };
+  $('btnCopiarNomes').onclick = copiarNomes;
   $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); confirmadosMarcados.clear(); ultimoResultado = null; presenca = null; mandar('limpar-historico'); desenharSorteio(); };
 
   $('btnSortear').onclick = () => {
