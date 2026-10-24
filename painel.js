@@ -2119,17 +2119,18 @@
   const POUSO = { sobe: 360, cai: 150, segura: 1500 };   // contados depois dos 5s
 
   // ------------------------------------------------------- corrida de patos
-  // Como o duckrace-game.com: cada pessoa da urna é um pato com o nome, todos
-  // largam juntos, o rio rola com a câmera seguindo quem está na frente, há
-  // ultrapassagens e, quando o tempo acaba, a chegada aparece e o primeiro a
-  // cruzar ganha. Diferente das outras animações, a corrida toma a janela
-  // inteira do painel até acabar. O vencedor já vem sorteado da urna (com a
-  // chance de cada um); a corrida só é montada para ele cruzar primeiro.
-  const CORRIDA_MS = 12000;        // do tiro de largada até o vencedor cruzar
-  const LARGADA_MS = 1500;         // patos parados na linha, contagem 3-2-1
-  const DEPOIS_MS = 1300;          // os outros terminando, câmera parada na chegada
-  const PODIO_MS = 3600;           // o vencedor sozinho na tela
-  const CORES_PATO = ['#ffd23f', '#ff8c42', '#ff5d73', '#7bd389', '#4cb3f0', '#b388eb', '#f2f2f2', '#ffb3c6', '#c0e218', '#8ecae6'];
+  // Fiel ao duckrace-game.com: as raias em diagonal (a de trás mais à direita),
+  // a largada e a chegada quadriculadas inclinadas com o número de cada raia ao
+  // lado, patos grandes de contorno preto e fantasia (patos.js), o rio passando
+  // devagar com a câmera acompanhando o grupo e a diferença entre os patos de
+  // no máximo um corpo, mudando aos poucos. No último segundo a chegada entra
+  // pela direita; depois a câmera segue só o vencedor. A corrida toma a janela
+  // inteira do painel. O vencedor já vem sorteado da urna (com a chance de cada
+  // um); a corrida só é montada para ele cruzar primeiro.
+  const CORRIDA_MS = 15000;        // relógio do tiro de largada até zerar
+  const LARGADA_MS = 800;          // patos parados na linha antes do tiro
+  const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
+  const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
 
   function correrPatos(participantes, vencedor, pronto) {
     const fim = () => {
@@ -2137,7 +2138,7 @@
       $('btnSortear').classList.remove('girando');
       pronto();
     };
-    if (!participantes.length || !vencedor) { pararPalco(); fim(); return; }
+    if (!participantes.length || !vencedor || !window.BJPatos) { pararPalco(); fim(); return; }
     pararPalco();
     limpar($('resultado'));
 
@@ -2150,94 +2151,75 @@
     document.body.appendChild(camada);
     const fonte = getComputedStyle(document.body).fontFamily || 'sans-serif';
     let med = medirPalco(cv);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // quantos cabem: cada raia tem pelo menos 16px; o vencedor sempre corre
-    const topoRio = () => Math.max(70, med.a * 0.18);
-    const maxRaias = Math.max(2, Math.min(60, Math.floor((med.a - topoRio()) / 16)));
+    // quantos cabem: com raias de 12px o pato ainda é reconhecível; o vencedor sempre corre
+    const maxRaias = Math.max(2, Math.min(80, Math.floor((med.a * 0.78) / 12)));
     let corredores = participantes.filter((x) => x.id !== vencedor.id);
     const doVencedor = participantes.find((x) => x.id === vencedor.id) || { id: vencedor.id, usuario: vencedor.usuario };
     embaralhar(corredores);
     corredores = embaralhar(corredores.slice(0, maxRaias - 1).concat([doVencedor]));
     const fora = Math.max(0, participantes.length - corredores.length);
+    const n = corredores.length;
+    BJPatos.preparar(corredores.map((x) => x.id));
 
-    // Trajeto de cada pato: uma base comum + desvios aleatórios suaves (é daí
-    // que vêm as ultrapassagens), que terminam no lugar final de cada um. O
-    // vencedor termina na frente; os outros, atrás por margens diferentes.
-    const NOS = 8;
+    // Vantagem de cada pato sobre o grupo, em corpos: nós aleatórios a cada
+    // ~1,5 s ligados por curvas suaves (as ultrapassagens). No fim, o vencedor
+    // está na frente e os outros atrás por margens diferentes.
+    const NOS = 10;
     const patos = corredores.map((x, i) => {
-      const ganha = x.id === vencedor.id;
-      const amp = 0.02 + Math.random() * 0.03;
       const nos = [0];
-      for (let k = 1; k < NOS; k++) nos.push((Math.random() * 2 - 1) * amp);
-      nos.push(ganha ? 0 : -(0.004 + Math.random() * 0.035));
-      return {
-        id: x.id, nome: '@' + (x.usuario || '?'), ganha, raia: i, nos,
-        cor: CORES_PATO[i % CORES_PATO.length], fase: Math.random() * 6.28,
-      };
+      for (let k = 1; k < NOS; k++) nos.push((Math.random() * 2 - 1) * (0.45 + Math.random() * 0.55));
+      return { id: x.id, nome: '@' + (x.usuario || '?'), ganha: x.id === vencedor.id, raia: i, nos, fase: Math.random() * 6.28 };
     });
-    const ordemFinal = patos.slice().sort((a, b) => b.nos[NOS] - a.nos[NOS]);
+    const finais = patos.filter((x) => !x.ganha).map(() => 0.1 + Math.random() * 1.1).sort((a, b) => a - b);
+    const topoFinal = 0.55 + Math.random() * 0.5;
+    patos.filter((x) => !x.ganha).forEach((x, j) => { x.nos.push(topoFinal - finais[finais.length - 1 - j] - 0.12); });
+    patos.find((x) => x.ganha).nos.push(topoFinal);
+    // ordem de chegada, para o 2º e o 3º
+    const ordem = patos.slice().sort((a, b) => b.nos[NOS] - a.nos[NOS]);
 
-    const p = {
-      ctx: med.ctx, cv, overlay: camada, inicio: performance.now(), raf: 0, rede: 0, fecha: 0,
-      pecas: [], l: med.l, a: med.a, acabou: false, confete: false,
-    };
+    const p = { ctx: med.ctx, cv, overlay: camada, inicio: performance.now(), raf: 0, rede: 0, fecha: 0, pecas: [], l: med.l, a: med.a, acabou: false };
     palco = p;
 
-    const base = (q) => q * 0.8 + q * q * (3 - 2 * q) * 0.2;   // arranca e segue quase constante
     const suave = (q) => (1 - Math.cos(Math.PI * q)) / 2;
-    function desvio(pt, q) {
-      const k = Math.min(NOS - 1, Math.floor(q * NOS));
-      const r = q * NOS - k;
-      return pt.nos[k] + (pt.nos[k + 1] - pt.nos[k]) * suave(r);
+    function vantagem(pt, t) {
+      const q = Math.max(0, Math.min(1, t / CORRIDA_MS)) * NOS;
+      const k = Math.min(NOS - 1, Math.floor(q));
+      return pt.nos[k] + (pt.nos[k + 1] - pt.nos[k]) * suave(q - k);
     }
-    // posição no rio, em frações do trajeto (1 = linha de chegada)
-    function posicao(pt, t) {
-      if (t <= 0) return 0;
-      if (t <= CORRIDA_MS) { const q = t / CORRIDA_MS; return base(q) + desvio(pt, q); }
-      // depois do tempo: todo mundo segue nadando até cruzar
-      return 1 + pt.nos[NOS] + ((t - CORRIDA_MS) / CORRIDA_MS) * 0.95;
-    }
-
-    function pato(ctx, x, y, s, cor, bob) {
-      ctx.save();
-      ctx.translate(x, y + Math.sin(bob) * s * 0.06);
-      ctx.fillStyle = 'rgba(255,255,255,.28)';
-      ctx.beginPath(); ctx.ellipse(-s * 0.1, s * 0.5, s * 1.15, s * 0.16, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = cor;
-      ctx.beginPath(); ctx.moveTo(-s * 0.95, -s * 0.05); ctx.lineTo(-s * 1.35, -s * 0.5); ctx.lineTo(-s * 0.75, -s * 0.35); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(-s * 0.1, s * 0.05, s * 0.95, s * 0.5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,.14)';
-      ctx.beginPath(); ctx.ellipse(-s * 0.25, s * 0.02, s * 0.5, s * 0.24, -0.25, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = cor;
-      ctx.beginPath(); ctx.arc(s * 0.55, -s * 0.52, s * 0.42, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ff9f1c';
-      ctx.beginPath(); ctx.moveTo(s * 0.88, -s * 0.6); ctx.lineTo(s * 1.32, -s * 0.48); ctx.lineTo(s * 0.88, -s * 0.36); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#111';
-      ctx.beginPath(); ctx.arc(s * 0.68, -s * 0.62, Math.max(1.2, s * 0.07), 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-    function pilula(ctx, x, y, w, h, r) {
+    function pilula(ctx, x, y, w, h, r, fundo, borda) {
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
-      ctx.fill();
+      ctx.fillStyle = fundo; ctx.fill();
+      if (borda) { ctx.lineWidth = borda; ctx.strokeStyle = '#000'; ctx.stroke(); }
     }
-    function etiqueta(ctx, x, y, txt, tam, destaque) {
+    function etiqueta(ctx, xDir, yMeio, txt, tam, destaque) {
       ctx.font = '600 ' + tam + 'px ' + fonte;
       const w = ctx.measureText(txt).width + tam * 0.9;
-      const h = tam * 1.5;
-      ctx.fillStyle = destaque ? '#ffd23f' : '#fff';
-      pilula(ctx, x - w, y - h / 2, w, h, h / 2);
-      ctx.fillStyle = '#111';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(txt, x - w + tam * 0.45, y + 0.5);
+      const h = tam * 1.45;
+      pilula(ctx, xDir - w, yMeio - h / 2, w, h, tam * 0.35, destaque ? '#ffd23f' : '#fff', Math.max(1.5, tam * 0.12));
+      ctx.fillStyle = '#000'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.fillText(txt, xDir - w + tam * 0.45, yMeio + 0.5);
     }
-    function xadrez(ctx, x, y0, y1, q) {
-      for (let y = y0, i = 0; y < y1; y += q, i++) {
+    // faixa quadriculada inclinada (paralela à diagonal das raias)
+    function linhaXadrez(ctx, xBase, yTopo, yFundo, incl, q) {
+      const linhas = Math.ceil((yFundo - yTopo) / q);
+      for (let r = 0; r < linhas; r++) {
+        const y0 = yTopo + r * q;
+        const y1 = Math.min(yFundo, y0 + q);
         for (let c = 0; c < 2; c++) {
-          ctx.fillStyle = (i + c) % 2 ? '#111' : '#fff';
-          ctx.fillRect(x + c * q, y, q, Math.min(q, y1 - y));
+          const x0 = xBase + (yFundo - y0) * incl + c * q;
+          const x1 = xBase + (yFundo - y1) * incl + c * q;
+          ctx.fillStyle = (r + c) % 2 ? '#000' : '#fff';
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + q, y0); ctx.lineTo(x1 + q, y1); ctx.lineTo(x1, y1); ctx.closePath(); ctx.fill();
         }
       }
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(xBase + (yFundo - yTopo) * incl, yTopo); ctx.lineTo(xBase, yFundo);
+      ctx.moveTo(xBase + (yFundo - yTopo) * incl + 2 * q, yTopo); ctx.lineTo(xBase + 2 * q, yFundo);
+      ctx.stroke();
     }
 
     function quadro() {
@@ -2249,90 +2231,173 @@
       }
       const { ctx, l, a } = med;
       p.l = l; p.a = a;
-      const D = l * 7;                       // comprimento do trajeto, em px
-      const rioY = topoRio();
-      const raia = (a - rioY - 10) / patos.length;
-      const s = Math.max(6, Math.min(46, raia * 0.4));
-      const tamNome = Math.max(9, Math.min(18, raia * 0.38));
-      const xLargada = l * 0.3;              // na tela, antes de a câmera andar
-      const fimCorrida = CORRIDA_MS + DEPOIS_MS;
-      const pos = patos.map((pt) => posicao(pt, Math.min(t, fimCorrida)));
-      const lider = Math.max(...pos) * D;
-      // a câmera segue quem está na frente e para quando ele chega
-      const cam = Math.max(0, Math.min(D - l * 0.4, lider - l * 0.4));
 
-      // margem e rio
-      ctx.fillStyle = '#3fa34d'; ctx.fillRect(0, 0, l, rioY);
-      ctx.fillStyle = '#2f7fb8'; ctx.fillRect(0, rioY, l, a - rioY);
-      ctx.fillStyle = '#2f8a3c';
-      for (let k = Math.floor(cam / 260) - 1; k < (cam + l) / 260 + 1; k++) {
-        const bx = k * 260 - cam + (((k * 97) % 120) + 120) % 120;
-        ctx.beginPath(); ctx.arc(bx, rioY, 18, Math.PI, 0); ctx.arc(bx + 24, rioY, 13, Math.PI, 0); ctx.fill();
+      // geometria: margem em cima, rio embaixo, raias em diagonal
+      const rioY = a * 0.2;
+      const dy = (a - rioY) / (n + 0.45);
+      const h = Math.max(14, Math.min(a * 0.24, dy * 1.4));    // altura do pato
+      const w = h * (130 / 118);
+      const incl = 0.5;                                          // quanto a raia de cima anda para a direita, por px de altura
+      const sx = dy * incl;
+      const x0 = Math.max(l * 0.06, w * 0.2);                    // pato da raia de baixo, na largada
+      const v = l * 0.075;                                       // px/s do rio passando
+      const corpo = w * 0.9;                                     // "um corpo" de vantagem
+
+      // câmera: o grupo nada a v (o rio passa); os patos quase não saem do lugar na tela
+      const fimRelogio = CORRIDA_MS;
+      const cam = (Math.max(0, Math.min(t, fimRelogio + 2000)) / 1000) * v;
+      // A linha é guardada pela base (x no pé da faixa); na raia de cada pato ela
+      // está em base + (yFundo - y) * incl, a mesma inclinação das raias. Por isso
+      // basta comparar a base com o nariz do pato "trazido" para a raia de baixo.
+      const yFundoL = rioY + dy * (n - 1 + 0.75) + h * 0.35;
+      const baseNoNariz = (vant) => x0 + w * 0.98 + vant * corpo - h * 0.35 * incl;
+      // nos últimos CHEGADA_MS a chegada desliza da direita até o nariz do vencedor
+      // e continua no mesmo passo, cruzando os outros em ordem
+      let xChegada = null;
+      if (t > fimRelogio - CHEGADA_MS) {
+        const k = (t - (fimRelogio - CHEGADA_MS)) / CHEGADA_MS;
+        const alvo = baseNoNariz(patos.find((x) => x.ganha).nos[NOS]);
+        const de = l * 1.05;
+        xChegada = de + (alvo - de) * Math.min(k, 1.7);
       }
-      ctx.fillRect(0, rioY - 4, l, 6);
-      ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 2;
-      for (let i = 0; i < 9; i++) {
-        const yy = rioY + ((a - rioY) * (i + 0.5)) / 9;
-        const desl = -((cam * (0.6 + i * 0.05) + agora * 0.02) % 160);
+
+      // fase do vencedor: depois de zerar, os outros ficam para trás e ele vai ao meio
+      const dv = Math.max(0, t - fimRelogio - 300);
+      const kv = Math.min(1, dv / 1400);
+
+      // ---- margem
+      ctx.fillStyle = '#5cc93f'; ctx.fillRect(0, 0, l, rioY);
+      ctx.fillStyle = '#4bb330';
+      for (let k = Math.floor(cam / 70) - 1; k < (cam + l) / 70 + 1; k++) {
+        const gx = k * 70 - cam * 1 + ((k * 37) % 50 + 50) % 50;
+        const gy = rioY * (0.35 + ((k * 53) % 40) / 100);
+        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + 4, gy - 9); ctx.lineTo(gx + 7, gy); ctx.lineTo(gx + 10, gy - 7); ctx.lineTo(gx + 13, gy); ctx.closePath(); ctx.fill();
+      }
+      for (let k = Math.floor(cam / 330) - 1; k < (cam + l) / 330 + 1; k++) {
+        const bx = k * 330 - cam + ((k * 131) % 160 + 160) % 160;
+        const r = Math.max(10, rioY * 0.16);
+        ctx.fillStyle = '#3f9e2e'; ctx.strokeStyle = '#1d4d15'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bx, rioY - 6, r, Math.PI, 0); ctx.arc(bx + r * 1.3, rioY - 6, r * 0.8, Math.PI, 0); ctx.arc(bx + r * 2.4, rioY - 6, r * 0.65, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.fillStyle = '#8a5a2b'; ctx.fillRect(0, rioY - 6, l, 8);
+
+      // ---- rio: faixas onduladas que passam com a câmera
+      ctx.fillStyle = '#3d86ad'; ctx.fillRect(0, rioY + 2, l, a - rioY);
+      const faixas = 7;
+      for (let f = 0; f < faixas; f++) {
+        const y = rioY + 2 + ((a - rioY) * f) / faixas;
+        const alt = (a - rioY) / faixas;
+        const desl = cam * (0.9 + f * 0.04) + agora * 0.012;
+        ctx.fillStyle = f % 2 ? '#4797bf' : '#3a80a8';
         ctx.beginPath();
-        for (let xx = desl; xx < l + 160; xx += 160) { ctx.moveTo(xx, yy); ctx.quadraticCurveTo(xx + 40, yy - 5, xx + 80, yy); }
+        ctx.moveTo(0, y + alt);
+        for (let x = 0; x <= l + 20; x += 20) ctx.lineTo(x, y + Math.sin((x + desl) / 46) * alt * 0.12);
+        ctx.lineTo(l, y + alt); ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 2;
+      for (let f = 0; f < faixas * 2; f++) {
+        const y = rioY + 10 + ((a - rioY) * f) / (faixas * 2);
+        const desl = (cam * 1.0 + f * 53) % 220;
+        ctx.beginPath();
+        for (let x = -desl; x < l + 220; x += 220) { ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 22, y - 4, x + 44, y); }
         ctx.stroke();
       }
-      // largada e chegada
-      const q = Math.max(6, Math.min(12, raia * 0.3));
-      const xl = xLargada - cam + s * 1.4;
-      if (xl > -30) xadrez(ctx, xl, rioY, a, q);
-      const xc = xLargada + D - cam + s * 1.3;
-      if (t > CORRIDA_MS * 0.6 && xc < l + 30) xadrez(ctx, xc, rioY, a, q);
 
-      // patos, de cima para baixo (o de baixo cobre o de cima)
-      patos.forEach((pt, i) => {
-        const x = xLargada + pos[i] * D - cam;
-        const y = rioY + raia * (pt.raia + 0.62);
-        pato(ctx, x, y, s, pt.cor, agora / 180 + pt.fase);
-        etiqueta(ctx, x - s * 1.3, y - s * 0.1, pt.nome, tamNome, t > CORRIDA_MS && pt.ganha);
+      // ---- largada (fica para trás) e chegada, inclinadas, com o número das raias
+      const q = Math.max(6, Math.min(18, dy * 0.32));
+      const yFundo = yFundoL;
+      const yTopo = Math.max(rioY + 4, rioY + dy * 0.75 - h * 0.55);
+      const numeros = (xLinha) => {
+        ctx.fillStyle = '#000';
+        ctx.font = 'italic 800 ' + Math.round(Math.max(12, Math.min(64, dy * 0.85))) + 'px ' + fonte;
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        patos.forEach((pt) => {
+          const y = rioY + dy * (pt.raia + 0.75);
+          ctx.fillText(String(n - pt.raia), xLinha + (yFundo - y) * incl + 2 * q + 8, y);
+        });
+      };
+      const xLargada = baseNoNariz(0) + 2 - cam;
+      if (xLargada + (yFundo - yTopo) * incl > -80) { linhaXadrez(ctx, xLargada, yTopo, yFundo, incl, q); numeros(xLargada); }
+      if (xChegada != null) {
+        const xc = xChegada - (dv > 0 ? kv * l * 0.4 : 0);
+        if (xc < l + 40) { linhaXadrez(ctx, xc, yTopo, yFundo, incl, q); numeros(xc); }
+      }
+
+      // ---- patos, da raia de trás para a da frente
+      const gv = patos.find((x) => x.ganha);
+      patos.forEach((pt) => {
+        let x = x0 + (n - 1 - pt.raia) * sx + vantagem(pt, t) * corpo;
+        let y = rioY + dy * (pt.raia + 0.75);
+        if (dv > 0) {
+          if (pt.ganha) {
+            // vai para o meio da tela, na altura do meio do rio
+            const xm = l / 2 - w / 2;
+            const ym = rioY + (a - rioY) * 0.5;
+            x += (xm - x) * suave(kv); y += (ym - y) * suave(kv);
+          } else {
+            x -= kv * kv * l * 0.9;     // ficam para trás
+          }
+        }
+        const bob = Math.sin(agora / 260 + pt.fase);
+        const img = BJPatos.imagem(pt.id, h, dpr);
+        const yTopoPato = y - h * 0.72 + bob * h * 0.025;
+        ctx.save();
+        ctx.translate(x + w / 2, yTopoPato + h / 2);
+        ctx.rotate(bob * 0.03);
+        if (img) ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        else { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.ellipse(0, h * 0.15, w * 0.42, h * 0.3, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+        // número da raia no corpo e o nome perto da cabeça
+        const tamN = Math.max(8, Math.min(16, h * 0.15));
+        ctx.font = '700 ' + tamN + 'px ' + fonte;
+        const nw = Math.max(tamN * 1.6, ctx.measureText(String(n - pt.raia)).width + tamN);
+        pilula(ctx, x + w * 0.2, yTopoPato + h * 0.6, nw, tamN * 1.35, tamN * 0.3, '#fff', Math.max(1.2, tamN * 0.12));
+        ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(n - pt.raia), x + w * 0.2 + nw / 2, yTopoPato + h * 0.6 + tamN * 0.7);
+        etiqueta(ctx, x + w * 0.58, yTopoPato + h * 0.12, pt.nome, Math.max(9, Math.min(22, h * 0.19)), dv > 0 && pt.ganha);
       });
 
-      // relógio: 3-2-1 na largada, depois o tempo que falta
-      const txt = t < 0 ? String(Math.max(1, Math.ceil(-t / (LARGADA_MS / 3))))
-        : '00:' + String(Math.ceil(Math.max(0, CORRIDA_MS - t) / 1000)).padStart(2, '0');
-      const th = rioY * 0.6;
-      ctx.font = '700 ' + Math.round(th * 0.62) + 'px ' + fonte;
-      const tw = ctx.measureText(txt).width + 40;
-      ctx.fillStyle = 'rgba(255,255,255,.94)';
-      pilula(ctx, l / 2 - tw / 2, rioY * 0.14, tw, th, 12);
-      ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(txt, l / 2, rioY * 0.14 + th / 2 + 1);
+      // ---- relógio (HH:MM:SS, como no site)
+      const resta = t < 0 ? CORRIDA_MS : Math.max(0, CORRIDA_MS - t);
+      const s = Math.ceil(resta / 1000);
+      const txt = '00:' + String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+      const th = rioY * 0.62;
+      ctx.font = '500 ' + Math.round(th * 0.7) + 'px ' + fonte;
+      const tw = ctx.measureText(txt).width + th * 0.8;
+      pilula(ctx, l / 2 - tw / 2, rioY * 0.1, tw, th, th * 0.22, '#eceefc', 3);
+      ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(txt, l / 2, rioY * 0.1 + th / 2 + 1);
       ctx.textAlign = 'left';
       if (fora) {
-        ctx.font = '500 12px ' + fonte; ctx.fillStyle = 'rgba(255,255,255,.9)';
-        ctx.fillText(patos.length + ' patos na água · ' + fora + ' da urna não couberam na tela (a chance de todos já contou)', 14, rioY - 14);
+        ctx.font = '600 13px ' + fonte; ctx.fillStyle = '#000';
+        ctx.fillText(n + ' patos · ' + fora + ' da urna não couberam (a chance de todos já contou)', 14, rioY * 0.1 + th + 16);
       }
 
-      // pódio: o vencedor sozinho no meio, o 2º e o 3º embaixo
-      if (t >= fimCorrida) {
-        const d = t - fimCorrida;
-        const k = Math.min(1, d / 400);
-        ctx.fillStyle = 'rgba(0,0,0,' + 0.66 * k + ')';
-        ctx.fillRect(0, 0, l, a);
-        if (!p.confete) { p.confete = true; soltarConfete(p, 160); }
-        const S = Math.min(l, a) * 0.12 * (0.6 + 0.4 * k);
+      // ---- faixa do vencedor
+      if (kv >= 1) {
+        const d = dv - 1400;
+        const k = Math.min(1, d / 300);
+        const tam = Math.max(20, Math.min(40, a * 0.05));
         ctx.globalAlpha = k;
-        const vp = patos.find((x) => x.ganha);
-        pato(ctx, l / 2, a * 0.42, S, vp.cor, agora / 220);
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = '800 ' + Math.round(Math.max(24, S * 0.45)) + 'px ' + fonte;
-        ctx.fillStyle = '#fff';
-        ctx.fillText(vp.nome, l / 2, a * 0.42 + S * 1.3);
-        ctx.font = '500 15px ' + fonte; ctx.fillStyle = 'rgba(255,255,255,.75)';
-        const outros = ordemFinal.filter((x) => !x.ganha).slice(0, 2).map((x, j) => (j + 2) + 'º ' + x.nome).join('  ·  ');
-        ctx.fillText('venceu a corrida' + (outros ? '  ·  ' + outros : ''), l / 2, a * 0.42 + S * 1.3 + 34);
+        ctx.font = '800 ' + tam + 'px ' + fonte;
+        const frase = gv.nome + ' venceu!';
+        const fw = ctx.measureText(frase).width + tam * 1.4;
+        const fy = rioY + (a - rioY) * 0.5 - h * 1.05;
+        pilula(ctx, l / 2 - fw / 2, fy - tam, fw, tam * 1.8, tam * 0.5, '#fff', 3);
+        ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(frase, l / 2, fy - tam + tam * 0.9 + 1);
+        const outros = ordem.filter((x) => !x.ganha).slice(0, 2).map((x, j) => (j + 2) + 'º ' + x.nome).join('   ');
+        if (outros) {
+          ctx.font = '600 ' + Math.round(tam * 0.5) + 'px ' + fonte;
+          ctx.fillStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+          const oy = rioY + (a - rioY) * 0.5 + h * 0.75;
+          ctx.strokeText(outros, l / 2, oy); ctx.fillText(outros, l / 2, oy);
+        }
         ctx.textAlign = 'left';
         ctx.globalAlpha = 1;
-        desenharConfete(p, d > 1800);
       }
 
-      if (!p.acabou && t >= fimCorrida + PODIO_MS) encerrar();
+      if (!p.acabou && t >= fimRelogio + 300 + VENCEDOR_MS) encerrar();
     }
     function encerrar() {
       if (p.acabou) return;
@@ -2347,7 +2412,7 @@
     p.soltar = () => document.removeEventListener('keydown', tecla);
     p.raf = setInterval(quadro, 16);
     quadro();
-    p.rede = setTimeout(() => { if (palco === p) encerrar(); }, LARGADA_MS + CORRIDA_MS + DEPOIS_MS + PODIO_MS + 1500);
+    p.rede = setTimeout(() => { if (palco === p) encerrar(); }, LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
   }
 
   function embaralhar(v) {
