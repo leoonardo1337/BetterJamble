@@ -141,6 +141,7 @@
       const porComprador = new Map();
       const tipos = { leilao: { valor: 0, vendas: 0 }, fixo: { valor: 0, compras: 0, itens: 0 } };
       const porMinuto = {};   // minuto (ms) -> itens vendidos, para o gráfico dos Insights
+      const vendas = [];      // cada venda (para a dica dos picos do gráfico)
       for (const it of items) {
         const v = it && it.sold;
         if (!v || v.isCanceled || !v.buyerId) continue;
@@ -156,6 +157,10 @@
         if (v.createdAt) {
           const m = Math.floor((Number(v.createdAt) * 1000) / 60000) * 60000;
           porMinuto[m] = (porMinuto[m] || 0) + itens;
+          vendas.push({
+            t: Math.round(Number(v.createdAt) * 1000), titulo: String(it.title || '').slice(0, 80), img: it.imageUrl || '',
+            valor, qtd: itens, tipo: ehFixo(it) ? 'fixo' : 'leilao', quem: v.buyerUsername || '',
+          });
         }
       }
       window.__jambleCompradores = {
@@ -163,6 +168,7 @@
         at: Date.now(),
         tipos,
         porMinuto: Object.entries(porMinuto).map(([m, n]) => [Number(m), n]).sort((a, b) => a[0] - b[0]),
+        vendas: vendas.sort((a, b) => a.t - b.t).slice(-400),
         lista: [...porComprador.values()].sort((a, b) => b.v - a.v),
       };
       window.dispatchEvent(new CustomEvent('jamble:compradores'));

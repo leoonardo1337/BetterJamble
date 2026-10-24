@@ -723,6 +723,11 @@
         const d = window.__jambleCompradores, h = live();
         return d && h && d.showId === h.showId && d.tipos ? d.tipos : null;
       })(),
+      // cada venda (nome, foto, valor, quantidade, tipo), para a dica dos picos
+      vendasLista: (() => {
+        const d = window.__jambleCompradores, h = live();
+        return d && h && d.showId === h.showId && Array.isArray(d.vendas) ? d.vendas : [];
+      })(),
       // itens vendidos por minuto (os dois tipos), para o gráfico dos Insights
       vendasMin: (() => {
         const d = window.__jambleCompradores, h = live();

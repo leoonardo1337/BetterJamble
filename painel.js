@@ -902,7 +902,55 @@
     });
     alvo.addEventListener('mouseleave', () => { mira.setAttribute('visibility', 'hidden'); esconderDica(); });
     svg.appendChild(alvo);
+
+    // bolinhas nos picos de lances e de vendas: passando o mouse, a dica mostra
+    // o que estava sendo vendido (foto, nome, valor, quantidade, tipo)
+    visiveis.filter((s) => s.itens).forEach((s) => {
+      s.vals.forEach((v, i) => {
+        if (!v || !(s.itens[i] || []).length) return;
+        const antes = i > 0 ? s.vals[i - 1] || 0 : 0;
+        const depois = i < n - 1 ? s.vals[i + 1] || 0 : 0;
+        if (v < antes || v < depois) return;        // só nos picos
+        const b = svgEl('circle', { class: 'pico', cx: xDe(i), cy: yDe(v), r: 6, fill: 'var(--serie-' + s.k + ')' });
+        b.addEventListener('mouseenter', (ev) => {
+          mira.setAttribute('visibility', 'hidden');
+          const j = janelas[i];
+          const cab = el('div', 'dica-cab', hhmm(j.t) + '–' + hhmm(j.fim) + ' · ' + nf(v) + ' ' + (s.k === 'lances' ? plural(v, 'lance', 'lances') : plural(v, 'item vendido', 'itens vendidos')));
+          mostrarDica(ev, [cab].concat(s.itens[i].slice(0, 4).map((x) => cardDoItem(x, s.k))));
+        });
+        b.addEventListener('mouseleave', esconderDica);
+        svg.appendChild(b);
+      });
+    });
     caixa.appendChild(svg);
+  }
+
+  // Card de um item na dica do gráfico: venda (o que saiu, quantas unidades,
+  // por quanto) ou leilão (quantos lances, por quanto saiu).
+  function cardDoItem(x, tipoSerie) {
+    const c = el('div', 'dica-item');
+    const foto = el('div', 'dica-foto');
+    if (x.img) {
+      const im = el('img');
+      im.src = x.img; im.alt = ''; im.width = 44; im.height = 44;
+      im.onerror = () => im.remove();
+      foto.appendChild(im);
+    }
+    c.appendChild(foto);
+    const t = el('div', 'dica-txt');
+    t.appendChild(el('b', null, x.titulo || 'sem título'));
+    let linha;
+    if (tipoSerie === 'lances') {
+      linha = nf(x.lances || 0) + ' ' + plural(x.lances || 0, 'lance', 'lances')
+        + (x.final != null ? ' · ' + (x.status === 'FINISHED' ? 'saiu por ' : 'em ') + brl(x.final) : '')
+        + (x.vencedor && x.status === 'FINISHED' ? ' · @' + x.vencedor : '');
+    } else {
+      linha = (x.tipo === 'fixo' ? 'Preço fixo' : 'Leilão') + ' · ' + brl(x.valor)
+        + (x.qtd > 1 ? ' · ' + nf(x.qtd) + ' unidades' : '') + (x.quem ? ' · @' + x.quem : '');
+    }
+    t.appendChild(el('span', null, linha));
+    c.appendChild(t);
+    return c;
   }
 
   function mostrarDica(ev, partes) {
@@ -991,10 +1039,23 @@
     } else {
       // itens vendidos por janela
       const vendas = janelas.map((j) => vm.reduce((s, [m, n]) => (m >= j.t && m < j.fim ? s + n : s), 0));
+      // o que estava à venda em cada janela, para a dica dos picos:
+      // vendas = o que saiu nela; lances = os leilões abertos nela (o que
+      // começou na janela ou, se nenhum, o último que começou antes do fim dela)
+      const lista = (dadosDaLive().totais || {}).vendasLista || [];
+      const leiloes = (((audiencia && audiencia.leiloes) || {}).leiloes || []).slice().sort((x, y) => x.em - y.em);
+      const itensVendas = janelas.map((j) => lista.filter((v) => v.t >= j.t && v.t < j.fim));
+      const itensLances = janelas.map((j) => {
+        const dentro = leiloes.filter((x) => x.em >= j.t && x.em < j.fim);
+        if (dentro.length) return dentro;
+        const antes = leiloes.filter((x) => x.em < j.t);
+        return antes.length ? [antes[antes.length - 1]] : [];
+      });
       graficoLinhas(gA, janelas, SERIES_AUD.map(([k, rot], idx) => ({
         k, rot,
         // pessoas = média na janela; o resto = soma de interações na janela
         vals: k === 'vendas' ? vendas : janelas.map((j) => (idx === 0 ? j.media : j.inter[idx - 1])),
+        itens: k === 'vendas' ? itensVendas : k === 'lances' ? itensLances : null,
       })));
     }
 
