@@ -144,6 +144,11 @@
   // próprio site à /api/ e usamos nas nossas. Sem eles, só o login (que hoje
   // leva 403 nessas rotas).
   let cabecalhosDoSite = null;
+  // showId -> sellerId, aprendido sem depender do que está na tela: dos
+  // parâmetros das chamadas que o site faz e dos pacotes "show" do WebSocket.
+  // Em janela estreita a Jamble esconde o card de anúncios (de onde vinham as
+  // fotos de produto com o id) e o ranking de vendedores virava "—".
+  const sellerDoShow = new Map();
   function cabecalhos() {
     if (cabecalhosDoSite) return cabecalhosDoSite;
     try {
@@ -170,6 +175,8 @@
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input && input.url) || '';
     try {
       if (url.indexOf('/api/') >= 0) {
+        const q = new URLSearchParams(url.split('?')[1] || '');
+        if (q.get('show_id') && q.get('seller_id')) sellerDoShow.set(q.get('show_id'), q.get('seller_id'));
         const h = (init && init.headers) || (input && input.headers);
         const obj = h instanceof Headers ? Object.fromEntries(h) : h && typeof h === 'object' ? Object.assign({}, h) : null;
         if (obj && Object.keys(obj).some((k) => k.toLowerCase() === 'x-firebase-appcheck')) cabecalhosDoSite = obj;
@@ -354,7 +361,7 @@
     if (!m) return null;
     const showId = m[2];
     const guardado = db.shows[showId];
-    let sellerId = (guardado && guardado.sellerId) || null;
+    let sellerId = (guardado && guardado.sellerId) || sellerDoShow.get(showId) || null;
     if (!sellerId) {
       const img = document.querySelector('img[src*="/products/user_id="]');
       const mm = img && img.src.match(/products\/user_id=([^/]+)/);
@@ -769,6 +776,7 @@
   function ingerirShow(msg) {
     const sh = msg && msg.data && msg.data.show;
     if (!sh || !sh.id) return;
+    if (sh.seller_id) sellerDoShow.set(sh.id, sh.seller_id);
     registrarEstadoLive(sh.id, {
       inicio: sh.started_at ? Math.round(Number(sh.started_at) * 1000) : 0,
       aoVivo: !!sh.has_started && !sh.is_over,

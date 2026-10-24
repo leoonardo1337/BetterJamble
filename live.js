@@ -1,7 +1,8 @@
 // Badge com a soma do que já foi vendido na live, ao lado da aba "Vendidos (n)".
 // Estratégia: os ids vêm das respostas que o site já busca (feed/produtos), o total é
 // recalculado quando a contagem da aba muda, e cada live fica em cache. A cada minuto o
-// botão de atualizar do card "Anúncios" é clicado, para a contagem não ficar parada.
+// botão de atualizar do card "Anúncios" é clicado, para a contagem não ficar parada; se a
+// janela é estreita e o card nem aparece, as vendas são buscadas direto a cada 30 s.
 (() => {
   if (window.__jambleLiveTotalLoaded) return;
   window.__jambleLiveTotalLoaded = true;
@@ -325,10 +326,20 @@
     }
     return null;
   }
+  // Em janela estreita (tela dividida) a Jamble nem desenha o card de anúncios:
+  // sem a aba "Vendidos" não há contagem para comparar nem botão para clicar,
+  // e as vendas ficavam paradas. Aí buscamos as vendas direto, a cada 30 s.
+  let rodadaSync = 0;
   function sincronizarAnuncios() {
     const showId = showIdFromUrl();
-    const achado = showId && botaoAtualizarAnuncios();
-    if (!achado) return;
+    if (!showId) return;
+    rodadaSync++;
+    const achado = botaoAtualizarAnuncios();
+    if (!achado) {
+      if (!soldButton()) ensureData(showId, true);
+      return;
+    }
+    if (rodadaSync % 2) return;              // com o card à vista, o clique vai a cada minuto
     // não atrapalha quem está digitando na busca do card
     if (achado.card.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
     const antes = Date.now();
@@ -339,7 +350,7 @@
   }
 
   setInterval(() => { if (!document.hidden) schedule(0); }, 20000);
-  setInterval(sincronizarAnuncios, 60000);
+  setInterval(sincronizarAnuncios, 30000);
   setInterval(garantirCompradores, 3000);
   garantirCompradores();
   window.__jambleLiveDebug = { sincronizarAnuncios, botaoAtualizarAnuncios, cache, sellers, inflight, run, ensureData, paint, showIdFromUrl, sellerFor, soldButton, countOf, current };

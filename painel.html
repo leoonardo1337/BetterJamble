@@ -630,10 +630,13 @@
      filtro de gema dentro de um deles. */
   .sorteio-conf,.rk-conf{container-type:inline-size}
   .sorteio-grade{
-    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(6,auto);
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,auto);
     column-gap:16px;row-gap:6px;
   }
   .sorteio-grade > .sel-grupo{display:grid;grid-template-rows:subgrid;grid-row:span 3;min-width:0}
+  /* a segunda linha (Chance | Animação) tem até 3 cards: título + 3 linhas */
+  .sorteio-grade > .sel-grupo:nth-child(n+4){grid-row:span 4}
+  .sorteio-grade > .sel-grupo:nth-child(n+4) > .sel-cards{grid-row:span 3}
   .sorteio-grade > .sel-grupo > .sel-rot{margin-bottom:2px}
   .sorteio-grade > .sel-grupo:nth-child(n+4) > .sel-rot{padding-top:14px}
   .sorteio-grade > .sel-grupo > .sel-cards{display:grid;grid-template-rows:subgrid;grid-row:span 2;gap:6px}
@@ -660,7 +663,7 @@
   .sel-extra .conf-rot{margin-top:0}
   /* card médio: dois grupos por linha e as opções numa linha inteira embaixo */
   @container (max-width:720px){
-    .sorteio-grade{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(6,auto) auto}
+    .sorteio-grade{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(7,auto) auto}
     .sorteio-grade > .sorteio-lado{grid-column:1 / -1;grid-row:auto;order:1;margin-top:14px}
   }
   /* card estreito: tudo numa coluna */
@@ -700,6 +703,13 @@
   .menu-gemas .nome-g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .menu-gemas .info-g{flex:none;color:var(--bj-texto3);font-size:11.5px;font-variant-numeric:tabular-nums}
   .menu-gemas .sep{height:1px;background:var(--bj-borda2);margin:4px 2px}
+
+  /* -------------------------------------------------------- corrida de patos */
+  /* toma a janela inteira do painel enquanto a corrida dura */
+  .corrida{position:fixed;inset:0;z-index:90;background:#2f7fb8;animation:cair .2s ease-out}
+  .corrida canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .corrida.saindo{opacity:0;transition:opacity .4s ease}
+  .corrida-dica{position:absolute;right:14px;bottom:10px;font-size:12px;color:rgba(255,255,255,.8)}
 
   /* --------------------------------------------------------- palco do sorteio */
   /* a altura é controlada em px pelo JS: só assim o easing vale a pena */
@@ -1184,6 +1194,10 @@
                 <button class="op sel" type="button" role="radio" data-anim="feixes" aria-checked="false">
                   <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span>
                   <span class="txt"><span class="rot">Feixes</span><small>Feixes levam os nomes ao centro</small></span>
+                  <span class="marca-radio"></span>
+                </button>
+                <button class="op sel" type="button" role="radio" data-anim="patos" aria-checked="false">
+                  <span class="txt"><span class="rot">Corrida de patos</span><small>Cada pessoa é um pato; o primeiro a cruzar ganha</small></span>
                   <span class="marca-radio"></span>
                 </button>
                 </div>

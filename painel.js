@@ -70,7 +70,8 @@
   let limiteRanking = 10;
   const PASSO_RANKING = 10;
 
-  // anim: 'subida' (nomes subindo + pouso do vencedor) ou 'feixes' (a original,
+  // anim: 'subida' (nomes subindo + pouso do vencedor), 'patos' (corrida de patos
+  // na janela inteira) ou 'feixes' (a original,
   // versão antiga está no commit c8fa2b9, em backup/sorteio-feixes-v1). Fica salva só neste navegador.
   // tipo: 'gemas' (quem mandou gema) ou 'compradores' (quem comprou nesta live)
   const sorteio = {
@@ -107,7 +108,7 @@
     return lista;
   }
   function lerAnim() {
-    try { return localStorage.getItem('bj-anim-sorteio') === 'feixes' ? 'feixes' : 'subida'; } catch { return 'subida'; }
+    try { const v = localStorage.getItem('bj-anim-sorteio'); return v === 'feixes' || v === 'patos' ? v : 'subida'; } catch { return 'subida'; }
   }
   // Ranking: de gemas ou de compradores (ordenado por valor ou por compras) e
   // o olho que deixa só o ranking na tela (e, em compradores, esconde os valores).
@@ -1792,6 +1793,7 @@
     preCarregarFotos([r.vencedor].concat(r.participantes || []));
     const pronto = () => { pintarResultado(ultimoResultado); desenharSorteio(); };
     if (sorteio.anim === 'feixes') girar(r.participantes || [], r.vencedor, pronto);
+    else if (sorteio.anim === 'patos') correrPatos(r.participantes || [], r.vencedor, pronto);
     else girarSubida(r.participantes || [], r.vencedor, pronto);
   }
 
@@ -1810,6 +1812,8 @@
     clearInterval(palco.raf);
     clearTimeout(palco.rede);
     clearTimeout(palco.fecha);
+    if (palco.overlay) palco.overlay.remove();   // a corrida de patos usa a janela inteira
+    if (palco.soltar) palco.soltar();
     abrirPalco(false);
     const ctx = palco.ctx;
     if (ctx) ctx.clearRect(0, 0, palco.l, palco.a);
@@ -2113,6 +2117,238 @@
   // apaga animação quando o Windows pede menos movimento, e esta foi pedida.
   const SUBIDA_MS = 5000;
   const POUSO = { sobe: 360, cai: 150, segura: 1500 };   // contados depois dos 5s
+
+  // ------------------------------------------------------- corrida de patos
+  // Como o duckrace-game.com: cada pessoa da urna é um pato com o nome, todos
+  // largam juntos, o rio rola com a câmera seguindo quem está na frente, há
+  // ultrapassagens e, quando o tempo acaba, a chegada aparece e o primeiro a
+  // cruzar ganha. Diferente das outras animações, a corrida toma a janela
+  // inteira do painel até acabar. O vencedor já vem sorteado da urna (com a
+  // chance de cada um); a corrida só é montada para ele cruzar primeiro.
+  const CORRIDA_MS = 12000;        // do tiro de largada até o vencedor cruzar
+  const LARGADA_MS = 1500;         // patos parados na linha, contagem 3-2-1
+  const DEPOIS_MS = 1300;          // os outros terminando, câmera parada na chegada
+  const PODIO_MS = 3600;           // o vencedor sozinho na tela
+  const CORES_PATO = ['#ffd23f', '#ff8c42', '#ff5d73', '#7bd389', '#4cb3f0', '#b388eb', '#f2f2f2', '#ffb3c6', '#c0e218', '#8ecae6'];
+
+  function correrPatos(participantes, vencedor, pronto) {
+    const fim = () => {
+      girando = false;
+      $('btnSortear').classList.remove('girando');
+      pronto();
+    };
+    if (!participantes.length || !vencedor) { pararPalco(); fim(); return; }
+    pararPalco();
+    limpar($('resultado'));
+
+    const camada = el('div', 'corrida');
+    camada.setAttribute('role', 'dialog');
+    camada.setAttribute('aria-label', 'Corrida de patos');
+    const cv = el('canvas');
+    camada.appendChild(cv);
+    camada.appendChild(el('div', 'corrida-dica', 'Esc pula para o resultado'));
+    document.body.appendChild(camada);
+    const fonte = getComputedStyle(document.body).fontFamily || 'sans-serif';
+    let med = medirPalco(cv);
+
+    // quantos cabem: cada raia tem pelo menos 16px; o vencedor sempre corre
+    const topoRio = () => Math.max(70, med.a * 0.18);
+    const maxRaias = Math.max(2, Math.min(60, Math.floor((med.a - topoRio()) / 16)));
+    let corredores = participantes.filter((x) => x.id !== vencedor.id);
+    const doVencedor = participantes.find((x) => x.id === vencedor.id) || { id: vencedor.id, usuario: vencedor.usuario };
+    embaralhar(corredores);
+    corredores = embaralhar(corredores.slice(0, maxRaias - 1).concat([doVencedor]));
+    const fora = Math.max(0, participantes.length - corredores.length);
+
+    // Trajeto de cada pato: uma base comum + desvios aleatórios suaves (é daí
+    // que vêm as ultrapassagens), que terminam no lugar final de cada um. O
+    // vencedor termina na frente; os outros, atrás por margens diferentes.
+    const NOS = 8;
+    const patos = corredores.map((x, i) => {
+      const ganha = x.id === vencedor.id;
+      const amp = 0.02 + Math.random() * 0.03;
+      const nos = [0];
+      for (let k = 1; k < NOS; k++) nos.push((Math.random() * 2 - 1) * amp);
+      nos.push(ganha ? 0 : -(0.004 + Math.random() * 0.035));
+      return {
+        id: x.id, nome: '@' + (x.usuario || '?'), ganha, raia: i, nos,
+        cor: CORES_PATO[i % CORES_PATO.length], fase: Math.random() * 6.28,
+      };
+    });
+    const ordemFinal = patos.slice().sort((a, b) => b.nos[NOS] - a.nos[NOS]);
+
+    const p = {
+      ctx: med.ctx, cv, overlay: camada, inicio: performance.now(), raf: 0, rede: 0, fecha: 0,
+      pecas: [], l: med.l, a: med.a, acabou: false, confete: false,
+    };
+    palco = p;
+
+    const base = (q) => q * 0.8 + q * q * (3 - 2 * q) * 0.2;   // arranca e segue quase constante
+    const suave = (q) => (1 - Math.cos(Math.PI * q)) / 2;
+    function desvio(pt, q) {
+      const k = Math.min(NOS - 1, Math.floor(q * NOS));
+      const r = q * NOS - k;
+      return pt.nos[k] + (pt.nos[k + 1] - pt.nos[k]) * suave(r);
+    }
+    // posição no rio, em frações do trajeto (1 = linha de chegada)
+    function posicao(pt, t) {
+      if (t <= 0) return 0;
+      if (t <= CORRIDA_MS) { const q = t / CORRIDA_MS; return base(q) + desvio(pt, q); }
+      // depois do tempo: todo mundo segue nadando até cruzar
+      return 1 + pt.nos[NOS] + ((t - CORRIDA_MS) / CORRIDA_MS) * 0.95;
+    }
+
+    function pato(ctx, x, y, s, cor, bob) {
+      ctx.save();
+      ctx.translate(x, y + Math.sin(bob) * s * 0.06);
+      ctx.fillStyle = 'rgba(255,255,255,.28)';
+      ctx.beginPath(); ctx.ellipse(-s * 0.1, s * 0.5, s * 1.15, s * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = cor;
+      ctx.beginPath(); ctx.moveTo(-s * 0.95, -s * 0.05); ctx.lineTo(-s * 1.35, -s * 0.5); ctx.lineTo(-s * 0.75, -s * 0.35); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-s * 0.1, s * 0.05, s * 0.95, s * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.14)';
+      ctx.beginPath(); ctx.ellipse(-s * 0.25, s * 0.02, s * 0.5, s * 0.24, -0.25, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = cor;
+      ctx.beginPath(); ctx.arc(s * 0.55, -s * 0.52, s * 0.42, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff9f1c';
+      ctx.beginPath(); ctx.moveTo(s * 0.88, -s * 0.6); ctx.lineTo(s * 1.32, -s * 0.48); ctx.lineTo(s * 0.88, -s * 0.36); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(s * 0.68, -s * 0.62, Math.max(1.2, s * 0.07), 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    function pilula(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+      ctx.fill();
+    }
+    function etiqueta(ctx, x, y, txt, tam, destaque) {
+      ctx.font = '600 ' + tam + 'px ' + fonte;
+      const w = ctx.measureText(txt).width + tam * 0.9;
+      const h = tam * 1.5;
+      ctx.fillStyle = destaque ? '#ffd23f' : '#fff';
+      pilula(ctx, x - w, y - h / 2, w, h, h / 2);
+      ctx.fillStyle = '#111';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(txt, x - w + tam * 0.45, y + 0.5);
+    }
+    function xadrez(ctx, x, y0, y1, q) {
+      for (let y = y0, i = 0; y < y1; y += q, i++) {
+        for (let c = 0; c < 2; c++) {
+          ctx.fillStyle = (i + c) % 2 ? '#111' : '#fff';
+          ctx.fillRect(x + c * q, y, q, Math.min(q, y1 - y));
+        }
+      }
+    }
+
+    function quadro() {
+      if (palco !== p) return;
+      const agora = performance.now();
+      const t = agora - p.inicio - LARGADA_MS;
+      if (Math.round(cv.clientWidth) !== Math.round(med.l) || Math.round(cv.clientHeight) !== Math.round(med.a)) {
+        med = medirPalco(cv); p.ctx = med.ctx;
+      }
+      const { ctx, l, a } = med;
+      p.l = l; p.a = a;
+      const D = l * 7;                       // comprimento do trajeto, em px
+      const rioY = topoRio();
+      const raia = (a - rioY - 10) / patos.length;
+      const s = Math.max(6, Math.min(46, raia * 0.4));
+      const tamNome = Math.max(9, Math.min(18, raia * 0.38));
+      const xLargada = l * 0.3;              // na tela, antes de a câmera andar
+      const fimCorrida = CORRIDA_MS + DEPOIS_MS;
+      const pos = patos.map((pt) => posicao(pt, Math.min(t, fimCorrida)));
+      const lider = Math.max(...pos) * D;
+      // a câmera segue quem está na frente e para quando ele chega
+      const cam = Math.max(0, Math.min(D - l * 0.4, lider - l * 0.4));
+
+      // margem e rio
+      ctx.fillStyle = '#3fa34d'; ctx.fillRect(0, 0, l, rioY);
+      ctx.fillStyle = '#2f7fb8'; ctx.fillRect(0, rioY, l, a - rioY);
+      ctx.fillStyle = '#2f8a3c';
+      for (let k = Math.floor(cam / 260) - 1; k < (cam + l) / 260 + 1; k++) {
+        const bx = k * 260 - cam + (((k * 97) % 120) + 120) % 120;
+        ctx.beginPath(); ctx.arc(bx, rioY, 18, Math.PI, 0); ctx.arc(bx + 24, rioY, 13, Math.PI, 0); ctx.fill();
+      }
+      ctx.fillRect(0, rioY - 4, l, 6);
+      ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 9; i++) {
+        const yy = rioY + ((a - rioY) * (i + 0.5)) / 9;
+        const desl = -((cam * (0.6 + i * 0.05) + agora * 0.02) % 160);
+        ctx.beginPath();
+        for (let xx = desl; xx < l + 160; xx += 160) { ctx.moveTo(xx, yy); ctx.quadraticCurveTo(xx + 40, yy - 5, xx + 80, yy); }
+        ctx.stroke();
+      }
+      // largada e chegada
+      const q = Math.max(6, Math.min(12, raia * 0.3));
+      const xl = xLargada - cam + s * 1.4;
+      if (xl > -30) xadrez(ctx, xl, rioY, a, q);
+      const xc = xLargada + D - cam + s * 1.3;
+      if (t > CORRIDA_MS * 0.6 && xc < l + 30) xadrez(ctx, xc, rioY, a, q);
+
+      // patos, de cima para baixo (o de baixo cobre o de cima)
+      patos.forEach((pt, i) => {
+        const x = xLargada + pos[i] * D - cam;
+        const y = rioY + raia * (pt.raia + 0.62);
+        pato(ctx, x, y, s, pt.cor, agora / 180 + pt.fase);
+        etiqueta(ctx, x - s * 1.3, y - s * 0.1, pt.nome, tamNome, t > CORRIDA_MS && pt.ganha);
+      });
+
+      // relógio: 3-2-1 na largada, depois o tempo que falta
+      const txt = t < 0 ? String(Math.max(1, Math.ceil(-t / (LARGADA_MS / 3))))
+        : '00:' + String(Math.ceil(Math.max(0, CORRIDA_MS - t) / 1000)).padStart(2, '0');
+      const th = rioY * 0.6;
+      ctx.font = '700 ' + Math.round(th * 0.62) + 'px ' + fonte;
+      const tw = ctx.measureText(txt).width + 40;
+      ctx.fillStyle = 'rgba(255,255,255,.94)';
+      pilula(ctx, l / 2 - tw / 2, rioY * 0.14, tw, th, 12);
+      ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(txt, l / 2, rioY * 0.14 + th / 2 + 1);
+      ctx.textAlign = 'left';
+      if (fora) {
+        ctx.font = '500 12px ' + fonte; ctx.fillStyle = 'rgba(255,255,255,.9)';
+        ctx.fillText(patos.length + ' patos na água · ' + fora + ' da urna não couberam na tela (a chance de todos já contou)', 14, rioY - 14);
+      }
+
+      // pódio: o vencedor sozinho no meio, o 2º e o 3º embaixo
+      if (t >= fimCorrida) {
+        const d = t - fimCorrida;
+        const k = Math.min(1, d / 400);
+        ctx.fillStyle = 'rgba(0,0,0,' + 0.66 * k + ')';
+        ctx.fillRect(0, 0, l, a);
+        if (!p.confete) { p.confete = true; soltarConfete(p, 160); }
+        const S = Math.min(l, a) * 0.12 * (0.6 + 0.4 * k);
+        ctx.globalAlpha = k;
+        const vp = patos.find((x) => x.ganha);
+        pato(ctx, l / 2, a * 0.42, S, vp.cor, agora / 220);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '800 ' + Math.round(Math.max(24, S * 0.45)) + 'px ' + fonte;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(vp.nome, l / 2, a * 0.42 + S * 1.3);
+        ctx.font = '500 15px ' + fonte; ctx.fillStyle = 'rgba(255,255,255,.75)';
+        const outros = ordemFinal.filter((x) => !x.ganha).slice(0, 2).map((x, j) => (j + 2) + 'º ' + x.nome).join('  ·  ');
+        ctx.fillText('venceu a corrida' + (outros ? '  ·  ' + outros : ''), l / 2, a * 0.42 + S * 1.3 + 34);
+        ctx.textAlign = 'left';
+        ctx.globalAlpha = 1;
+        desenharConfete(p, d > 1800);
+      }
+
+      if (!p.acabou && t >= fimCorrida + PODIO_MS) encerrar();
+    }
+    function encerrar() {
+      if (p.acabou) return;
+      p.acabou = true;
+      camada.classList.add('saindo');
+      fim();
+      p.fecha = setTimeout(() => { if (palco === p) pararPalco(); }, 420);
+    }
+    // Esc pula a corrida e mostra o resultado no palco
+    const tecla = (e) => { if (e.key === 'Escape' && palco === p) encerrar(); };
+    document.addEventListener('keydown', tecla);
+    p.soltar = () => document.removeEventListener('keydown', tecla);
+    p.raf = setInterval(quadro, 16);
+    quadro();
+    p.rede = setTimeout(() => { if (palco === p) encerrar(); }, LARGADA_MS + CORRIDA_MS + DEPOIS_MS + PODIO_MS + 1500);
+  }
 
   function embaralhar(v) {
     for (let i = v.length - 1; i > 0; i--) {
