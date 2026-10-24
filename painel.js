@@ -170,7 +170,6 @@
         absorver(payload);
         desenhar();
         marcarConexao('ligado');
-        if (payload && !payload.completo) celebrar(payload.celebrar);
         break;
       case 'painel-sorteio':
         mostrarSorteio(payload);
@@ -1626,26 +1625,6 @@
       novos.forEach((e) => { const l = linhaViewer(e, !primeiro); l.dataset.t = e.t; caixa.appendChild(l); idsViewers.add(chaveViewer(e)); });
     }
     if (perto) caixa.scrollTop = caixa.scrollHeight;
-  }
-
-  // --------------------------------------------- celebração dos envios novos
-  function celebrar(envios) {
-    if (!envios || !envios.length || reduzido()) return;
-    const grandes = envios.filter((e) => (e.gemas || 0) >= 100).sort((a, b) => b.gemas - a.gemas).slice(0, 2);
-    grandes.forEach((e, i) => setTimeout(() => toast(e), i * 180));
-  }
-
-  function toast(e) {
-    const caixa = $('toasts');
-    if (caixa.children.length > 3) caixa.removeChild(caixa.firstElementChild);
-    const t = el('div', 'toast');
-    t.appendChild(iconeGema({ iconeUrl: e.iconeUrl }));
-    const txt = el('span');
-    txt.append(frase(['b', '@' + e.usuario], [null, ' mandou ' + (e.iconeNome || e.iconeId)]));
-    t.appendChild(txt);
-    t.appendChild(el('span', 'v', '+' + nf(e.gemas)));
-    caixa.appendChild(t);
-    setTimeout(() => { t.classList.add('saindo'); setTimeout(() => t.remove(), 260); }, 3600);
   }
 
   // ============================================================ TELA SORTEIO
