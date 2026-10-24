@@ -2787,78 +2787,94 @@
     alvo.appendChild(bloco);
   }
 
-  // Aura do vencedor: um brilho dourado fraco colado no card retangular e uma
-  // fumaça clara saindo da borda (mais de cima e dos lados), que sobe devagar
-  // fazendo curvas, cresce e some. Tudo bem translúcido, para não pesar.
-  // Canvas atrás do card, que se desliga sozinho quando o card sai da tela.
-  function auraDeFogo(card) {
-    const MARGEM = 60, ACIMA = 140;
-    const cv = el('canvas', 'aura-fogo');
+  // Holofote no vencedor: o palco escurece um pouco e um facho de luz vem de
+  // cima, varrendo de lado até mirar o card de ouro; ao acertar dá um clarão
+  // curto e fica aceso em cima dele, respirando de leve, com poeirinha
+  // flutuando no facho e uma poça de luz em volta do card. O canvas cobre o
+  // palco inteiro, atrás do card, e se desliga quando o card sai da tela.
+  function holofote(card) {
+    const cv = el('canvas', 'holofote');
     cv.setAttribute('aria-hidden', 'true');
-    const fumaca = [];
-    let ligado = false, antes = 0, sobra = 0;
-    function soltar(l, a) {
-      const r = Math.random();
-      let x, y;
-      if (r < 0.6) { x = Math.random() * l; y = 0; }                       // de cima
-      else if (r < 0.8) { x = 0; y = Math.random() * a * 0.7; }            // lado esquerdo, metade de cima
-      else { x = l; y = Math.random() * a * 0.7; }                         // lado direito
-      fumaca.push({
-        x0: MARGEM + x, y: ACIMA + y, x: MARGEM + x,
-        sobe: 22 + Math.random() * 26,                                     // px por segundo
-        raio: 8 + Math.random() * 8, cresce: 10 + Math.random() * 12,     // px por segundo
-        vida: 0, dura: 2.2 + Math.random() * 1.6,                          // segundos
-        f: 0.6 + Math.random() * 0.9, amp: 8 + Math.random() * 16, fase: Math.random() * 6.28,
-        clara: Math.random() < 0.5,
-      });
-    }
+    const poeira = Array.from({ length: 26 }, () => ({ u: Math.random(), v: Math.random(), vel: 0.02 + Math.random() * 0.05, tam: 0.6 + Math.random() * 1.4, fase: Math.random() * 6.28 }));
+    let ligado = false, inicio = 0;
+    const suave = (q) => 1 - Math.pow(1 - Math.max(0, Math.min(1, q)), 3);
     function quadro(ms) {
       if (!cv.isConnected) { if (ligado) return; requestAnimationFrame(quadro); return; }
-      ligado = true;
-      const dt = Math.min(0.05, antes ? (ms - antes) / 1000 : 0.016);
-      antes = ms;
-      const r = card.getBoundingClientRect();
-      const l = r.width, a = r.height;
-      const W = l + MARGEM * 2, H = a + ACIMA + MARGEM;
+      if (!ligado) { ligado = true; inicio = ms; }
+      const t = (ms - inicio) / 1000;
+      const palcoEl = $('palco');
+      const pr = palcoEl.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      const W = pr.width, H = pr.height;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
         cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
         cv.style.width = W + 'px'; cv.style.height = H + 'px';
-        cv.style.left = -MARGEM + 'px'; cv.style.top = -ACIMA + 'px';
       }
+      cv.style.left = (pr.left - cr.left) + 'px';
+      cv.style.top = (pr.top - cr.top) + 'px';
       const ctx = cv.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      // brilho fraco e retangular, respirando devagar
+      // card no sistema do palco
+      const cx = cr.left - pr.left + cr.width / 2;
+      const cyTopo = cr.top - pr.top;
+      const cyBase = cyTopo + cr.height;
+      // o facho entra varrendo da esquerda e para no card em ~0,9 s
+      const k = suave(t / 0.9);
+      const alvoX = cx + (1 - k) * (-W * 0.55);
+      const fonteX = cx + W * 0.12, fonteY = -30;
+      const respira = 1 + Math.sin(t * 2.2) * 0.04;
+      const clarao = t > 0.9 ? Math.max(0, 1 - (t - 0.9) / 0.5) : 0;
+      // escurece o palco em volta (entra junto com o facho)
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.42 * Math.min(1, t / 0.5)) + ')';
+      ctx.fillRect(0, 0, W, H);
+      // facho: um cone da fonte até um pouco abaixo do card
+      const meia = cr.width * 0.68 * respira;
+      const baseY = cyBase + 14;
       ctx.save();
-      ctx.shadowColor = 'rgba(255,205,90,.55)';
-      ctx.shadowBlur = 22 + Math.sin(ms / 900) * 6;
-      ctx.fillStyle = 'rgba(255,205,90,.12)';
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createLinearGradient(fonteX, fonteY, alvoX, baseY);
+      const forca = (0.16 + clarao * 0.18) * Math.min(1, t / 0.3);
+      g.addColorStop(0, 'rgba(255,244,210,' + forca * 1.6 + ')');
+      g.addColorStop(0.7, 'rgba(255,236,190,' + forca + ')');
+      g.addColorStop(1, 'rgba(255,230,170,' + forca * 0.4 + ')');
+      ctx.fillStyle = g;
+      ctx.filter = 'blur(6px)';
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(MARGEM, ACIMA, l, a, 18); else ctx.rect(MARGEM, ACIMA, l, a);
+      ctx.moveTo(fonteX - 10, fonteY);
+      ctx.lineTo(fonteX + 10, fonteY);
+      ctx.lineTo(alvoX + meia, baseY);
+      ctx.ellipse(alvoX, baseY, meia, 16, 0, 0, Math.PI);
+      ctx.lineTo(alvoX - meia, baseY);
+      ctx.closePath();
       ctx.fill();
+      ctx.filter = 'none';
+      // poça de luz em volta do card
+      // (círculo achatado: o degradê some antes da borda, sem linha de oval)
+      const fp = (0.22 + clarao * 0.3) * k;
+      const rx = cr.width * 0.95, ry = cr.height * 1.15;
+      ctx.save();
+      ctx.translate(alvoX, (cyTopo + cyBase) / 2);
+      ctx.scale(1, ry / rx);
+      const poca = ctx.createRadialGradient(0, 0, 10, 0, 0, rx);
+      poca.addColorStop(0, 'rgba(255,238,190,' + fp + ')');
+      poca.addColorStop(0.6, 'rgba(255,238,190,' + fp * 0.35 + ')');
+      poca.addColorStop(1, 'rgba(255,238,190,0)');
+      ctx.fillStyle = poca;
+      ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
-      // fumaça: umas 14 baforadas por segundo para cada 100 px de largura
-      sobra += dt * (l / 100) * 14;
-      while (sobra >= 1) { soltar(l, a); sobra--; }
-      for (const p of fumaca) {
-        p.vida += dt;
-        const k = p.vida / p.dura;
-        if (k >= 1) continue;
-        p.y -= p.sobe * dt;
-        p.x = p.x0 + Math.sin(p.vida * p.f * 2 + p.fase) * p.amp * Math.min(1, k * 2);
-        const raio = p.raio + p.cresce * p.vida;
-        // aparece rápido e some devagar
-        const alfa = (k < 0.2 ? k / 0.2 : (1 - k) / 0.8) * 0.13;
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, raio);
-        const cor = p.clara ? '255,246,220' : '255,214,130';
-        g.addColorStop(0, 'rgba(' + cor + ',' + alfa + ')');
-        g.addColorStop(0.6, 'rgba(' + cor + ',' + alfa * 0.45 + ')');
-        g.addColorStop(1, 'rgba(' + cor + ',0)');
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(p.x, p.y, raio, 0, Math.PI * 2); ctx.fill();
+      // poeira flutuando dentro do facho
+      for (const p of poeira) {
+        p.v = (p.v + p.vel * 0.016) % 1;
+        const y = fonteY + (baseY - fonteY) * p.v;
+        const larg = 10 + (meia - 10) * p.v;
+        const xc = fonteX + (alvoX - fonteX) * p.v;
+        const x = xc + (p.u * 2 - 1) * larg * 0.9 + Math.sin(t * 0.8 + p.fase) * 4;
+        ctx.fillStyle = 'rgba(255,248,225,' + (0.35 * Math.sin(p.v * Math.PI) * Math.min(1, t)) + ')';
+        ctx.beginPath(); ctx.arc(x, y, p.tam, 0, Math.PI * 2); ctx.fill();
       }
-      for (let i = fumaca.length - 1; i >= 0; i--) if (fumaca[i].vida >= fumaca[i].dura) fumaca.splice(i, 1);
+      ctx.restore();
       requestAnimationFrame(quadro);
     }
     requestAnimationFrame(quadro);
@@ -2876,7 +2892,7 @@
     const info = el('div', 'info');
     info.appendChild(el('div', 'nome', '@' + v.usuario));
     bloco.appendChild(info);
-    bloco.appendChild(auraDeFogo(bloco));
+    bloco.appendChild(holofote(bloco));
     if (!presenca) { $('palco').classList.remove('com-presenca'); alvo.appendChild(bloco); return; }
 
     // card + área de presença empilhados no meio do palco
