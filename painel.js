@@ -2195,6 +2195,127 @@
   const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
   const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
 
+  // Sons da corrida, todos gerados na hora com Web Audio (nenhum arquivo):
+  // o tiro de largada, quacks soltos de patos aleatórios e uma torcida de
+  // fundo que cresce na arrancada e explode na chegada. M liga/desliga (fica
+  // lembrado).
+  function somDaCorrida() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    let mudo = false;
+    try { mudo = localStorage.getItem('bj-som-corrida') === 'mudo'; } catch (e) { /* sem storage */ }
+    const nada = { largada() {}, quack() {}, torcida() {}, chegada() {}, alternar() { return false; }, fechar() {} };
+    if (!Ctx) return nada;
+    let ac;
+    try { ac = new Ctx(); } catch (e) { return nada; }
+    if (ac.state === 'suspended') ac.resume().catch(() => {});
+    const mestre = ac.createGain();
+    mestre.gain.value = mudo ? 0 : 0.7;
+    mestre.connect(ac.destination);
+
+    // 2 s de ruído branco, reaproveitado por tudo que precisa de ruído
+    const ruido = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    const dados = ruido.getChannelData(0);
+    for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1;
+    const fonteRuido = (loop) => { const s = ac.createBufferSource(); s.buffer = ruido; s.loop = !!loop; return s; };
+    const alea = (a, b) => a + Math.random() * (b - a);
+
+    // torcida: ruído em quatro faixas de voz, cada uma subindo e descendo no
+    // seu ritmo (vira um burburinho de arquibancada)
+    const torcidaG = ac.createGain();
+    torcidaG.gain.value = 0;
+    torcidaG.connect(mestre);
+    const fundo = fonteRuido(true);
+    [380, 720, 1250, 2300].forEach((f) => {
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 1.4;
+      const g = ac.createGain(); g.gain.value = 0.5;
+      const lfo = ac.createOscillator(); lfo.frequency.value = alea(0.4, 2.2);
+      const prof = ac.createGain(); prof.gain.value = 0.35;
+      lfo.connect(prof); prof.connect(g.gain); lfo.start();
+      fundo.connect(bp); bp.connect(g); g.connect(torcidaG);
+    });
+    fundo.start();
+
+    // um "uhuu" de alguém da torcida: voz (dente de serra) que sobe de tom
+    function grito(quando, forca) {
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      const f0 = alea(220, 420);
+      o.frequency.setValueAtTime(f0, quando);
+      o.frequency.linearRampToValueAtTime(f0 * alea(1.3, 1.7), quando + 0.25);
+      o.frequency.linearRampToValueAtTime(f0 * alea(1.1, 1.4), quando + 0.7);
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = alea(700, 1100); bp.Q.value = 2;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, quando);
+      g.gain.linearRampToValueAtTime(0.05 * forca, quando + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.001, quando + 0.8);
+      const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+      o.connect(bp); bp.connect(g);
+      if (pan) { pan.pan.value = alea(-0.8, 0.8); g.connect(pan); pan.connect(mestre); } else g.connect(mestre);
+      o.start(quando); o.stop(quando + 0.85);
+    }
+
+    return {
+      // tiro: estalo de ruído que decai rápido + um baque grave
+      largada() {
+        const t = ac.currentTime;
+        const s = fonteRuido(false);
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(6000, t); lp.frequency.exponentialRampToValueAtTime(400, t + 0.35);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+        s.connect(lp); lp.connect(g); g.connect(mestre);
+        s.start(t); s.stop(t + 0.5);
+        const o = ac.createOscillator();
+        o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(35, t + 0.25);
+        const go = ac.createGain();
+        go.gain.setValueAtTime(0.8, t); go.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        o.connect(go); go.connect(mestre);
+        o.start(t); o.stop(t + 0.32);
+        for (let i = 0; i < 5; i++) grito(t + 0.25 + Math.random() * 0.6, 1);
+      },
+      // quack: voz nasal (dente de serra em filtros de "bico") que cai de tom;
+      // às vezes sai em dobro
+      quack() {
+        const vezes = Math.random() < 0.3 ? 2 : 1;
+        const f0 = alea(420, 640), panV = alea(-0.9, 0.9), vol = alea(0.18, 0.32);
+        for (let k = 0; k < vezes; k++) {
+          const t = ac.currentTime + k * 0.17;
+          const o = ac.createOscillator(); o.type = 'sawtooth';
+          o.frequency.setValueAtTime(f0, t);
+          o.frequency.exponentialRampToValueAtTime(f0 * 0.72, t + 0.13);
+          const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 1150; f1.Q.value = 5;
+          const f2 = ac.createBiquadFilter(); f2.type = 'peaking'; f2.frequency.value = 2600; f2.gain.value = 8;
+          const g = ac.createGain();
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(vol, t + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+          o.connect(f1); f1.connect(f2); f2.connect(g);
+          if (ac.createStereoPanner) { const pan = ac.createStereoPanner(); pan.pan.value = panV; g.connect(pan); pan.connect(mestre); } else g.connect(mestre);
+          o.start(t); o.stop(t + 0.17);
+        }
+      },
+      // volume da torcida (0 a 1); muda suave, pode chamar a cada quadro
+      torcida(nivel) { torcidaG.gain.setTargetAtTime(0.09 * nivel, ac.currentTime, 0.4); },
+      // chegada: a torcida explode com vários gritos
+      chegada() {
+        const t = ac.currentTime;
+        torcidaG.gain.cancelScheduledValues(t);
+        torcidaG.gain.setTargetAtTime(0.2, t, 0.05);
+        for (let i = 0; i < 14; i++) grito(t + Math.random() * 1.4, 1.4);
+      },
+      alternar() {
+        mudo = !mudo;
+        try { localStorage.setItem('bj-som-corrida', mudo ? 'mudo' : 'som'); } catch (e) { /* sem storage */ }
+        mestre.gain.setTargetAtTime(mudo ? 0 : 0.7, ac.currentTime, 0.05);
+        return mudo;
+      },
+      fechar() {
+        try { mestre.gain.setTargetAtTime(0, ac.currentTime, 0.08); } catch (e) { /* já fechado */ }
+        setTimeout(() => ac.close().catch(() => {}), 400);
+      },
+    };
+  }
+
   function correrPatos(participantes, vencedor, pronto) {
     const fim = () => {
       girando = false;
@@ -2210,8 +2331,10 @@
     camada.setAttribute('aria-label', 'Corrida de patos');
     const cv = el('canvas');
     camada.appendChild(cv);
-    camada.appendChild(el('div', 'corrida-dica', 'Segure → para acelerar 2x · Esc pula para o resultado'));
+    camada.appendChild(el('div', 'corrida-dica', 'Segure → para acelerar 2x · M liga/desliga o som · Esc pula para o resultado'));
     document.body.appendChild(camada);
+    const som = somDaCorrida();
+    const alea = (a, b) => a + Math.random() * (b - a);
     const fonte = getComputedStyle(document.body).fontFamily || 'sans-serif';
     // O que pesa é pintar pixels (por isso a janela maior trava mais). Corrida
     // cheia: desenha em 1x e, em janela grande, numa resolução interna de até
@@ -2294,18 +2417,35 @@
       const briga = pt.briga.reduce((s, o, i) => s + (i ? 0.45 : 1) * Math.sin(o.w * tt + o.f), 0) * BRIGA * k;
       return v + ABRE * k + briga;
     }
-    // No fim o vencedor cruza com folga, sem margem para questionamento: uns 5%
-    // da largura da tela à frente do segundo (numa tela 16:9, ~0,9 corpo).
-    const FOLGA = 0.9;
-    const lider = Math.max(...outros.map((x) => base(x, CORRIDA_MS)), -Infinity);
-    gv0.extra = Math.max(0, (isFinite(lider) ? lider : 0) + FOLGA - base(gv0, CORRIDA_MS));
+    // O que dá para saber antes da corrida (não depende da tela): o mais longe
+    // que alguém chega em qualquer momento, quem lidera no fim fora o vencedor
+    // e como o vencedor está quando começa a arrancada.
+    const T0 = CORRIDA_MS - ARRANCADA_MS;
+    let maxTodos = 0;
+    for (const pt of patos) {
+      for (let tt = 0; tt <= (pt.ganha ? T0 + 2000 : CORRIDA_MS); tt += 250) maxTodos = Math.max(maxTodos, base(pt, tt));
+    }
+    let lider = 0, liderFim = 0;   // no fim / o mais longe nos últimos 1,5 s
+    for (const x of outros) {
+      lider = Math.max(lider, base(x, CORRIDA_MS));
+      for (let tt = CORRIDA_MS - 1500; tt <= CORRIDA_MS; tt += 100) liderFim = Math.max(liderFim, base(x, tt));
+    }
+    const p0 = base(gv0, T0);
+    const m0Bruto = Math.max(0, (base(gv0, T0 + 50) - base(gv0, T0 - 50)) / 100);
+    // A arrancada do vencedor é uma curva que só acelera (velocidade sempre
+    // para a frente e crescendo) até cruzar a chegada; W e m1 (posição e
+    // velocidade finais) saem da escala da tela, a cada quadro.
+    const plano = { W: p0 + 1, m0: 0, m1: 0, X: 0 };
     function vantagem(pt, t) {
       const v = base(pt, t);
-      return pt.ganha ? v + pt.extra * suave((t - (CORRIDA_MS - ARRANCADA_MS)) / (ARRANCADA_MS - 500)) : v;
+      if (t <= T0) return v;
+      // na arrancada os outros cansam um pouco (X, calculado na tela)
+      if (!pt.ganha) return v - plano.X * suave((t - T0) / ARRANCADA_MS);
+      const T = ARRANCADA_MS, s = Math.min(1, (t - T0) / T), s2 = s * s, s3 = s2 * s;
+      const H = (2 * s3 - 3 * s2 + 1) * p0 + (s3 - 2 * s2 + s) * T * plano.m0
+        + (3 * s2 - 2 * s3) * plano.W + (s3 - s2) * T * plano.m1;
+      return v + (H - v) * suave((t - T0) / 2000);   // entra na curva aos poucos
     }
-    const vantFinal = (pt) => vantagem(pt, CORRIDA_MS);
-    // ordem de chegada, para o 2º e o 3º
-    const ordem = patos.slice().sort((a, b) => vantFinal(b) - vantFinal(a));
 
     const p = { ctx: med.ctx, cv, overlay: camada, inicio: performance.now(), raf: 0, rede: 0, fecha: 0, pecas: [], l: med.l, a: med.a, acabou: false };
     palco = p;
@@ -2466,34 +2606,53 @@
       const sx = dy * incl;
       // pato da raia de baixo, na largada; com o bolo espalhado, mais para dentro
       // para quem fica para trás não sair da tela pela esquerda
-      const x0 = Math.max(l * 0.06, w * 0.2) + (espalha - 1) * hRef * (130 / 118) * 0.9;
+      // (quem fica para trás pode sair pela esquerda: sobra mais rio para a frente)
+      const x0 = Math.max(l * 0.06, w * 0.2);
       const v = l * 0.075;                                       // px/s do rio passando
       const corpo = hRef * (130 / 118) * 0.9;                    // "um corpo" de vantagem (na referência)
 
       // câmera: o grupo nada a v (o rio passa); os patos quase não saem do lugar na tela
       const fimRelogio = CORRIDA_MS;
-      const cam = (Math.max(0, Math.min(t, fimRelogio + 2000)) / 1000) * v;
+      const cam = (Math.max(0, t) / 1000) * v;   // o rio nunca para
       // A linha é guardada pela base (x no pé da faixa); na raia de cada pato ela
       // está em base + (yFundo - y) * incl, a mesma inclinação das raias. Por isso
       // basta comparar a base com o nariz do pato "trazido" para a raia de baixo.
       const yFundoL = yRaia(n - 1) + h * 0.35;
-      // Ninguém sai da tela pela direita: quando o líder passa de um limite (que
-      // deixa até o pato da raia mais alta na tela), a câmera anda junto com ele
-      // e todo mundo desliza para a esquerda. As distâncias entre os patos ficam
-      // exatamente as mesmas (para trás podem sair da tela).
+      // Ninguém sai da tela pela direita, e sem câmera correndo atrás do líder
+      // (ela deixava o pato da frente parado na tela): um corpo encolhe o
+      // necessário para que, em momento nenhum, alguém passe do limite (que
+      // deixa até o pato da raia mais alta na tela). Para trás podem sair. O
+      // vencedor termina 5% da largura à frente do segundo.
       const desvioMax = (n - 1) * sx;
       const uLim = l - w - 14 - desvioMax;
-      const camLider = (tt) => {
-        let m = -Infinity;
-        for (const pt of patos) m = Math.max(m, vantagem(pt, tt));
-        return Math.max(0, x0 + m * corpo - uLim);
-      };
-      const segue = camLider(Math.min(t, fimRelogio));
-      const uPato = (pt, tt) => x0 + vantagem(pt, tt) * corpo - (tt === t ? segue : camLider(tt));
+      // folga do vencedor: 5% da tela, e nunca menos que meio pato (em janela
+      // estreita 5% some ao lado de patos grandes)
+      const folgaPx = Math.max(l * 0.05, w * 0.5), espaco = uLim - x0;
+      // O vencedor assume a frente 1,5 s antes de zerar (s = 0,8125 da
+      // arrancada, onde a curva percorreu a fração gS do caminho) e só aumenta
+      // a distância até a chegada.
+      const gS = 1.5 * 0.8125 ** 2 - 0.5 * 0.8125 ** 3, passaPx = w * 0.1;
+      let c = corpo;
+      if (maxTodos > 0) c = Math.min(c, espaco / maxTodos);
+      if (lider > 0) c = Math.min(c, (espaco - folgaPx) / lider);
+      const kPassa = p0 + (liderFim - p0) / gS;
+      if (kPassa > 0) c = Math.min(c, (espaco - passaPx / gS) / kPassa);
+      c = Math.max(c, corpo * 0.15);
+      // Se o vencedor começa a arrancada muito atrás, para passar a 1,5 s do
+      // fim ele chegaria longe demais na frente; então os outros cansam o
+      // bastante (X) para a folga final ficar nos 5%.
+      const atras = lider - p0, cabe = ((folgaPx * gS - passaPx) / c) / (1 - gS);
+      plano.X = Math.max(0, atras - cabe);
+      const lid = lider - plano.X, lidFim = liderFim - plano.X * suave(0.8125);
+      plano.W = Math.max(lid + folgaPx / c, p0 + (lidFim + passaPx / c - p0) / gS, Math.min(p0 + 1, espaco / c));
+      const media = (plano.W - p0) / ARRANCADA_MS;
+      plano.m0 = Math.min(m0Bruto, 2 * media);
+      plano.m1 = 1.5 * media;                                   // a velocidade só cresce até a chegada
+      const uPato = (pt, tt) => x0 + vantagem(pt, tt) * c;
       const xPato = (pt, tt) => uPato(pt, tt) + (n - 1 - pt.raia) * sx;
       // base da linha que encosta no bico deste pato (igual para todas as raias)
       const baseNoBico = (pt, tt) => uPato(pt, tt) + w * AN.bico - h * 0.35 * incl;
-      const baseNoNariz = (vant) => x0 + w * AN.bico + vant * corpo - h * 0.35 * incl;
+      const baseNoNariz = (vant) => x0 + w * AN.bico + vant * c - h * 0.35 * incl;
       // nos últimos CHEGADA_MS a chegada desliza da direita até o nariz do vencedor
       // e continua no mesmo passo, cruzando os outros em ordem
       let xChegada = null;
@@ -2508,9 +2667,19 @@
       const dv = Math.max(0, t - fimRelogio - 300);
       const kv = Math.min(1, dv / 1400);
 
+      // ---- sons: tiro na largada, quacks soltos, torcida crescendo na
+      // arrancada e explodindo na chegada
+      if (!p.tiro && t >= 0) { p.tiro = true; som.largada(); p.proxQuack = agora + alea(600, 1800); }
+      if (!p.cruzou && t >= fimRelogio) { p.cruzou = true; som.chegada(); }
+      if (!p.cruzou) som.torcida(t < 0 ? 0.25 : 0.45 + 0.55 * suave((t - (fimRelogio - ARRANCADA_MS)) / ARRANCADA_MS));
+      if (p.tiro && t < fimRelogio + 2500 && agora >= p.proxQuack) {
+        som.quack();
+        p.proxQuack = agora + alea(900, 4200) / (acelerando ? 2 : 1);
+      }
+
       // ---- margem e rio: a faixa pronta, deslizando com a câmera
       if (!fundo || fundo.l !== l || fundo.a !== a) fundo = fazerFundo(l, a, rioY);
-      const desl = (cam + segue + agora * 0.012) % PERIODO;   // a câmera seguindo o líder também move o rio
+      const desl = (cam + agora * 0.012) % PERIODO;
       ctx.drawImage(fundo.c, 0, 0, fundo.c.width, fundo.c.height, -desl, 0, fundo.W, fundo.H);
 
       // ---- largada (fica para trás) e chegada, inclinadas, com o número das raias
@@ -2527,7 +2696,7 @@
           ctx.fillText(String(n - pt.raia), xLinha + (yFundo - y) * incl + 2 * q + 8, y);
         });
       };
-      const xLargada = baseNoNariz(0) + 2 - cam - segue;
+      const xLargada = baseNoNariz(0) + 2 - cam;
       if (xLargada + (yFundo - yTopo) * incl > -80) { linhaXadrez(ctx, xLargada, yTopo, yFundo, incl, q); numeros(xLargada); }
       if (xChegada != null) {
         const xc = xChegada - (dv > 0 ? kv * l * 0.4 : 0);
@@ -2536,27 +2705,23 @@
 
       // ---- patos, da raia de trás para a da frente
       const gv = patos.find((x) => x.ganha);
-      // pódio no fim: o vencedor no meio, o 2º à esquerda e o 3º à direita
-      const [segundo, terceiro] = ordem.filter((x) => !x.ganha);
-      const ym = rioY + (a - rioY) * 0.5;
-      const lado = Math.min(w * 1.6, l * 0.3);
-      const podio = [];
+      let xGv = 0;
       patos.forEach((pt) => {
         let x = xPato(pt, t);
         if (p.ultimas) p.ultimas[pt.raia] = [pt.fuga ? (pt.ganha ? 2 : 1) : 0, Math.round(x - (n - 1 - pt.raia) * sx)];
-        let y = yRaia(pt.raia);
-        if (dv > 0) {
-          const lugar = pt.ganha ? 1 : pt === segundo ? 2 : pt === terceiro ? 3 : 0;
-          if (lugar) {
-            // vão para o pódio: o vencedor no meio, um pouco mais alto
-            const xm = l / 2 - w / 2 + (lugar === 2 ? -lado : lugar === 3 ? lado : 0);
-            const yAlvo = ym + (lugar === 1 ? 0 : h * 0.18);
-            x += (xm - x) * suave(kv); y += (yAlvo - y) * suave(kv);
-            podio.push({ lugar, x: x + w / 2, y });
-          } else {
-            x -= kv * kv * l * 0.9;     // os outros ficam para trás
-          }
+        const y = yRaia(pt.raia);
+        if (pt.ganha && t > fimRelogio) {
+          // depois de cruzar, o vencedor não freia de uma vez: segue nadando
+          // para a frente e vai desacelerando até parar na tela (o rio continua)
+          const vF = c * plano.m1;                      // px/ms ao cruzar
+          const D = Math.max(0, Math.min(vF * 800, l - w - 14 - x));
+          const T2 = D > 0 ? Math.min(1600, (3 * D) / vF) : 1;
+          const s = Math.min(1, (t - fimRelogio) / T2), s2 = s * s, s3 = s2 * s;
+          x += (s3 - 2 * s2 + s) * T2 * vF + (3 * s2 - 2 * s3) * D;
+        } else if (dv > 0 && !pt.ganha) {
+          x -= kv * kv * l * 0.9;       // os outros ficam para trás
         }
+        if (pt.ganha) xGv = x;
         const bob = Math.sin(agora / 260 + pt.fase);
         const yTopoPato = y - h * 0.86 + bob * h * 0.025;   // a raia é a linha d'água
         const sp = sprite(pt, Math.round(h), w, tamNome, tamNum, dv > 0 && pt.ganha);
@@ -2599,31 +2764,16 @@
         ctx.font = '800 ' + tam + 'px ' + fonte;
         const frase = gv.nome + ' venceu!';
         const fw = ctx.measureText(frase).width + tam * 1.4;
-        const fy = rioY + (a - rioY) * 0.5 - h * 1.05;
-        pilula(ctx, l / 2 - fw / 2, fy - tam, fw, tam * 1.8, tam * 0.5, '#fff', 3);
+        // acima do vencedor, sem sair da tela
+        const fx = Math.max(fw / 2 + 10, Math.min(l - fw / 2 - 10, xGv + w / 2));
+        const fy = Math.max(rioY + tam * 1.2, yRaia(gv.raia) - h * 1.2);
+        pilula(ctx, fx - fw / 2, fy - tam, fw, tam * 1.8, tam * 0.5, '#fff', 3);
         ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(frase, l / 2, fy - tam + tam * 0.9 + 1);
+        ctx.fillText(frase, fx, fy - tam + tam * 0.9 + 1);
         ctx.textAlign = 'left';
         ctx.globalAlpha = 1;
       }
-      p.podio = podio;   // para depurar (window.__bjCorrida)
-      // medalhas do pódio, embaixo de cada pato (1º ouro, 2º prata, 3º bronze)
-      if (dv > 0 && podio.length) {
-        const r = Math.max(14, Math.min(26, h * 0.16));
-        ctx.globalAlpha = Math.min(1, dv / 600);
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = '800 ' + Math.round(r * 0.95) + 'px ' + fonte;
-        for (const m of podio) {
-          const cy = m.y + h * 0.3 + r;
-          ctx.fillStyle = m.lugar === 1 ? '#ffc62b' : m.lugar === 2 ? '#d7dbe0' : '#d9945a';
-          ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(m.x, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#000';
-          ctx.fillText(m.lugar + 'º', m.x, cy + 1);
-        }
-        ctx.textAlign = 'left';
-        ctx.globalAlpha = 1;
-      }
+      p.xGv = xGv;   // para depurar (window.__bjCorrida)
 
       if (!p.acabou && t >= fimRelogio + 300 + VENCEDOR_MS) encerrar();
     }
@@ -2640,6 +2790,7 @@
       if (palco !== p) return;
       if (e.key === 'Escape') encerrar();
       else if (e.key === 'ArrowRight') { acelerando = true; e.preventDefault(); }
+      else if (e.key === 'm' || e.key === 'M') som.alternar();
     };
     const solta = (e) => { if (e.key === 'ArrowRight') acelerando = false; };
     const perdeuFoco = () => { acelerando = false; };
@@ -2650,6 +2801,7 @@
       document.removeEventListener('keydown', tecla);
       document.removeEventListener('keyup', solta);
       window.removeEventListener('blur', perdeuFoco);
+      som.fechar();
     };
     // posições do último quadro, para depurar pelo console (window.__bjCorrida)
     p.ultimas = [];
