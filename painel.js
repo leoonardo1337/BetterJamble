@@ -652,6 +652,8 @@
   })();
   const SERIES_AUD = [
     ['pessoas', 'Pessoas assistindo'], ['chat', 'Mensagens'], ['gemas', 'Gemas'], ['entradas', 'Entradas'], ['lances', 'Lances'],
+    // leilão e preço fixo: lance só existe no leilão; isto conta os itens que saíram
+    ['vendas', 'Itens vendidos'],
   ];
   // séries escondidas pela legenda (clicar no nome liga e desliga a linha)
   const seriesOcultas = new Set();
@@ -751,11 +753,12 @@
   // Janelas de tempo alinhadas no relógio (14:00, 14:05...), da primeira
   // amostra até agora. Audiência = média das amostras na janela (ou o último
   // valor conhecido, se nada mudou nela); interações = soma dos minutos.
-  function janelasAudiencia(a, passoMin) {
+  // `desde`: começa antes se houver venda anterior à primeira amostra.
+  function janelasAudiencia(a, passoMin, desde) {
     const passo = passoMin * 60000;
     const am = a.amostras || [];
     const mins = a.minutos || [];
-    const inicio = Math.min(am.length ? am[0][0] : Infinity, mins.length ? mins[0][0] : Infinity);
+    const inicio = Math.min(am.length ? am[0][0] : Infinity, mins.length ? mins[0][0] : Infinity, desde || Infinity);
     if (!isFinite(inicio)) return [];
     const agora = Date.now();
     // a live inteira, do começo até agora: em lives longas as janelas só ficam
@@ -966,7 +969,10 @@
       ));
     }
 
-    const janelas = a ? janelasAudiencia(a, janelaAud) : [];
+    // itens vendidos por minuto (da lista de vendidos): o gráfico começa na
+    // primeira venda se ela veio antes da primeira amostra de audiência
+    const vm = (dadosDaLive().totais || {}).vendasMin || [];
+    const janelas = a ? janelasAudiencia(a, janelaAud, vm.length ? vm[0][0] : 0) : [];
     const leg = limpar($('legAudiencia'));
     SERIES_AUD.forEach(([k, rot]) => {
       const b = el('button');
@@ -983,10 +989,12 @@
     if (!janelas.length) {
       limpar(gA).appendChild(el('div', 'aud-vazio', 'O gráfico começa assim que a live mandar o primeiro número de audiência.'));
     } else {
+      // itens vendidos por janela
+      const vendas = janelas.map((j) => vm.reduce((s, [m, n]) => (m >= j.t && m < j.fim ? s + n : s), 0));
       graficoLinhas(gA, janelas, SERIES_AUD.map(([k, rot], idx) => ({
         k, rot,
         // pessoas = média na janela; o resto = soma de interações na janela
-        vals: janelas.map((j) => (idx === 0 ? j.media : j.inter[idx - 1])),
+        vals: k === 'vendas' ? vendas : janelas.map((j) => (idx === 0 ? j.media : j.inter[idx - 1])),
       })));
     }
 
