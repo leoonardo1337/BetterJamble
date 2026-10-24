@@ -2193,7 +2193,8 @@
   const ZOOM_CORRIDA = 0.9;        // 10% mais afastado: tudo um pouco menor
   const LARGADA_MS = 3040;         // contagem 3-2-1 com os patos na linha; o GO é o tiro (= CONTAGEM_GO)
   const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
-  const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
+  const VENCEDOR_MS = 4700;        // depois de cruzar: os outros ficam para trás, a faixa do
+                                   // vencedor entra (~1,7 s) e a tela fica mais 3 s com ele
 
   // Sons da corrida: os mp3 da pasta sons/ (contagem, música, torcida e
   // quack); se algum não carregar, aquele som é gerado na hora com Web Audio. Ordem: contagem 3-2-1-GO, a
@@ -2519,11 +2520,11 @@
       ctx.fillStyle = '#000'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
       ctx.fillText(txt, xDir - w + tam * 0.45, yMeio + 0.5);
     }
-    // Cada corredor vira UMA imagem pronta: o pato, o número da raia no corpo e
+    // Cada corredor vira UMA imagem pronta: o pato e
     // o nome perto da cabeça. Assim cada quadro faz um drawImage por pato, em
     // vez de pato + duas pílulas + dois textos (com centenas, era o que pesava).
     const sprites = new Map();   // id|destaque -> {c, ox, oy}
-    function sprite(pt, h, w, tamNome, tamNum, destaque) {
+    function sprite(pt, h, w, tamNome, destaque) {
       const chave = pt.id + (destaque ? '|d' : '');
       const pronto = sprites.get(chave);
       if (pronto && pronto.h === h) return pronto;
@@ -2544,13 +2545,6 @@
       const x = c.getContext('2d');
       x.scale(dpr, dpr);
       x.drawImage(img, ox, oy, w, h);
-      x.font = '700 ' + tamNum + 'px ' + fonte;
-      const num = String(n - pt.raia);
-      const nw = Math.max(tamNum * 1.6, x.measureText(num).width + tamNum);
-      const tagX = ox + w * AN.corpoX, tagY = oy + h * AN.corpoY - tamNum * 0.7;
-      pilula(x, tagX, tagY, nw, tamNum * 1.35, tamNum * 0.3, '#fff', Math.max(1.2, tamNum * 0.12));
-      x.fillStyle = '#000'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.fillText(num, tagX + nw / 2, tagY + tamNum * 0.7);
       etiqueta(x, ox + nomeDir, oy + h * AN.cabecaTopo, pt.nome, tamNome, destaque);
       const sp = { c, ox, oy, W, H, h };
       sprites.set(chave, sp);
@@ -2655,7 +2649,6 @@
       const dy = n > 1 ? (yUltima - yPrimeira) / (n - 1) : 0;
       const yRaia = (r) => (n > 1 ? yPrimeira + dy * r : (yPrimeira + yUltima) / 2);
       const tamNome = Math.max(10, Math.min(20, a * 0.03)) * ZOOM_CORRIDA;
-      const tamNum = Math.max(8, Math.min(15, a * 0.022)) * ZOOM_CORRIDA;
       const AN = BJPatos.ancora;                                 // onde ficam bico, cabeça e corpo no desenho
       const w = h * AN.aspecto;
       const incl = 0.5;                                          // quanto a raia de cima anda para a direita, por px de altura
@@ -2738,25 +2731,15 @@
       const desl = (cam + agora * 0.012) % PERIODO;
       ctx.drawImage(fundo.c, 0, 0, fundo.c.width, fundo.c.height, -desl, 0, fundo.W, fundo.H);
 
-      // ---- largada (fica para trás) e chegada, inclinadas, com o número das raias
+      // ---- largada (fica para trás) e chegada, inclinadas
       const q = Math.max(6, Math.min(16, a * 0.02));
       const yFundo = yFundoL;
       const yTopo = Math.max(rioY + 4, yRaia(0) - h * 0.55);
-      const numeros = (xLinha) => {
-        if (dy < 22) return;   // amontoado: os números não cabem (o original também some com eles)
-        ctx.fillStyle = '#000';
-        ctx.font = 'italic 800 ' + Math.round(Math.max(12, Math.min(64, dy * 0.85))) + 'px ' + fonte;
-        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-        patos.forEach((pt) => {
-          const y = yRaia(pt.raia);
-          ctx.fillText(String(n - pt.raia), xLinha + (yFundo - y) * incl + 2 * q + 8, y);
-        });
-      };
       const xLargada = baseNoNariz(0) + 2 - cam;
-      if (xLargada + (yFundo - yTopo) * incl > -80) { linhaXadrez(ctx, xLargada, yTopo, yFundo, incl, q); numeros(xLargada); }
+      if (xLargada + (yFundo - yTopo) * incl > -80) linhaXadrez(ctx, xLargada, yTopo, yFundo, incl, q);
       if (xChegada != null) {
         const xc = xChegada - (dv > 0 ? kv * l * 0.4 : 0);
-        if (xc < l + 40) { linhaXadrez(ctx, xc, yTopo, yFundo, incl, q); numeros(xc); }
+        if (xc < l + 40) linhaXadrez(ctx, xc, yTopo, yFundo, incl, q);
       }
 
       // ---- patos, da raia de trás para a da frente
@@ -2780,7 +2763,7 @@
         if (pt.ganha) xGv = x;
         const bob = Math.sin(agora / 260 + pt.fase);
         const yTopoPato = y - h * 0.86 + bob * h * 0.025;   // a raia é a linha d'água
-        const sp = sprite(pt, Math.round(h), w, tamNome, tamNum, dv > 0 && pt.ganha);
+        const sp = sprite(pt, Math.round(h), w, tamNome, dv > 0 && pt.ganha);
         if (!sp) return;
         const sx0 = Math.round(x - sp.ox), sy0 = Math.round(yTopoPato - sp.oy);
         if (sx0 > l || sx0 + sp.W < 0) return;               // fora da tela: nem desenha
@@ -2871,6 +2854,7 @@
     const tecla = (e) => {
       if (palco !== p) return;
       if (e.key === 'Escape') encerrar();
+      else if (!p.somPronto && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); p.iniciar(); }
       else if (e.key === 'ArrowRight') { acelerando = true; e.preventDefault(); }
       else if (e.key === 'm' || e.key === 'M') som.alternar();
     };
@@ -2890,14 +2874,28 @@
     window.__bjCorrida = p;
     const laco = () => { if (palco !== p) return; quadro(); requestAnimationFrame(laco); };
     requestAnimationFrame(laco);
-    // espera os sons (no máximo 2 s; sem eles, vai com os gerados)
-    Promise.race([carregarSons(), new Promise((r) => setTimeout(r, 2000))]).then(() => {
-      if (palco !== p) return;
-      som = somDaCorrida();
-      som.comecar();
-      p.somPronto = true;
-    });
-    p.rede = setTimeout(() => { if (palco === p) encerrar(); }, 2000 + LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
+    // A corrida espera o botão Iniciar no meio da tela (ou Enter/espaço);
+    // enquanto isso os sons já vão carregando.
+    carregarSons();
+    const iniciar = el('button', 'corrida-iniciar', 'Iniciar');
+    iniciar.type = 'button';
+    camada.appendChild(iniciar);
+    iniciar.focus();
+    let comecou = false;
+    p.iniciar = () => {
+      if (comecou || palco !== p) return;
+      comecou = true;
+      iniciar.remove();
+      // espera os sons (no máximo 2 s; sem eles, vai com os gerados)
+      Promise.race([carregarSons(), new Promise((r) => setTimeout(r, 2000))]).then(() => {
+        if (palco !== p) return;
+        som = somDaCorrida();
+        som.comecar();
+        p.somPronto = true;
+      });
+      p.rede = setTimeout(() => { if (palco === p) encerrar(); }, 2000 + LARGADA_MS + CORRIDA_MS + 300 + VENCEDOR_MS + 1500);
+    };
+    iniciar.addEventListener('click', p.iniciar);
   }
 
   function embaralhar(v) {
@@ -3047,9 +3045,9 @@
     ctx.setTransform(p.base, 0, 0, p.base, p.base * p.dx, p.base * p.dy);
   }
 
-  // O vencedor desce rápido, passa um pouco do meio, volta e crava no centro
-  // (tudo de cima para baixo, como os nomes): amassa com o impacto, solta
-  // poeira para os lados, racha o "teto" e o palco chacoalha. Depois de POUSO.segura o resultado de verdade (com avatar) entra
+  // O vencedor cai de cima (acelerando, como na gravidade, igual aos nomes) e
+  // bate no "chão" logo abaixo dele, no centro: amassa apoiado no chão, solta
+  // poeira para os lados e para cima, racha o chão embaixo e o palco chacoalha. Depois de POUSO.segura o resultado de verdade (com avatar) entra
   // por cima e o nome do canvas some.
   function desenharPouso(p, T, vencedor, fonte) {
     const { ctx, l, a } = p;
@@ -3060,21 +3058,16 @@
     ctx.font = '900 ' + tam + 'px ' + fonte;
     const larg = ctx.measureText(txt).width;
     if (larg > l * 0.84) { tam = Math.max(18, (tam * l * 0.84) / larg); ctx.font = '900 ' + tam.toFixed(1) + 'px ' + fonte; }
-    const topo = cy + tam * 1.1;      // onde ele para depois de passar do meio (abaixo)
-    const chao = cy - tam * 0.55;     // o "teto" do impacto (acima do nome)
+    const chao = cy + tam * 0.55;     // o chão do impacto (logo abaixo do nome)
 
     let y, rot = 0, sx = 1, sy = 1, rastro = 0;
-    if (T < POUSO.sobe) {
-      const k = T / POUSO.sobe;
-      const e = 1 - Math.pow(1 - k, 3);
-      y = -tam + (topo - -tam) * e;
-      rot = 0.14 * (1 - e);
-      sy = 1.18 - 0.12 * e; sx = 0.92 + 0.06 * e;
-      rastro = 1 - e * 0.6;
-    } else if (T < POUSO.sobe + POUSO.cai) {
-      const k = (T - POUSO.sobe) / POUSO.cai;
-      y = topo + (cy - topo) * k * k;
-      sy = 1.06 + 0.08 * k; sx = 0.97;
+    if (T < POUSO.sobe + POUSO.cai) {
+      // queda: começa devagar e vai acelerando até o chão
+      const k = T / (POUSO.sobe + POUSO.cai);
+      y = -tam + (cy + tam) * k * k;
+      rot = 0.1 * (1 - k);
+      sy = 1.04 + 0.12 * k; sx = 0.97 - 0.03 * k;   // estica com a velocidade
+      rastro = 0.4 + 0.6 * k;
     } else {
       y = cy;
       const L = T - POUSO.sobe - POUSO.cai;
@@ -3086,7 +3079,7 @@
           const lado = i % 2 ? 1 : -1;
           p.poeira.push({
             x: cx + lado * Math.random() * 30, y: chao,
-            vx: lado * (1.5 + Math.random() * 6.5), vy: Math.random() * 2.4,
+            vx: lado * (1.5 + Math.random() * 6.5), vy: -Math.random() * 2.4,
             r: 2 + Math.random() * 5, vida: 1,
           });
         }
@@ -3098,7 +3091,7 @@
           const passos = 3 + ((Math.random() * 3) | 0);
           for (let j = 0; j < passos; j++) {
             px += lado * (14 + Math.random() * 30);
-            py -= (Math.random() - 0.35) * 9;
+            py += (Math.random() - 0.35) * 9;   // a rachadura corre pelo chão, para baixo
             pts.push([px, py]);
           }
           p.rachas.push(pts);
@@ -3138,7 +3131,7 @@
       // poeira
       for (const q of p.poeira) {
         q.x += q.vx; q.y += q.vy;
-        q.vx *= 0.94; q.vy = q.vy * 0.94 + 0.03;
+        q.vx *= 0.94; q.vy = q.vy * 0.94 - 0.03;   // a poeira sobe do chão
         q.r += 0.18; q.vida -= 0.018;
         if (q.vida <= 0) continue;
         ctx.fillStyle = 'rgba(160,160,165,' + 0.35 * q.vida + ')';
@@ -3171,10 +3164,10 @@
       }
       ctx.translate(cx, y);
       ctx.rotate(rot);
-      // o amassado acontece apoiado no teto, não no meio do texto
-      ctx.translate(0, -tam * 0.5);
-      ctx.scale(sx, sy);
+      // o amassado acontece apoiado no chão, não no meio do texto
       ctx.translate(0, tam * 0.5);
+      ctx.scale(sx, sy);
+      ctx.translate(0, -tam * 0.5);
       // depois do impacto o brilho vira dourado, respirando como a aura do
       // card do resultado que entra em seguida
       ctx.shadowColor = d >= 0 ? 'rgba(255,200,60,.85)' : 'rgba(255,255,255,.45)';
