@@ -2269,21 +2269,36 @@
     // disparam, abrindo uma distância grande para o resto — a disputa fica
     // entre eles. O vencedor foge um pouco mais rápido e, no fim, ainda dá a
     // arrancada que garante o primeiro lugar.
+    // Os 4 ficam na frente, mas perto o bastante para o grupo de trás ainda ter
+    // esperança. Entre eles a velocidade oscila (cada um no seu ritmo), então a
+    // liderança troca de mão várias vezes; o vencedor foge igual aos outros e só
+    // garante o primeiro lugar com a arrancada dos últimos segundos.
     const gv0 = patos.find((x) => x.ganha);
     const outros = patos.filter((x) => !x.ganha);
     embaralhar(outros).slice(0, Math.min(3, outros.length)).forEach((x) => { x.fuga = 1; });
-    gv0.fuga = 1.12;
-    const ABRE = 4 + espalha * 1.2;                  // quanto os 4 andam na frente (em corpos)
-    const CANSA = 1.2 + espalha * 0.5;               // quanto o resto perde
+    gv0.fuga = 1;
+    const ABRE = 1.6 + espalha * 0.55;               // quanto os 4 andam na frente (em corpos)
+    const CANSA = 0.5 + espalha * 0.25;              // quanto o resto perde
+    const BRIGA = 0.7 + espalha * 0.25;              // tamanho da disputa entre os 4
+    patos.forEach((x) => {
+      if (!x.fuga) return;
+      // duas ondas de 9 a 16 s com fases aleatórias: quem lidera vai mudando
+      x.briga = [0, 1].map((i) => ({ w: (2 * Math.PI) / ((i ? 9000 : 15000) * (0.8 + Math.random() * 0.4)), f: Math.random() * 6.28 }));
+    });
     function base(pt, t) {
       const k = suave((t - FUGA_MS) / FUGA_DURA);
-      // na fuga as ondas acalmam: os 4 disputam entre si e o resto, cansado,
-      // não chega perto deles (fica uma distância clara entre os dois grupos)
-      const v = ondas(pt, t) * (1 - (pt.fuga ? 0.5 : 0.45) * k);
-      return pt.fuga ? v + ABRE * pt.fuga * k : v - CANSA * k;
+      // na fuga as ondas de antes acalmam um pouco
+      const v = ondas(pt, t) * (1 - (pt.fuga ? 0.5 : 0.25) * k);
+      if (!pt.fuga) return v - CANSA * k;
+      const tt = Math.max(0, Math.min(t, CORRIDA_MS));
+      const briga = pt.briga.reduce((s, o, i) => s + (i ? 0.45 : 1) * Math.sin(o.w * tt + o.f), 0) * BRIGA * k;
+      return v + ABRE * k + briga;
     }
+    // No fim o vencedor cruza com folga, sem margem para questionamento: uns 5%
+    // da largura da tela à frente do segundo (numa tela 16:9, ~0,9 corpo).
+    const FOLGA = 0.9;
     const lider = Math.max(...outros.map((x) => base(x, CORRIDA_MS)), -Infinity);
-    gv0.extra = Math.max(0, (isFinite(lider) ? lider : 0) + 0.6 - base(gv0, CORRIDA_MS));
+    gv0.extra = Math.max(0, (isFinite(lider) ? lider : 0) + FOLGA - base(gv0, CORRIDA_MS));
     function vantagem(pt, t) {
       const v = base(pt, t);
       return pt.ganha ? v + pt.extra * suave((t - (CORRIDA_MS - ARRANCADA_MS)) / (ARRANCADA_MS - 500)) : v;
@@ -2462,18 +2477,22 @@
       // está em base + (yFundo - y) * incl, a mesma inclinação das raias. Por isso
       // basta comparar a base com o nariz do pato "trazido" para a raia de baixo.
       const yFundoL = yRaia(n - 1) + h * 0.35;
-      // Ninguém sai da tela pela direita: a posição de corrida (sem a diagonal
-      // da raia) vai sendo comprimida, cada vez mais devagar, até um limite que
-      // deixa até o pato da raia mais alta dentro da tela. Como a compressão é
-      // a mesma para todos, a ordem na chegada não muda.
+      // Ninguém sai da tela pela direita: quando o líder passa de um limite (que
+      // deixa até o pato da raia mais alta na tela), a câmera anda junto com ele
+      // e todo mundo desliza para a esquerda. As distâncias entre os patos ficam
+      // exatamente as mesmas (para trás podem sair da tela).
       const desvioMax = (n - 1) * sx;
       const uLim = l - w - 14 - desvioMax;
-      const uSuave = Math.min(l * 0.55, uLim - l * 0.2);
-      const naTela = (u) => (u <= uSuave || uLim <= uSuave ? Math.min(u, Math.max(uSuave, uLim))
-        : uSuave + (uLim - uSuave) * (1 - Math.exp(-(u - uSuave) / (uLim - uSuave))));
-      const xPato = (pt, tt) => naTela(x0 + vantagem(pt, tt) * corpo) + (n - 1 - pt.raia) * sx;
+      const camLider = (tt) => {
+        let m = -Infinity;
+        for (const pt of patos) m = Math.max(m, vantagem(pt, tt));
+        return Math.max(0, x0 + m * corpo - uLim);
+      };
+      const segue = camLider(Math.min(t, fimRelogio));
+      const uPato = (pt, tt) => x0 + vantagem(pt, tt) * corpo - (tt === t ? segue : camLider(tt));
+      const xPato = (pt, tt) => uPato(pt, tt) + (n - 1 - pt.raia) * sx;
       // base da linha que encosta no bico deste pato (igual para todas as raias)
-      const baseNoBico = (pt, tt) => naTela(x0 + vantagem(pt, tt) * corpo) + w * AN.bico - h * 0.35 * incl;
+      const baseNoBico = (pt, tt) => uPato(pt, tt) + w * AN.bico - h * 0.35 * incl;
       const baseNoNariz = (vant) => x0 + w * AN.bico + vant * corpo - h * 0.35 * incl;
       // nos últimos CHEGADA_MS a chegada desliza da direita até o nariz do vencedor
       // e continua no mesmo passo, cruzando os outros em ordem
@@ -2491,7 +2510,7 @@
 
       // ---- margem e rio: a faixa pronta, deslizando com a câmera
       if (!fundo || fundo.l !== l || fundo.a !== a) fundo = fazerFundo(l, a, rioY);
-      const desl = (cam + agora * 0.012) % PERIODO;
+      const desl = (cam + segue + agora * 0.012) % PERIODO;   // a câmera seguindo o líder também move o rio
       ctx.drawImage(fundo.c, 0, 0, fundo.c.width, fundo.c.height, -desl, 0, fundo.W, fundo.H);
 
       // ---- largada (fica para trás) e chegada, inclinadas, com o número das raias
@@ -2508,7 +2527,7 @@
           ctx.fillText(String(n - pt.raia), xLinha + (yFundo - y) * incl + 2 * q + 8, y);
         });
       };
-      const xLargada = baseNoNariz(0) + 2 - cam;
+      const xLargada = baseNoNariz(0) + 2 - cam - segue;
       if (xLargada + (yFundo - yTopo) * incl > -80) { linhaXadrez(ctx, xLargada, yTopo, yFundo, incl, q); numeros(xLargada); }
       if (xChegada != null) {
         const xc = xChegada - (dv > 0 ? kv * l * 0.4 : 0);

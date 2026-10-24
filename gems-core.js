@@ -878,7 +878,31 @@
       .filter((r) => !o.semRepetir || !jaGanharam.has(chaveGanhou(tipo, r.id)))
       // quem ganhou no outro tipo (gemas <-> compradores) fica de fora
       .filter((r) => !o.entreTipos || !ganhouNoOutro(tipo, r))
-      .map((r) => ({ ...r, bilhetes: modo === 'peso' ? Math.max(1, peso(r)) : 1 }));
+      .map((r) => ({ ...r, bilhetes: modo === 'peso' ? Math.max(1, Math.round(peso(r) || 0)) : 1 }));
+  }
+
+  // Inteiro sorteado em [0, max), uniforme: vem do gerador criptográfico do
+  // navegador e descarta os valores do fim da faixa que dariam viés no resto
+  // da divisão (rejeição). Sem crypto, cai no Math.random.
+  function inteiroAleatorio(max) {
+    max = Math.floor(max);
+    if (max <= 1) return 0;
+    const c = typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto : null;
+    if (!c || max > 0xffffffff) return Math.floor(Math.random() * max);
+    const teto = Math.floor(0x100000000 / max) * max;   // maior múltiplo de max que cabe em 32 bits
+    const buf = new Uint32Array(1);
+    do c.getRandomValues(buf); while (buf[0] >= teto);
+    return buf[0] % max;
+  }
+
+  // Sorteio por bilhetes: cada bilhete tem a mesma chance, então a chance de
+  // cada pessoa é exatamente bilhetes dela / total. A ordem da lista não
+  // importa: o bilhete sorteado cai em um intervalo [início, fim) por pessoa.
+  function sortearBilhete(lista) {
+    const total = lista.reduce((a, r) => a + r.bilhetes, 0);
+    let n = inteiroAleatorio(total);
+    for (const r of lista) { if (n < r.bilhetes) return r; n -= r.bilhetes; }
+    return lista[lista.length - 1];
   }
 
   function sortear(op) {
@@ -886,9 +910,7 @@
     const lista = participantes(o);   // já garante o histórico do canal
     const bilhetes = lista.reduce((a, r) => a + r.bilhetes, 0);
     if (!lista.length) return { vencedor: null, participantes: lista, bilhetes: 0, historico: historico.slice() };
-    let n = Math.random() * bilhetes;
-    let vencedor = lista[lista.length - 1];
-    for (const r of lista) { n -= r.bilhetes; if (n <= 0) { vencedor = r; break; } }
+    const vencedor = sortearBilhete(lista);
     const tipo = o.tipo === 'compradores' ? 'compradores' : 'gemas';
     jaGanharam.add(chaveGanhou(tipo, vencedor.id));
     const lv = live();
