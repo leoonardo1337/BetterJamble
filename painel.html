@@ -630,13 +630,13 @@
      filtro de gema dentro de um deles. */
   .sorteio-conf,.rk-conf{container-type:inline-size}
   .sorteio-grade{
-    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,auto);
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(6,auto);
     column-gap:16px;row-gap:6px;
   }
   .sorteio-grade > .sel-grupo{display:grid;grid-template-rows:subgrid;grid-row:span 3;min-width:0}
-  /* a segunda linha (Chance | Animação) tem até 3 cards: título + 3 linhas */
-  .sorteio-grade > .sel-grupo:nth-child(n+4){grid-row:span 4}
-  .sorteio-grade > .sel-grupo:nth-child(n+4) > .sel-cards{grid-row:span 3}
+  /* card com seletor (Período, Chance, Animação): ocupa as duas linhas de cards */
+  .sorteio-grade .card-seletor{grid-row:span 2;align-content:start;cursor:default;border-color:var(--bj-borda2)}
+  .card-seletor .filtro-gema{margin-top:10px}
   .sorteio-grade > .sel-grupo > .sel-rot{margin-bottom:2px}
   .sorteio-grade > .sel-grupo:nth-child(n+4) > .sel-rot{padding-top:14px}
   .sorteio-grade > .sel-grupo > .sel-cards{display:grid;grid-template-rows:subgrid;grid-row:span 2;gap:6px}
@@ -663,7 +663,7 @@
   .sel-extra .conf-rot{margin-top:0}
   /* card médio: dois grupos por linha e as opções numa linha inteira embaixo */
   @container (max-width:720px){
-    .sorteio-grade{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(7,auto) auto}
+    .sorteio-grade{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(6,auto) auto}
     .sorteio-grade > .sorteio-lado{grid-column:1 / -1;grid-row:auto;order:1;margin-top:14px}
   }
   /* card estreito: tudo numa coluna */
@@ -1149,17 +1149,12 @@
                 </div>
               </div>
               <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Período</div>
-                <div class="sel-cards" id="opcoesSorteioEscopo" role="radiogroup" aria-label="Entre quem sortear">
-                <button class="op sel" type="button" role="radio" data-sesc="live" aria-checked="true">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioLive">Nesta live</span><small id="subSorteioLive">Só a live aberta agora</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                <button class="op sel" type="button" role="radio" data-sesc="vendedor" aria-checked="false">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotSorteioVendedor">Todas as lives</span><small id="subSorteioVendedor">Todas as lives do canal</small></span>
-                  <span class="marca-radio"></span>
-                </button>
+                <div class="sel-cards" id="opcoes-escopo">
+                <div class="op sel card-seletor" data-seletor="escopo">
+                  <span class="txt"><span class="rot"></span><small></small>
+                    <button class="filtro-gema" type="button" aria-haspopup="listbox" aria-expanded="false" title="Período do sorteio"><span class="nome-g"></span><span class="seta">▾</span></button>
+                  </span>
+                </div>
                 </div>
               </div>
               <div class="sel-grupo sorteio-lado"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Opções</div>
@@ -1171,36 +1166,24 @@
                 <div class="sortear-col"><button class="botao-sortear" id="btnSortear" type="button">Sortear</button></div>
               </div>
               <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1" class="ch"/><circle cx="15" cy="15" r="1" class="ch"/><circle cx="15" cy="9" r="1" class="ch"/><circle cx="9" cy="15" r="1" class="ch"/></svg>Chance</div>
-                <div class="sel-cards" id="opcoesModo" role="radiogroup" aria-label="Como calcular a chance">
-                <button class="op sel" type="button" role="radio" data-modo="peso" aria-checked="true">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="4" rx="1.5"/><rect x="13" y="10" width="7" height="10" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/></svg></span>
-                  <span class="txt"><span class="rot" id="rotModoPeso">Por quantidade</span><small id="subModoPeso">Cada gema vale uma chance</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                <button class="op sel" type="button" role="radio" data-modo="pessoa" aria-checked="false">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8"/></svg></span>
-                  <span class="txt"><span class="rot">1 por pessoa</span><small>Todo mundo com a mesma chance</small></span>
-                  <span class="marca-radio"></span>
-                </button>
+                <div class="sel-cards" id="opcoes-modo">
+                <div class="op sel card-seletor" data-seletor="modo">
+                  <span class="txt"><span class="rot"></span><small></small>
+                    <button class="filtro-gema" type="button" aria-haspopup="listbox" aria-expanded="false" title="Como calcular a chance"><span class="nome-g"></span><span class="seta">▾</span></button>
+                  </span>
+                </div>
                 </div>
               </div>
               <div class="sel-grupo"><div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.5l1.6 4.4L16 9.5l-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6z"/><path d="M17.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>Animação</div>
-                <div class="sel-cards" id="opcoesAnim" role="radiogroup" aria-label="Animação do sorteio">
-                <button class="op sel" type="button" role="radio" data-anim="subida" aria-checked="true">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></span>
-                  <span class="txt"><span class="rot">Subida</span><small>Os nomes sobem e o vencedor pousa no meio</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                <button class="op sel" type="button" role="radio" data-anim="feixes" aria-checked="false">
-                  <span class="sel-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span>
-                  <span class="txt"><span class="rot">Feixes</span><small>Feixes levam os nomes ao centro</small></span>
-                  <span class="marca-radio"></span>
-                </button>
-                <button class="op sel" type="button" role="radio" data-anim="patos" aria-checked="false">
-                  <span class="txt"><span class="rot">Corrida de patos</span><small>Cada pessoa é um pato; o primeiro a cruzar ganha</small></span>
-                  <span class="marca-radio"></span>
-                </button>
+                <!-- Período, Chance e Animação: um card com a opção escolhida e o seletor com os nomes -->
+                <div class="sel-cards" id="opcoes-anim">
+                <div class="op sel card-seletor" data-seletor="anim">
+                  <span class="txt"><span class="rot"></span><small></small>
+                    <button class="filtro-gema" type="button" aria-haspopup="listbox" aria-expanded="false" title="Animação do sorteio"><span class="nome-g"></span><span class="seta">▾</span></button>
+                  </span>
                 </div>
+                </div>
+                <div class="menu-gemas" id="menuSel" role="listbox" hidden></div>
               </div>
               </div>
 

@@ -107,6 +107,11 @@
     });
     return lista;
   }
+  const ANIMACOES = {
+    subida: { nome: 'Subida', sub: 'Os nomes sobem e o vencedor pousa no meio' },
+    feixes: { nome: 'Feixes', sub: 'Feixes levam os nomes ao centro' },
+    patos: { nome: 'Corrida de patos', sub: 'Cada pessoa é um pato; o primeiro a cruzar ganha' },
+  };
   function lerAnim() {
     try { const v = localStorage.getItem('bj-anim-sorteio'); return v === 'feixes' || v === 'patos' ? v : 'subida'; } catch { return 'subida'; }
   }
@@ -1577,15 +1582,7 @@
     // passou a gravá-los (3.5): o texto do card diz desde quando há registro.
     const comp = deCompradores();
     document.querySelectorAll('[data-tipo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.tipo === sorteio.tipo ? 'true' : 'false'));
-    document.querySelectorAll('[data-sesc]').forEach((b) => b.setAttribute('aria-checked', b.dataset.sesc === sorteio.escopo ? 'true' : 'false'));
-    document.querySelectorAll('[data-modo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.modo === sorteio.modo ? 'true' : 'false'));
-    document.querySelectorAll('[data-anim]').forEach((b) => b.setAttribute('aria-checked', b.dataset.anim === sorteio.anim ? 'true' : 'false'));
-    $('rotSorteioLive').textContent = 'Nesta live';
-    $('rotSorteioVendedor').textContent = 'Todas as lives';
-    const desde = registroMaisAntigo(comp);
-    $('subSorteioVendedor').textContent = 'Todas as lives do canal' + (desde ? ' desde ' + dataLonga(desde) : '');
-    $('rotModoPeso').textContent = 'Por quantidade';
-    $('subModoPeso').textContent = comp ? 'Cada compra vale uma chance' : 'Cada gema vale uma chance';
+    desenharSeletores();
 
     // O filtro de gema é herdado da tela "Ao vivo" e tem que aparecer por extenso:
     // sortear sem perceber que havia filtro é o erro mais caro da interface.
@@ -3143,17 +3140,6 @@
     };
   });
 
-  document.querySelectorAll('[data-sesc]').forEach((b) => {
-    b.onclick = () => {
-      if (b.getAttribute('aria-disabled') === 'true') return;
-      sorteio.escopo = b.dataset.sesc;
-      desenharSorteio();
-    };
-  });
-
-  document.querySelectorAll('[data-modo]').forEach((b) => {
-    b.onclick = () => { sorteio.modo = b.dataset.modo; desenharSorteio(); };
-  });
 
   document.querySelectorAll('[data-tipo]').forEach((b) => {
     b.onclick = () => { sorteio.tipo = b.dataset.tipo; desenharSorteio(); };
@@ -3252,13 +3238,91 @@
   });
   document.addEventListener('scroll', (e) => { if (!$('menuGemas').contains(e.target)) fecharMenuGemas(); }, true);
 
-  document.querySelectorAll('[data-anim]').forEach((b) => {
-    b.onclick = () => {
-      sorteio.anim = b.dataset.anim;
-      try { localStorage.setItem('bj-anim-sorteio', sorteio.anim); } catch {}
-      desenharSorteio();
+  // Período, Chance e Animação do sorteio: cada um é um card com a opção
+  // escolhida (nome e descrição) e um seletor que lista só os nomes. O menu é
+  // um só, no body (o container-type da área do sorteio deslocaria o fixed).
+  const SELETORES = {
+    escopo: {
+      opcoes: () => {
+        const desde = registroMaisAntigo(deCompradores());
+        return {
+          live: { nome: 'Nesta live', sub: 'Só a live aberta agora' },
+          vendedor: { nome: 'Todas as lives', sub: 'Todas as lives do canal' + (desde ? ' desde ' + dataLonga(desde) : '') },
+        };
+      },
+      valor: () => sorteio.escopo,
+      escolher: (k) => { sorteio.escopo = k; },
+    },
+    modo: {
+      opcoes: () => ({
+        peso: { nome: 'Por quantidade', sub: deCompradores() ? 'Cada compra vale uma chance' : 'Cada gema vale uma chance' },
+        pessoa: { nome: '1 por pessoa', sub: 'Todo mundo com a mesma chance' },
+      }),
+      valor: () => sorteio.modo,
+      escolher: (k) => { sorteio.modo = k; },
+    },
+    anim: {
+      opcoes: () => ANIMACOES,
+      valor: () => sorteio.anim,
+      escolher: (k) => { sorteio.anim = k; try { localStorage.setItem('bj-anim-sorteio', k); } catch {} },
+    },
+  };
+  function desenharSeletores() {
+    document.querySelectorAll('[data-seletor]').forEach((c) => {
+      const sel = SELETORES[c.dataset.seletor];
+      const ops = sel.opcoes();
+      const o = ops[sel.valor()] || Object.values(ops)[0];
+      c.querySelector('.rot').textContent = o.nome;
+      c.querySelector('small').textContent = o.sub;
+      c.querySelector('.nome-g').textContent = o.nome;
+    });
+  }
+  const menuSel = $('menuSel');
+  document.body.appendChild(menuSel);
+  let botaoAberto = null;
+  function fecharMenuSel() {
+    menuSel.hidden = true;
+    if (botaoAberto) botaoAberto.setAttribute('aria-expanded', 'false');
+    botaoAberto = null;
+  }
+  function abrirMenuSel(botao, chave) {
+    const sel = SELETORES[chave];
+    limpar(menuSel);
+    menuSel.setAttribute('aria-label', botao.title || '');
+    Object.entries(sel.opcoes()).forEach(([k, o]) => {
+      const b = el('button');
+      b.type = 'button';
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-selected', sel.valor() === k ? 'true' : 'false');
+      b.appendChild(el('span', 'nome-g', o.nome));
+      b.onclick = (e) => { e.stopPropagation(); fecharMenuSel(); sel.escolher(k); desenharSorteio(); };
+      menuSel.appendChild(b);
+    });
+    const r = botao.getBoundingClientRect();
+    menuSel.style.width = r.width + 'px';
+    menuSel.style.left = r.left + 'px';
+    menuSel.hidden = false;
+    const cabeAbaixo = window.innerHeight - r.bottom - 8 >= menuSel.scrollHeight;
+    menuSel.style.top = (cabeAbaixo ? r.bottom + 4 : Math.max(8, r.top - menuSel.offsetHeight - 4)) + 'px';
+    botao.setAttribute('aria-expanded', 'true');
+    botaoAberto = botao;
+  }
+  document.querySelectorAll('[data-seletor]').forEach((c) => {
+    const botao = c.querySelector('.filtro-gema');
+    botao.onclick = (e) => {
+      e.stopPropagation();
+      const era = botaoAberto;
+      fecharMenuSel();
+      if (era !== botao) abrirMenuSel(botao, c.dataset.seletor);
     };
   });
+  document.addEventListener('mousedown', (e) => {
+    if (menuSel.hidden || menuSel.contains(e.target) || (botaoAberto && botaoAberto.contains(e.target))) return;
+    fecharMenuSel();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMenuSel(); });
+  window.addEventListener('resize', fecharMenuSel);
+  document.addEventListener('scroll', (e) => { if (!menuSel.contains(e.target)) fecharMenuSel(); }, true);
 
   $('semRepetir').onchange =(e) => { sorteio.semRepetir = !!e.target.checked; desenharSorteio(); };
   document.querySelectorAll('[data-janela]').forEach((b) => {
