@@ -2210,7 +2210,7 @@
     camada.setAttribute('aria-label', 'Corrida de patos');
     const cv = el('canvas');
     camada.appendChild(cv);
-    camada.appendChild(el('div', 'corrida-dica', 'Esc pula para o resultado'));
+    camada.appendChild(el('div', 'corrida-dica', 'Segure → para acelerar 2x · Esc pula para o resultado'));
     document.body.appendChild(camada);
     const fonte = getComputedStyle(document.body).fontFamily || 'sans-serif';
     // O que pesa é pintar pixels (por isso a janela maior trava mais). Corrida
@@ -2411,10 +2411,18 @@
       ctx.stroke();
     }
 
+    // Relógio da corrida: anda 2x enquanto a seta para a direita está
+    // pressionada (o balanço dos patos e o rio seguem no tempo normal).
+    let acelerando = false;
+    let relogio = 0, ultimoQuadro = 0;
     function quadro() {
       if (palco !== p) return;
       const agora = performance.now();
-      const t = agora - p.inicio - LARGADA_MS;
+      const dtReal = ultimoQuadro ? Math.min(100, agora - ultimoQuadro) : 0;
+      ultimoQuadro = agora;
+      relogio += dtReal * (acelerando ? 2 : 1);
+      p.relogio = relogio;
+      const t = relogio - LARGADA_MS;
       if (Math.round(cv.clientWidth) !== Math.round(med.l) || Math.round(cv.clientHeight) !== Math.round(med.a)) {
         med = medir(); p.ctx = med.ctx; sprites.clear(); fundo = null;
       }
@@ -2542,6 +2550,14 @@
       pilula(ctx, l / 2 - tw / 2, rioY * 0.1, tw, th, th * 0.22, '#eceefc', 3);
       ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(txt, l / 2, rioY * 0.1 + th / 2 + 1);
+      if (acelerando) {
+        ctx.font = '800 ' + Math.round(th * 0.42) + 'px ' + fonte;
+        const ax = l / 2 + tw / 2 + th * 0.25;
+        ctx.textAlign = 'left';
+        pilula(ctx, ax, rioY * 0.1 + th * 0.18, th * 1.25, th * 0.64, th * 0.32, '#000', 0);
+        ctx.fillStyle = '#fff';
+        ctx.fillText('▶▶ 2x', ax + th * 0.16, rioY * 0.1 + th / 2 + 1);
+      }
       ctx.textAlign = 'left';
       if (fora) {
         ctx.font = '600 13px ' + fonte; ctx.fillStyle = '#000';
@@ -2581,10 +2597,23 @@
       fim();
       p.fecha = setTimeout(() => { if (palco === p) pararPalco(); }, 420);
     }
-    // Esc pula a corrida e mostra o resultado no palco
-    const tecla = (e) => { if (e.key === 'Escape' && palco === p) encerrar(); };
+    // Esc pula a corrida e mostra o resultado no palco; segurar a seta para a
+    // direita acelera 2x até soltar
+    const tecla = (e) => {
+      if (palco !== p) return;
+      if (e.key === 'Escape') encerrar();
+      else if (e.key === 'ArrowRight') { acelerando = true; e.preventDefault(); }
+    };
+    const solta = (e) => { if (e.key === 'ArrowRight') acelerando = false; };
+    const perdeuFoco = () => { acelerando = false; };
     document.addEventListener('keydown', tecla);
-    p.soltar = () => document.removeEventListener('keydown', tecla);
+    document.addEventListener('keyup', solta);
+    window.addEventListener('blur', perdeuFoco);
+    p.soltar = () => {
+      document.removeEventListener('keydown', tecla);
+      document.removeEventListener('keyup', solta);
+      window.removeEventListener('blur', perdeuFoco);
+    };
     // posições do último quadro, para depurar pelo console (window.__bjCorrida)
     p.ultimas = [];
     window.__bjCorrida = p;
