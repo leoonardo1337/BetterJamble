@@ -109,7 +109,7 @@
     return lista;
   }
   const ANIMACOES = {
-    subida: { nome: 'Subida', sub: 'Os nomes sobem e o vencedor pousa no meio' },
+    subida: { nome: 'Descida', sub: 'Os nomes descem e o vencedor cai no meio' },
     feixes: { nome: 'Feixes', sub: 'Feixes levam os nomes ao centro' },
     patos: { nome: 'Corrida de patos', sub: 'Cada pessoa é um pato; o primeiro a cruzar ganha' },
   };
@@ -2638,7 +2638,7 @@
       const k = (t - n.sai) / n.dura;
       if (k < 0 || k > 1) continue;
       if (!n.spr) n.spr = spriteDoNome(n, fonte);
-      const y = a + 26 - (a + 52) * k;
+      const y = -26 + (a + 52) * k;          // de cima para baixo
       const meia = n.larg / 2 + 6;
       const x = Math.min(l - meia, Math.max(meia, n.x * l)) + Math.sin(n.f1 + s * n.w) * 12;
       ctx.globalAlpha = (0.22 + n.prof * 0.7) * Math.min(1, k * 6, (1 - k) * 6);
@@ -2654,9 +2654,9 @@
     ctx.setTransform(p.base, 0, 0, p.base, p.base * p.dx, p.base * p.dy);
   }
 
-  // O vencedor sobe rápido, passa um pouco do meio, despenca e crava no centro:
-  // amassa com o impacto, solta poeira para os lados, racha o "chão" e o palco
-  // chacoalha. Depois de POUSO.segura o resultado de verdade (com avatar) entra
+  // O vencedor desce rápido, passa um pouco do meio, volta e crava no centro
+  // (tudo de cima para baixo, como os nomes): amassa com o impacto, solta
+  // poeira para os lados, racha o "teto" e o palco chacoalha. Depois de POUSO.segura o resultado de verdade (com avatar) entra
   // por cima e o nome do canvas some.
   function desenharPouso(p, T, vencedor, fonte) {
     const { ctx, l, a } = p;
@@ -2667,15 +2667,15 @@
     ctx.font = '900 ' + tam + 'px ' + fonte;
     const larg = ctx.measureText(txt).width;
     if (larg > l * 0.84) { tam = Math.max(18, (tam * l * 0.84) / larg); ctx.font = '900 ' + tam.toFixed(1) + 'px ' + fonte; }
-    const topo = cy - tam * 1.1;
-    const chao = cy + tam * 0.55;
+    const topo = cy + tam * 1.1;      // onde ele para depois de passar do meio (abaixo)
+    const chao = cy - tam * 0.55;     // o "teto" do impacto (acima do nome)
 
     let y, rot = 0, sx = 1, sy = 1, rastro = 0;
     if (T < POUSO.sobe) {
       const k = T / POUSO.sobe;
       const e = 1 - Math.pow(1 - k, 3);
-      y = a + tam + (topo - (a + tam)) * e;
-      rot = -0.14 * (1 - e);
+      y = -tam + (topo - -tam) * e;
+      rot = 0.14 * (1 - e);
       sy = 1.18 - 0.12 * e; sx = 0.92 + 0.06 * e;
       rastro = 1 - e * 0.6;
     } else if (T < POUSO.sobe + POUSO.cai) {
@@ -2693,7 +2693,7 @@
           const lado = i % 2 ? 1 : -1;
           p.poeira.push({
             x: cx + lado * Math.random() * 30, y: chao,
-            vx: lado * (1.5 + Math.random() * 6.5), vy: -Math.random() * 2.4,
+            vx: lado * (1.5 + Math.random() * 6.5), vy: Math.random() * 2.4,
             r: 2 + Math.random() * 5, vida: 1,
           });
         }
@@ -2705,7 +2705,7 @@
           const passos = 3 + ((Math.random() * 3) | 0);
           for (let j = 0; j < passos; j++) {
             px += lado * (14 + Math.random() * 30);
-            py += (Math.random() - 0.35) * 9;
+            py -= (Math.random() - 0.35) * 9;
             pts.push([px, py]);
           }
           p.rachas.push(pts);
@@ -2745,7 +2745,7 @@
       // poeira
       for (const q of p.poeira) {
         q.x += q.vx; q.y += q.vy;
-        q.vx *= 0.94; q.vy = q.vy * 0.94 - 0.03;
+        q.vx *= 0.94; q.vy = q.vy * 0.94 + 0.03;
         q.r += 0.18; q.vida -= 0.018;
         if (q.vida <= 0) continue;
         ctx.fillStyle = 'rgba(160,160,165,' + 0.35 * q.vida + ')';
@@ -2764,24 +2764,24 @@
       ctx.globalAlpha = alfa;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // rastro de velocidade abaixo do nome enquanto sobe
+      // rastro de velocidade acima do nome enquanto desce
       if (rastro > 0) {
         ctx.strokeStyle = 'rgba(237,237,243,' + 0.35 * rastro + ')';
         ctx.lineWidth = 1.5;
         for (let i = -3; i <= 3; i++) {
           const rx = cx + i * (larg / 7);
           ctx.beginPath();
-          ctx.moveTo(rx, y + tam * 0.7);
-          ctx.lineTo(rx, y + tam * 0.7 + 30 + Math.abs(i) * -5 + 60 * rastro);
+          ctx.moveTo(rx, y - tam * 0.7);
+          ctx.lineTo(rx, y - tam * 0.7 - (30 + Math.abs(i) * -5 + 60 * rastro));
           ctx.stroke();
         }
       }
       ctx.translate(cx, y);
       ctx.rotate(rot);
-      // o amassado acontece apoiado no chão, não no meio do texto
-      ctx.translate(0, tam * 0.5);
-      ctx.scale(sx, sy);
+      // o amassado acontece apoiado no teto, não no meio do texto
       ctx.translate(0, -tam * 0.5);
+      ctx.scale(sx, sy);
+      ctx.translate(0, tam * 0.5);
       // depois do impacto o brilho vira dourado, respirando como a aura do
       // card do resultado que entra em seguida
       ctx.shadowColor = d >= 0 ? 'rgba(255,200,60,.85)' : 'rgba(255,255,255,.45)';
