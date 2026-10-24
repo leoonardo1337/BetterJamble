@@ -2787,6 +2787,97 @@
     alvo.appendChild(bloco);
   }
 
+  // Aura do vencedor (tipo a do Goku): uma névoa dourada translúcida que
+  // envolve o card retangular e sobe em pontas que se curvam e mudam o tempo
+  // todo, como fumaça. São três camadas (de fora para dentro, cada vez mais
+  // clara e opaca), cada uma um contorno do card empurrado para fora por ondas
+  // que andam com o tempo; em cima as pontas sobem bem mais. Canvas atrás do
+  // card, que se desliga sozinho quando o card sai da tela.
+  function auraDeFogo(card) {
+    const MARGEM = 60, ACIMA = 120;
+    const cv = el('canvas', 'aura-fogo');
+    cv.setAttribute('aria-hidden', 'true');
+    const fases = [Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28];
+    let ligado = false;
+    // onda suave entre 0 e 1 que anda com o tempo (u = posição no contorno)
+    const onda = (u, t, f) => {
+      // u em px de contorno: uma ponta a cada ~40-60 px, que vai andando
+      const v = Math.sin(u / 21 + t * 1.3 + f) + 0.65 * Math.sin(u / 11.5 - t * 2.1 + f * 2) + 0.35 * Math.sin(u / 6.7 + t * 3.1 + f * 3);
+      return (v / 1.95 + 1) / 2;
+    };
+    // contorno do card (retângulo) em N pontos, cada um com a direção para fora
+    function contorno(l, a, n) {
+      const per = 2 * (l + a);
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        let d = (i / n) * per;
+        let x, y, nx, ny, lado;
+        if (d < l) { x = d; y = 0; nx = 0; ny = -1; lado = 'topo'; }
+        else if ((d -= l) < a) { x = l; y = d; nx = 1; ny = 0; lado = 'dir'; }
+        else if ((d -= a) < l) { x = l - d; y = a; nx = 0; ny = 1; lado = 'baixo'; }
+        else { d -= l; x = 0; y = a - d; nx = -1; ny = 0; lado = 'esq'; }
+        pts.push({ x, y, nx, ny, lado, u: (i / n) * per, k: y / a });
+      }
+      return pts;
+    }
+    function camada(ctx, pts, t, f, escala, cor, alfa, blur) {
+      ctx.save();
+      ctx.filter = 'blur(' + blur + 'px)';
+      ctx.globalAlpha = alfa;
+      ctx.fillStyle = cor;
+      ctx.beginPath();
+      const q = pts.map((p) => {
+        const o = onda(p.u, t, f);
+        let dx = p.nx, dy = p.ny, dist;
+        if (p.lado === 'topo') dist = 8 + Math.pow(o, 2.6) * 150;          // pontas subindo
+        else if (p.lado === 'baixo') dist = 6 + o * 10;
+        else {
+          dist = 8 + Math.pow(o, 1.8) * 40;
+          dy = -0.35 - (1 - p.k) * 0.5;                                     // os lados também puxam para cima
+          const m = Math.hypot(dx, dy); dx /= m; dy /= m;
+          dist *= 1 + (1 - p.k) * 0.8;
+        }
+        dist *= escala;
+        return [MARGEM + p.x + dx * dist, ACIMA + p.y + dy * dist];
+      });
+      // curva suave passando pelos pontos médios
+      for (let i = 0; i < q.length; i++) {
+        const a1 = q[i], b1 = q[(i + 1) % q.length];
+        const mx = (a1[0] + b1[0]) / 2, my = (a1[1] + b1[1]) / 2;
+        if (i === 0) ctx.moveTo(mx, my); else ctx.quadraticCurveTo(a1[0], a1[1], mx, my);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    function quadro(ms) {
+      if (!cv.isConnected) { if (ligado) return; requestAnimationFrame(quadro); return; }
+      ligado = true;
+      const t = ms / 1000;
+      const r = card.getBoundingClientRect();
+      const l = r.width, a = r.height;
+      const W = l + MARGEM * 2, H = a + ACIMA + MARGEM;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+        cv.style.width = W + 'px'; cv.style.height = H + 'px';
+        cv.style.left = -MARGEM + 'px'; cv.style.top = -ACIMA + 'px';
+      }
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      const pts = contorno(l, a, 140);
+      ctx.globalCompositeOperation = 'lighter';
+      camada(ctx, pts, t * 0.9, fases[0], 1.0, '#ffb92e', 0.28, 14);
+      camada(ctx, pts, t * 1.15, fases[1], 0.7, '#ffd66b', 0.32, 10);
+      camada(ctx, pts, t * 1.4, fases[2], 0.42, '#fff1c4', 0.38, 7);
+      ctx.globalCompositeOperation = 'source-over';
+      requestAnimationFrame(quadro);
+    }
+    requestAnimationFrame(quadro);
+    return cv;
+  }
+
   function pintarResultado(res) {
     const alvo = limpar($('resultado'));
     const v = res.vencedor;
@@ -2798,6 +2889,7 @@
     const info = el('div', 'info');
     info.appendChild(el('div', 'nome', '@' + v.usuario));
     bloco.appendChild(info);
+    bloco.appendChild(auraDeFogo(bloco));
     if (!presenca) { $('palco').classList.remove('com-presenca'); alvo.appendChild(bloco); return; }
 
     // card + área de presença empilhados no meio do palco
