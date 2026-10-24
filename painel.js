@@ -2333,7 +2333,7 @@
     }
 
     const musicaG = ac.createGain();
-    musicaG.gain.value = 0.5;
+    musicaG.gain.value = 0.35;   // ~3 dB abaixo do que era
     musicaG.connect(mestre);
 
     return {
@@ -2385,7 +2385,7 @@
         const t = ac.currentTime;
         torcidaG.gain.cancelScheduledValues(t);
         torcidaG.gain.setTargetAtTime(TORCIDA_VOL * 2.6, t, 0.08);
-        musicaG.gain.setTargetAtTime(0.3, t, 0.3);
+        musicaG.gain.setTargetAtTime(0.2, t, 0.3);
         if (!buffersSom.torcida) for (let i = 0; i < 14; i++) grito(t + Math.random() * 1.4, 1.4);
       },
       alternar() {
