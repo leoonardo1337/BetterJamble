@@ -122,7 +122,7 @@
         if (api) api.definirFiltro(p.iconeId || '');
         break;
       case 'sortear':
-        if (api) enviar('painel-sorteio', api.sortear({ modo: p.modo, semRepetir: !!p.semRepetir, entreTipos: !!p.entreTipos, escopo: p.escopo, tipo: p.tipo }));
+        if (api) enviar('painel-sorteio', api.sortear({ modo: p.modo, semRepetir: !!p.semRepetir, entreTipos: !!p.entreTipos, escopo: p.escopo, tipo: p.tipo, filtro: p.filtro || '' }));
         break;
       // A tela de sorteio mostra a urna (quem está dentro e com que chance)
       // ANTES de clicar, e o escopo do sorteio é independente do escopo do
@@ -133,7 +133,9 @@
         if (api) {
           const esc = p.escopo === 'vendedor' ? 'vendedor' : 'live';
           const tipo = p.tipo === 'compradores' ? 'compradores' : 'gemas';
-          enviar('painel-urna', { escopo: esc, tipo, lista: api.participantes({ modo: 'peso', escopo: esc, tipo }) });
+          // o sorteio tem o filtro de gema dele, independente do Ranking
+          const filtro = p.filtro || '';
+          enviar('painel-urna', { escopo: esc, tipo, filtro, lista: api.participantes({ modo: 'peso', escopo: esc, tipo, filtro }) });
         }
         break;
       case 'motivo-sorteio':

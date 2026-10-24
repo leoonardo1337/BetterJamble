@@ -76,6 +76,7 @@
   // tipo: 'gemas' (quem mandou gema) ou 'compradores' (quem comprou nesta live)
   const sorteio = {
     tipo: 'gemas', escopo: 'live', modo: 'peso', semRepetir: false, anim: lerAnim(), presenca: lerPresenca(),
+    filtro: '',   // gema do sorteio ('' = todas), separada do filtro das fichas do Ranking
     // quem ganhou num tipo (gemas/compradores) fica fora do outro
     entreTipos: (() => { try { return localStorage.getItem('bj-sorteio-entre-tipos') === '1'; } catch { return false; } })(),
   };
@@ -194,8 +195,8 @@
             rkCanalVelho = false;
             if (rkTipo === 'compradores' && dados) desenharRanking();
           }
-          if (payload.escopo === sorteio.escopo && tipo === sorteio.tipo) {
-            urnaRemota = { escopo: payload.escopo, tipo, lista: payload.lista || [] };
+          if (payload.escopo === sorteio.escopo && tipo === sorteio.tipo && (payload.filtro || '') === sorteio.filtro) {
+            urnaRemota = { escopo: payload.escopo, tipo, filtro: payload.filtro || '', lista: payload.lista || [] };
             urnaVelha = false;
           }
         }
@@ -1589,7 +1590,7 @@
     // abaixo dos cards ficou redundante. No sorteio de compradores ele não vale.
     $('soGemas').hidden = true;
     desenharFiltroGema();
-    if (d.filtro) $('soGemasNome').textContent = (d.nomeDoFiltro || d.filtro);
+    if (sorteio.filtro) $('soGemasNome').textContent = nomeFiltroSorteio();
 
     const base = baseDaUrna();
     const urna = base ? calcularUrna(base) : null;
@@ -1629,11 +1630,13 @@
     if (deCompradores() && sorteio.escopo === 'live') {
       return (dados.compradores || []).map((c) => Object.assign({}, c, { envios: c.compras }));
     }
-    if (!deCompradores() && sorteio.escopo === (dados.escopo || 'live')) return dados.ranking || [];
-    const temCache = urnaRemota && urnaRemota.escopo === sorteio.escopo && urnaRemota.tipo === sorteio.tipo;
+    // o ranking do snapshot só serve se o escopo E o filtro de gema forem os mesmos
+    if (!deCompradores() && sorteio.escopo === (dados.escopo || 'live') && sorteio.filtro === (dados.filtro || '')) return dados.ranking || [];
+    const filtro = deCompradores() ? '' : sorteio.filtro;
+    const temCache = urnaRemota && urnaRemota.escopo === sorteio.escopo && urnaRemota.tipo === sorteio.tipo && urnaRemota.filtro === filtro;
     if ((!temCache || urnaVelha) && Date.now() - urnaPedidaEm > 900) {
       urnaPedidaEm = Date.now();
-      mandar('participantes', { escopo: sorteio.escopo, tipo: sorteio.tipo });
+      mandar('participantes', { escopo: sorteio.escopo, tipo: sorteio.tipo, filtro });
     }
     return temCache ? urnaRemota.lista : null;
   }
@@ -1681,7 +1684,7 @@
     limpar(sub).append(frase(
       ['span', nf(urna.lista.length) + ' ' + plural(urna.lista.length, 'pessoa', 'pessoas')],
       [null, ' · ' + nf(urna.total) + ' ' + plural(urna.total, 'chance', 'chances')
-        + (!comp && dados.filtro ? ' · só ' + (dados.nomeDoFiltro || dados.filtro) : '')],
+        + (!comp && sorteio.filtro ? ' · só ' + nomeFiltroSorteio() : '')],
     ));
     sub.firstChild.className = 'forte';
 
@@ -1692,8 +1695,8 @@
           : sorteio.escopo === 'vendedor'
             ? 'Nenhuma compra salva ainda. A extensão guarda os compradores de cada live daqui em diante.'
             : 'Ninguém comprou nesta live ainda. O sorteio abre quando sair a primeira venda.')
-        : dados.filtro
-          ? 'Ninguém mandou ' + (dados.nomeDoFiltro || dados.filtro) + ' nesse escopo ainda — não há ninguém para sortear.'
+        : sorteio.filtro
+          ? 'Ninguém mandou ' + nomeFiltroSorteio() + ' nesse escopo ainda — não há ninguém para sortear.'
           : sorteio.semRepetir && urna.fora.length
             ? 'Todo mundo que mandou gema já ganhou. Desmarque “Não repetir quem já ganhou neste sorteio” ou limpe a lista.'
             : 'Ninguém mandou gema ainda. O sorteio abre sozinho quando a primeira gema chegar.'));
@@ -3142,16 +3145,20 @@
 
 
   // ------------------------------------------------ filtro de gema do sorteio
-  // O mesmo filtro das fichas do Ranking: escolher uma gema aqui faz o ranking,
-  // a urna e o sorteio contarem só quem mandou aquela gema.
+  // O sorteio tem o filtro de gema dele (sorteio.filtro), separado das fichas
+  // do Ranking: escolher uma gema aqui só muda quem entra na urna.
+  function nomeFiltroSorteio() {
+    const c = ((dados && dados.catalogo) || []).find((x) => x.id === sorteio.filtro);
+    return (c && c.nome) || sorteio.filtro;
+  }
   function desenharFiltroGema() {
     const b = $('filtroGema');
     limpar(b);
     const d = dados || {};
-    const atual = d.filtro ? (d.catalogo || []).find((c) => c.id === d.filtro) : null;
-    if (d.filtro) {
+    const atual = sorteio.filtro ? (d.catalogo || []).find((c) => c.id === sorteio.filtro) : null;
+    if (sorteio.filtro) {
       b.appendChild(iconeGema(atual || {}));
-      b.appendChild(el('span', 'nome-g', d.nomeDoFiltro || (atual && atual.nome) || d.filtro));
+      b.appendChild(el('span', 'nome-g', nomeFiltroSorteio()));
     } else {
       b.appendChild(el('span', 'emj', '💎'));
       b.appendChild(el('span', 'nome-g', 'Todos'));
@@ -3167,7 +3174,7 @@
   function escolherGema(id) {
     sorteio.tipo = 'gemas';
     fecharMenuGemas();
-    if ((dados && dados.filtro || '') !== id) trocarFiltro(id);
+    if (sorteio.filtro !== id) { sorteio.filtro = id; urnaVelha = true; }
     desenharSorteio();
   }
 
@@ -3178,7 +3185,7 @@
       const o = el('button');
       o.type = 'button';
       o.setAttribute('role', 'option');
-      o.setAttribute('aria-selected', (d.filtro || '') === id ? 'true' : 'false');
+      o.setAttribute('aria-selected', sorteio.filtro === id ? 'true' : 'false');
       o.appendChild(icone);
       o.appendChild(el('span', 'nome-g', nome));
       if (info) o.appendChild(el('span', 'info-g', info));
@@ -3364,6 +3371,7 @@
       semRepetir: sorteio.semRepetir,
       entreTipos: sorteio.entreTipos,
       escopo: sorteio.escopo,
+      filtro: sorteio.tipo === 'compradores' ? '' : sorteio.filtro,
     });
     // Se a aba não responder, o botão não pode ficar preso. Se respondeu, a
     // animação pode durar mais que isso (a de subida tem ~7s) e não é cortada.

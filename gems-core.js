@@ -561,19 +561,20 @@
     return '';
   }
 
-  // Ranking de quem mandou gema, já com o filtro de tipo aplicado.
-  function ranking(esc) {
+  // Ranking de quem mandou gema, já com o filtro de tipo aplicado. `f` é o
+  // filtro a usar (o do Ranking, por padrão; o sorteio passa o dele).
+  function ranking(esc, f = filtro) {
     const acc = new Map();
     for (const [, s] of livesDoEscopo(esc)) {
       for (const [uid, u] of Object.entries(s.users || {})) {
-        const envios = filtro ? ((u.icons || {})[filtro] || 0) : u.n;
-        if (filtro && !envios) continue;
+        const envios = f ? ((u.icons || {})[f] || 0) : u.n;
+        if (f && !envios) continue;
         const cur = acc.get(uid) || { id: uid, usuario: u.u, avatar: foto(u.a), gemas: 0, envios: 0, lives: 0, ultimo: 0, icones: {} };
         cur.usuario = u.u || cur.usuario;
         if (u.a) cur.avatar = foto(u.a);
         if (avatares[uid]) cur.avatar = foto(avatares[uid]);
         cur.envios += envios;
-        cur.gemas += filtro ? envios * preco(filtro) : u.g;
+        cur.gemas += f ? envios * preco(f) : u.g;
         cur.lives++;
         cur.ultimo = Math.max(cur.ultimo, u.last || 0);
         Object.entries(u.icons || {}).forEach(([k, v]) => (cur.icones[k] = (cur.icones[k] || 0) + v));
@@ -850,7 +851,7 @@
     const tipo = o.tipo === 'compradores' ? 'compradores' : 'gemas';
     const base = tipo === 'compradores'
       ? compradoresDoEscopo(o.escopo || 'live').map((c) => ({ ...c, envios: c.compras }))
-      : ranking(o.escopo || escopo);
+      : ranking(o.escopo || escopo, o.filtro != null ? o.filtro : filtro);
     const peso = (r) => (tipo === 'compradores' ? r.compras : r.gemas);
     // marcado como "já sorteado" ou "ausente" sai da urna mesmo sem "não repetir"
     const marcados = new Set(historico.filter((h) => h.motivo && h.tipo === tipo).map((h) => h.id));
@@ -879,7 +880,7 @@
       tipo,
       modo: o.modo === 'pessoa' ? 'pessoa' : 'peso',
       escopo: o.escopo || (tipo === 'compradores' ? 'live' : escopo),
-      filtro: tipo === 'compradores' ? '' : (filtro || ''),
+      filtro: tipo === 'compradores' ? '' : ((o.filtro != null ? o.filtro : filtro) || ''),
     });
     historico = historico.slice(0, MAX_HISTORICO);
     recalcularGanhadores();
