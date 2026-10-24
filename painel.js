@@ -2840,100 +2840,6 @@
     alvo.appendChild(bloco);
   }
 
-  // Holofote no vencedor: o palco escurece um pouco e um facho de luz vem de
-  // cima, varrendo de lado até mirar o card de ouro; ao acertar dá um clarão
-  // curto e fica aceso em cima dele, respirando de leve, com poeirinha
-  // flutuando no facho e uma poça de luz em volta do card. O canvas cobre o
-  // palco inteiro, atrás do card, e se desliga quando o card sai da tela.
-  function holofote(card) {
-    const cv = el('canvas', 'holofote');
-    cv.setAttribute('aria-hidden', 'true');
-    const poeira = Array.from({ length: 26 }, () => ({ u: Math.random(), v: Math.random(), vel: 0.02 + Math.random() * 0.05, tam: 0.6 + Math.random() * 1.4, fase: Math.random() * 6.28 }));
-    let ligado = false, inicio = 0;
-    const suave = (q) => 1 - Math.pow(1 - Math.max(0, Math.min(1, q)), 3);
-    function quadro(ms) {
-      if (!cv.isConnected) { if (ligado) return; requestAnimationFrame(quadro); return; }
-      if (!ligado) { ligado = true; inicio = ms; }
-      const t = (ms - inicio) / 1000;
-      const palcoEl = $('palco');
-      const pr = palcoEl.getBoundingClientRect();
-      const cr = card.getBoundingClientRect();
-      const W = pr.width, H = pr.height;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
-        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-        cv.style.width = W + 'px'; cv.style.height = H + 'px';
-      }
-      cv.style.left = (pr.left - cr.left) + 'px';
-      cv.style.top = (pr.top - cr.top) + 'px';
-      const ctx = cv.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, W, H);
-      // card no sistema do palco
-      const cx = cr.left - pr.left + cr.width / 2;
-      const cyTopo = cr.top - pr.top;
-      const cyBase = cyTopo + cr.height;
-      // o facho entra varrendo da esquerda e para no card em ~0,9 s
-      const k = suave(t / 0.9);
-      const alvoX = cx + (1 - k) * (-W * 0.55);
-      const fonteX = cx + W * 0.12, fonteY = -30;
-      const respira = 1 + Math.sin(t * 2.2) * 0.04;
-      const clarao = t > 0.9 ? Math.max(0, 1 - (t - 0.9) / 0.5) : 0;
-      // escurece o palco em volta (entra junto com o facho)
-      ctx.fillStyle = 'rgba(0,0,0,' + (0.42 * Math.min(1, t / 0.5)) + ')';
-      ctx.fillRect(0, 0, W, H);
-      // facho: um cone da fonte até um pouco abaixo do card
-      const meia = cr.width * 0.68 * respira;
-      const baseY = cyBase + 14;
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const g = ctx.createLinearGradient(fonteX, fonteY, alvoX, baseY);
-      const forca = (0.16 + clarao * 0.18) * Math.min(1, t / 0.3);
-      g.addColorStop(0, 'rgba(255,244,210,' + forca * 1.6 + ')');
-      g.addColorStop(0.7, 'rgba(255,236,190,' + forca + ')');
-      g.addColorStop(1, 'rgba(255,230,170,' + forca * 0.4 + ')');
-      ctx.fillStyle = g;
-      ctx.filter = 'blur(6px)';
-      ctx.beginPath();
-      ctx.moveTo(fonteX - 10, fonteY);
-      ctx.lineTo(fonteX + 10, fonteY);
-      ctx.lineTo(alvoX + meia, baseY);
-      ctx.ellipse(alvoX, baseY, meia, 16, 0, 0, Math.PI);
-      ctx.lineTo(alvoX - meia, baseY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.filter = 'none';
-      // poça de luz em volta do card
-      // (círculo achatado: o degradê some antes da borda, sem linha de oval)
-      const fp = (0.22 + clarao * 0.3) * k;
-      const rx = cr.width * 0.95, ry = cr.height * 1.15;
-      ctx.save();
-      ctx.translate(alvoX, (cyTopo + cyBase) / 2);
-      ctx.scale(1, ry / rx);
-      const poca = ctx.createRadialGradient(0, 0, 10, 0, 0, rx);
-      poca.addColorStop(0, 'rgba(255,238,190,' + fp + ')');
-      poca.addColorStop(0.6, 'rgba(255,238,190,' + fp * 0.35 + ')');
-      poca.addColorStop(1, 'rgba(255,238,190,0)');
-      ctx.fillStyle = poca;
-      ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-      // poeira flutuando dentro do facho
-      for (const p of poeira) {
-        p.v = (p.v + p.vel * 0.016) % 1;
-        const y = fonteY + (baseY - fonteY) * p.v;
-        const larg = 10 + (meia - 10) * p.v;
-        const xc = fonteX + (alvoX - fonteX) * p.v;
-        const x = xc + (p.u * 2 - 1) * larg * 0.9 + Math.sin(t * 0.8 + p.fase) * 4;
-        ctx.fillStyle = 'rgba(255,248,225,' + (0.35 * Math.sin(p.v * Math.PI) * Math.min(1, t)) + ')';
-        ctx.beginPath(); ctx.arc(x, y, p.tam, 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.restore();
-      requestAnimationFrame(quadro);
-    }
-    requestAnimationFrame(quadro);
-    return cv;
-  }
-
   function pintarResultado(res) {
     const alvo = limpar($('resultado'));
     const v = res.vencedor;
@@ -2945,7 +2851,6 @@
     const info = el('div', 'info');
     info.appendChild(el('div', 'nome', '@' + v.usuario));
     bloco.appendChild(info);
-    bloco.appendChild(holofote(bloco));
     if (!presenca) { $('palco').classList.remove('com-presenca'); alvo.appendChild(bloco); return; }
 
     // card + área de presença empilhados no meio do palco
