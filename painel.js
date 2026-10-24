@@ -123,7 +123,7 @@
   let rkTipo = lerLS('bj-rk-tipo', ['gemas', 'compradores'], 'gemas');
   let rkMetrica = lerLS('bj-rk-metrica', ['valor', 'compras'], 'valor');
   let rkOculto = lerLS('bj-rk-oculto', ['1', '0'], '0') === '1';
-  const METRICAS = { valor: 'Valor total', compras: 'Quantidade de compras' };
+  const METRICAS = { valor: 'Valor total', compras: 'Itens comprados' };
   let rkCompradoresCanal = null;   // compradores de todas as lives (pedidos à aba)
   let rkCanalVelho = true;
   let rkCanalPedidoEm = 0;
@@ -520,10 +520,15 @@
     numero($('iTicketVenda'), t.vendasCount ? t.vendasValor / t.vendasCount : 0, brl);
     $('rGemas').textContent = 'gemas';
     $('rEnvios').textContent = 'envios';
-    $('rVendido').textContent = 'vendido';
+    // leilão x preço fixo (no preço fixo uma compra pode ter várias unidades)
+    const tp = t.vendasTipos;
+    $('rVendido').textContent = 'vendido' + (tp && tp.fixo.compras
+      ? ' · leilão ' + brl(tp.leilao.valor) + ' · preço fixo ' + brl(tp.fixo.valor) + ' (' + nf(tp.fixo.itens) + ' ' + plural(tp.fixo.itens, 'item', 'itens') + ')'
+      : '');
     $('rCompradores').textContent = 'compradores únicos';
     $('rTicketVenda').textContent = 'ticket médio por venda'
-      + (t.vendasCount ? ' · ' + nf(t.vendasCount) + ' ' + plural(t.vendasCount, 'venda', 'vendas') : '');
+      + (t.vendasCount ? ' · ' + nf(t.vendasCount) + ' ' + plural(t.vendasCount, 'venda', 'vendas') : '')
+      + (t.vendasItens && t.vendasItens !== t.vendasCount ? ' · ' + nf(t.vendasItens) + ' itens' : '');
 
     // ---- escopo: escrito por extenso, com número
     document.querySelectorAll('[data-escopo]').forEach((b) => {
@@ -560,7 +565,7 @@
     const cp = d.compradores || [];
     limpar($('subCompradores')).append(frase(
       ['span', nf(cp.length) + ' ' + plural(cp.length, 'pessoa', 'pessoas')],
-      [null, ' · ' + brl(t.vendasValor) + ' · ' + nf(t.vendasCount) + ' ' + plural(t.vendasCount, 'compra', 'compras')],
+      [null, ' · ' + brl(t.vendasValor) + ' · ' + nf(t.vendasItens != null ? t.vendasItens : t.vendasCount) + ' ' + plural(t.vendasItens != null ? t.vendasItens : t.vendasCount, 'item', 'itens')],
     ));
     $('subCompradores').firstChild.className = 'forte';
     $('notaCompradores').hidden = true;   // os Insights são sempre da live aberta: o aviso não se aplica
@@ -570,7 +575,7 @@
       lista.appendChild(vazioSimples('Nenhuma venda registrada nesta live ainda.'));
     } else {
       cp.slice(0, 40).forEach((c, i) => lista.appendChild(linhaPessoa(
-        i + 1, c, nf(c.compras) + ' ' + plural(c.compras, 'compra', 'compras'), brl(c.valor), '',
+        i + 1, c, nf(c.compras) + ' ' + plural(c.compras, 'item', 'itens'), brl(c.valor), '',
       )));
     }
 
@@ -1134,7 +1139,7 @@
     }
     const oculto = rkOculto;
     const porValor = rkMetrica === 'valor';
-    const compras = (r) => nf(r.compras) + ' ' + plural(r.compras, 'compra', 'compras');
+    const compras = (r) => nf(r.compras) + ' ' + plural(r.compras, 'item', 'itens');
     return {
       num: (r) => (porValor ? r.valor : r.compras) || 0,
       valor: (r) => (oculto ? '***' : porValor ? brl(r.valor) : nf(r.compras)),
@@ -1710,7 +1715,7 @@
       l.appendChild(avatar(r.avatar, r.usuario, r.id, 'av-p'));
       l.appendChild(el('div', 'quem', '@' + r.usuario));
       l.appendChild(el('div', 'gem', comp
-        ? nf(r.compras) + ' ' + plural(r.compras, 'compra', 'compras')
+        ? nf(r.compras) + ' ' + plural(r.compras, 'item', 'itens')
         : nf(r.gemas) + ' 💎'));
       l.appendChild(el('div', 'pct', pct(p)));
       const trilha = el('div', 'trilha');
@@ -3228,7 +3233,7 @@
     redesenharRanking();
   };
 
-  // "Valor total / Quantidade de compras": fichas embaixo dos cards, no lugar das de gema
+  // "Valor total / Itens comprados": fichas embaixo dos cards, no lugar das de gema
   document.querySelectorAll('[data-rmetrica]').forEach((b) => {
     b.onclick = () => {
       rkMetrica = b.dataset.rmetrica;
@@ -3355,7 +3360,7 @@
     },
     modo: {
       opcoes: () => ({
-        peso: { nome: 'Por quantidade', sub: deCompradores() ? 'Cada compra vale uma chance' : 'Cada gema vale uma chance' },
+        peso: { nome: 'Por quantidade', sub: deCompradores() ? 'Cada item comprado vale uma chance' : 'Cada gema vale uma chance' },
         pessoa: { nome: '1 por pessoa', sub: 'Todo mundo com a mesma chance' },
       }),
       valor: () => sorteio.modo,

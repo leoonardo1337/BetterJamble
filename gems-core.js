@@ -655,9 +655,11 @@
       ? d.lista
       // aba recarregada: até o live.js buscar de novo, vale o que foi gravado
       : Object.entries((db.shows[h.showId] || {}).buyers || {}).map(([id, c]) => ({ id, ...c }));
+    // compras = itens comprados (no preço fixo uma compra pode ter várias
+    // unidades); pedidos = quantas compras (gravações antigas não têm: = itens)
     return lista.map((c) => ({
       id: c.id, usuario: c.u, avatar: foto(avatares[c.id] || c.a),
-      compras: Number(c.n) || 0, valor: Number(c.v) || 0,
+      compras: Number(c.n) || 0, pedidos: Number(c.p != null ? c.p : c.n) || 0, valor: Number(c.v) || 0,
     }));
   }
 
@@ -674,7 +676,7 @@
     if (!show.seller || show.seller === '?') show.seller = h.sellerSlug;
     show.buyers = {};
     d.lista.forEach((c) => {
-      show.buyers[c.id] = { u: c.u, a: c.a || '', n: Number(c.n) || 0, v: Number(c.v) || 0 };
+      show.buyers[c.id] = { u: c.u, a: c.a || '', n: Number(c.n) || 0, p: Number(c.p != null ? c.p : c.n) || 0, v: Number(c.v) || 0 };
       fotoNova(c.id, c.a);   // a lista de vendidos traz a foto atual de quem comprou
     });
     salvar();
@@ -714,7 +716,13 @@
       livesNoEscopo: livesDoEscopo(esc).length,
       compradores: c.length,
       vendasValor: c.reduce((a, x) => a + x.valor, 0),
-      vendasCount: c.reduce((a, x) => a + x.compras, 0),
+      vendasCount: c.reduce((a, x) => a + x.pedidos, 0),   // compras (pedidos)
+      vendasItens: c.reduce((a, x) => a + x.compras, 0),   // itens (5 de uma vez no preço fixo contam 5)
+      // leilão x preço fixo, da lista de vendidos da live aberta
+      vendasTipos: (() => {
+        const d = window.__jambleCompradores, h = live();
+        return d && h && d.showId === h.showId && d.tipos ? d.tipos : null;
+      })(),
     };
   }
 

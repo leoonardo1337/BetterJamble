@@ -127,22 +127,36 @@
     return items;
   }
 
+  // Itens de uma linha de vendidos. No leilão é sempre 1; no preço fixo
+  // (saleType BUY_IT_NOW) uma compra de várias unidades vem numa linha só, com
+  // soldCount = quantidade, soldPrice = preço da unidade e totalSoldPrice = total.
+  const itensDaLinha = (it) => Math.max(1, Number(it && it.soldCount) || 1);
+  const ehFixo = (it) => !!it && it.saleType === 'BUY_IT_NOW';
+
   // Ranking de compradores desta live, para o card do BetterJamble desenhar.
   // Nada é gravado no armazenamento: vale só enquanto a aba está aberta.
+  // n = itens comprados (5 no preço fixo + 1 no leilão = 6), p = compras.
   function compradoresDaLive(showId, items) {
     try {
       const porComprador = new Map();
+      const tipos = { leilao: { valor: 0, vendas: 0 }, fixo: { valor: 0, compras: 0, itens: 0 } };
       for (const it of items) {
         const v = it && it.sold;
         if (!v || v.isCanceled || !v.buyerId) continue;
-        const c = porComprador.get(v.buyerId) || { id: v.buyerId, u: v.buyerUsername || v.buyerId, a: v.buyerAvatarUrl || '', n: 0, v: 0 };
-        c.n++;
-        c.v += Number(v.totalSoldPrice != null ? v.totalSoldPrice : v.soldPrice) || 0;
+        const c = porComprador.get(v.buyerId) || { id: v.buyerId, u: v.buyerUsername || v.buyerId, a: v.buyerAvatarUrl || '', n: 0, p: 0, v: 0 };
+        const valor = Number(v.totalSoldPrice != null ? v.totalSoldPrice : v.soldPrice) || 0;
+        const itens = itensDaLinha(it);
+        c.n += itens;
+        c.p++;
+        c.v += valor;
         porComprador.set(v.buyerId, c);
+        if (ehFixo(it)) { tipos.fixo.valor += valor; tipos.fixo.compras++; tipos.fixo.itens += itens; }
+        else { tipos.leilao.valor += valor; tipos.leilao.vendas++; }
       }
       window.__jambleCompradores = {
         showId,
         at: Date.now(),
+        tipos,
         lista: [...porComprador.values()].sort((a, b) => b.v - a.v),
       };
       window.dispatchEvent(new CustomEvent('jamble:compradores'));
@@ -158,6 +172,7 @@
       const price = Number(v.totalSoldPrice != null ? v.totalSoldPrice : v.soldPrice) || 0;
       s.total += price;
       s.vendas++;
+      s.itens = (s.itens || 0) + itensDaLinha(it);
       if (v.isPaid) { s.pago += price; s.pagas++; }
     }
     return s;
@@ -204,7 +219,7 @@
     if (badge.textContent !== txt) badge.textContent = txt;
     badge.style.background = sum.total > 0 ? '#1f7a4d' : '#44444f';
     badge.style.opacity = pending ? '.65' : '1';
-    badge.title = `${sum.vendas} venda(s) · ${brl(sum.pago)} já pago (${sum.pagas})` +
+    badge.title = `${sum.vendas} venda(s)` + (sum.itens && sum.itens !== sum.vendas ? ` · ${sum.itens} itens` : '') + ` · ${brl(sum.pago)} já pago (${sum.pagas})` +
       (sum.canceladas ? ` · ${sum.canceladas} cancelada(s) fora da soma` : '');
     return true;
   }
