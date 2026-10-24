@@ -2160,8 +2160,9 @@
     let med = medirPalco(cv);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // quantos cabem: com raias de 12px o pato ainda é reconhecível; o vencedor sempre corre
-    const maxRaias = Math.max(2, Math.min(80, Math.floor((med.a * 0.78) / 12)));
+    // Como no original, todo mundo da urna entra na água, mesmo que fique tudo
+    // amontoado; o teto é só para não pesar (o vencedor sempre corre)
+    const maxRaias = 200;
     let corredores = participantes.filter((x) => x.id !== vencedor.id);
     const doVencedor = participantes.find((x) => x.id === vencedor.id) || { id: vencedor.id, usuario: vencedor.usuario };
     embaralhar(corredores);
@@ -2173,14 +2174,17 @@
     // Vantagem de cada pato sobre o grupo, em corpos: nós aleatórios a cada
     // ~1,5 s ligados por curvas suaves (as ultrapassagens). No fim, o vencedor
     // está na frente e os outros atrás por margens diferentes.
+    // Com muita gente o bolo se espalha mais (no original, 60 patos ocupam metade
+    // do rio na horizontal): a diferença cresce com o número de patos.
+    const espalha = Math.min(4, 1 + n / 20);
     const NOS = 10;
     const patos = corredores.map((x, i) => {
       const nos = [0];
-      for (let k = 1; k < NOS; k++) nos.push((Math.random() * 2 - 1) * (0.45 + Math.random() * 0.55));
+      for (let k = 1; k < NOS; k++) nos.push((Math.random() * 2 - 1) * (0.45 + Math.random() * 0.55) * espalha);
       return { id: x.id, nome: '@' + (x.usuario || '?'), ganha: x.id === vencedor.id, raia: i, nos, fase: Math.random() * 6.28 };
     });
-    const finais = patos.filter((x) => !x.ganha).map(() => 0.1 + Math.random() * 1.1).sort((a, b) => a - b);
-    const topoFinal = 0.55 + Math.random() * 0.5;
+    const finais = patos.filter((x) => !x.ganha).map(() => 0.1 + Math.random() * 1.1 * espalha).sort((a, b) => a - b);
+    const topoFinal = (0.55 + Math.random() * 0.5) * espalha;
     patos.filter((x) => !x.ganha).forEach((x, j) => { x.nos.push(topoFinal - finais[finais.length - 1 - j] - 0.12); });
     patos.find((x) => x.ganha).nos.push(topoFinal);
     // ordem de chegada, para o 2º e o 3º
@@ -2202,7 +2206,7 @@
       if (borda) { ctx.lineWidth = borda; ctx.strokeStyle = '#000'; ctx.stroke(); }
     }
     function etiqueta(ctx, xDir, yMeio, txt, tam, destaque) {
-      ctx.font = '600 ' + tam + 'px ' + fonte;
+      ctx.font = '500 ' + tam + 'px ' + fonte;
       const w = ctx.measureText(txt).width + tam * 0.9;
       const h = tam * 1.45;
       pilula(ctx, xDir - w, yMeio - h / 2, w, h, tam * 0.35, destaque ? '#ffd23f' : '#fff', Math.max(1.5, tam * 0.12));
@@ -2241,12 +2245,22 @@
 
       // geometria: margem em cima, rio embaixo, raias em diagonal
       const rioY = a * 0.2;
-      const dy = (a - rioY) / (n + 0.45);
-      const h = Math.max(14, Math.min(a * 0.24, dy * 1.4));    // altura do pato
+      // O pato e o nome têm tamanho fixo (como no original): com pouca gente o
+      // pato é grande; com muita, encolhe só um pouco e as raias se apertam, os
+      // patos se amontoam uns por cima dos outros na mesma diagonal.
+      const h = a * Math.max(0.11, 0.2 * Math.pow(4 / Math.max(4, n), 0.22));   // altura do pato
+      const yPrimeira = rioY + h * 0.5;                          // raia de trás
+      const yUltima = a - h * 0.32;                              // raia da frente
+      const dy = n > 1 ? (yUltima - yPrimeira) / (n - 1) : 0;
+      const yRaia = (r) => (n > 1 ? yPrimeira + dy * r : (yPrimeira + yUltima) / 2);
+      const tamNome = Math.max(10, Math.min(20, a * 0.03));
+      const tamNum = Math.max(8, Math.min(15, a * 0.022));
       const w = h * (130 / 118);
       const incl = 0.5;                                          // quanto a raia de cima anda para a direita, por px de altura
       const sx = dy * incl;
-      const x0 = Math.max(l * 0.06, w * 0.2);                    // pato da raia de baixo, na largada
+      // pato da raia de baixo, na largada; com o bolo espalhado, mais para dentro
+      // para quem fica para trás não sair da tela pela esquerda
+      const x0 = Math.max(l * 0.06, w * 0.2) + (espalha - 1) * w * 0.9;
       const v = l * 0.075;                                       // px/s do rio passando
       const corpo = w * 0.9;                                     // "um corpo" de vantagem
 
@@ -2256,7 +2270,7 @@
       // A linha é guardada pela base (x no pé da faixa); na raia de cada pato ela
       // está em base + (yFundo - y) * incl, a mesma inclinação das raias. Por isso
       // basta comparar a base com o nariz do pato "trazido" para a raia de baixo.
-      const yFundoL = rioY + dy * (n - 1 + 0.75) + h * 0.35;
+      const yFundoL = yRaia(n - 1) + h * 0.35;
       const baseNoNariz = (vant) => x0 + w * 0.98 + vant * corpo - h * 0.35 * incl;
       // nos últimos CHEGADA_MS a chegada desliza da direita até o nariz do vencedor
       // e continua no mesmo passo, cruzando os outros em ordem
@@ -2311,15 +2325,16 @@
       }
 
       // ---- largada (fica para trás) e chegada, inclinadas, com o número das raias
-      const q = Math.max(6, Math.min(18, dy * 0.32));
+      const q = Math.max(6, Math.min(16, a * 0.02));
       const yFundo = yFundoL;
-      const yTopo = Math.max(rioY + 4, rioY + dy * 0.75 - h * 0.55);
+      const yTopo = Math.max(rioY + 4, yRaia(0) - h * 0.55);
       const numeros = (xLinha) => {
+        if (dy < 22) return;   // amontoado: os números não cabem (o original também some com eles)
         ctx.fillStyle = '#000';
         ctx.font = 'italic 800 ' + Math.round(Math.max(12, Math.min(64, dy * 0.85))) + 'px ' + fonte;
         ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
         patos.forEach((pt) => {
-          const y = rioY + dy * (pt.raia + 0.75);
+          const y = yRaia(pt.raia);
           ctx.fillText(String(n - pt.raia), xLinha + (yFundo - y) * incl + 2 * q + 8, y);
         });
       };
@@ -2334,7 +2349,7 @@
       const gv = patos.find((x) => x.ganha);
       patos.forEach((pt) => {
         let x = x0 + (n - 1 - pt.raia) * sx + vantagem(pt, t) * corpo;
-        let y = rioY + dy * (pt.raia + 0.75);
+        let y = yRaia(pt.raia);
         if (dv > 0) {
           if (pt.ganha) {
             // vai para o meio da tela, na altura do meio do rio
@@ -2355,13 +2370,13 @@
         else { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.ellipse(0, h * 0.15, w * 0.42, h * 0.3, 0, 0, Math.PI * 2); ctx.fill(); }
         ctx.restore();
         // número da raia no corpo e o nome perto da cabeça
-        const tamN = Math.max(8, Math.min(16, h * 0.15));
+        const tamN = tamNum;
         ctx.font = '700 ' + tamN + 'px ' + fonte;
         const nw = Math.max(tamN * 1.6, ctx.measureText(String(n - pt.raia)).width + tamN);
         pilula(ctx, x + w * 0.2, yTopoPato + h * 0.6, nw, tamN * 1.35, tamN * 0.3, '#fff', Math.max(1.2, tamN * 0.12));
         ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(n - pt.raia), x + w * 0.2 + nw / 2, yTopoPato + h * 0.6 + tamN * 0.7);
-        etiqueta(ctx, x + w * 0.58, yTopoPato + h * 0.12, pt.nome, Math.max(9, Math.min(22, h * 0.19)), dv > 0 && pt.ganha);
+        etiqueta(ctx, x + w * 0.58, yTopoPato + h * 0.12, pt.nome, tamNome, dv > 0 && pt.ganha);
       });
 
       // ---- relógio (HH:MM:SS, como no site)
