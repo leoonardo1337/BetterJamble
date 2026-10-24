@@ -2195,9 +2195,8 @@
   const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
   const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
 
-  // Sons da corrida. Se a pasta sons/ existir (contagem, música, torcida e
-  // quack em mp3 — ficam fora do git e do zip da loja), toca os arquivos;
-  // senão, gera tudo na hora com Web Audio. Ordem: contagem 3-2-1-GO, a
+  // Sons da corrida: os mp3 da pasta sons/ (contagem, música, torcida e
+  // quack); se algum não carregar, aquele som é gerado na hora com Web Audio. Ordem: contagem 3-2-1-GO, a
   // música de corrida logo depois, a torcida baixinha de fundo (cresce na
   // arrancada e explode na chegada) e quacks soltos. M liga/desliga.
   const SONS = { contagem: 'sons/contagem.mp3', musica: 'sons/musica.mp3', torcida: 'sons/torcida.mp3', quack: 'sons/quack.mp3' };
