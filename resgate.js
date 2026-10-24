@@ -18,6 +18,9 @@
 // Endpoint lido: GET /api/live/watch-time -> { tracker: { convertedMins, unconvertedMins, milestones[] } }
 // ============================================================================
 (() => {
+  // relógios que também andam com o tique do painel (ritmo.js): a aba da live
+  // escondida não trava o que é periódico
+  const relogio = window.__bjRitmo || window;
   if (window.__jambleResgateLoaded) return;
   window.__jambleResgateLoaded = true;
 
@@ -49,7 +52,7 @@
   let lastClickAt = 0;
   const attempts = new Map(); // marco (min) -> tentativas
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sleep = (ms) => new Promise((r) => relogio.setTimeout(r, ms));
   const log = (...a) => console.log('[BetterJamble resgate]', ...a);
   const post = (payload) => {
     try { window.postMessage({ tag: 'jamble-ext', type: 'painel-resgate', payload }, location.origin); } catch {}
@@ -308,7 +311,7 @@
   }
 
   function arm() {
-    clearTimeout(timer);
+    relogio.clearTimeout(timer);
     const now = Date.now();
     let wait;
     if (!getCtx()) wait = 5000;
@@ -323,7 +326,7 @@
       const checkAt = boundaryAt + k * MINUTE + 30_000;
       wait = Math.min(target.at, checkAt) - now;
     }
-    timer = setTimeout(loop, Math.max(250, wait));
+    timer = relogio.setTimeout(loop, Math.max(250, wait));
   }
 
   // Estado para o painel. Só manda quando muda (o painel conta o tempo sozinho).
@@ -403,7 +406,7 @@
     new MutationObserver(() => {
       if (!domScheduled) {
         domScheduled = true;
-        setTimeout(domCheck, 300);
+        relogio.setTimeout(domCheck, 300);
       }
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
     loop();

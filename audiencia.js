@@ -24,6 +24,9 @@
 //     pausa e o painel avisa.
 // ============================================================================
 (() => {
+  // relógios que também andam com o tique do painel (ritmo.js): a aba da live
+  // escondida não trava o que é periódico
+  const relogio = window.__bjRitmo || window;
   if (window.__jambleAudienciaLoaded) return;
   window.__jambleAudienciaLoaded = true;
 
@@ -74,8 +77,8 @@
   let timerSalvar = 0;
   function salvar() {
     mudou = true;
-    clearTimeout(timerSalvar);
-    timerSalvar = setTimeout(() => { try { localStorage.setItem(LS, JSON.stringify(db)); } catch {} }, 3000);
+    relogio.clearTimeout(timerSalvar);
+    timerSalvar = relogio.setTimeout(() => { try { localStorage.setItem(LS, JSON.stringify(db)); } catch {} }, 3000);
   }
 
   const minuto = (t) => Math.floor(t / 60000) * 60000;
@@ -315,8 +318,8 @@
   const painelAberto = () => !!(window.__jambleTransporte && window.__jambleTransporte.aberto());
 
   function agendar(ms) {
-    clearTimeout(consulta.timer);
-    consulta.timer = setTimeout(rodar, ms);
+    relogio.clearTimeout(consulta.timer);
+    consulta.timer = relogio.setTimeout(rodar, ms);
   }
 
   // A live acabou (aviso do gems-core, que vê is_over e o título da página):
@@ -478,7 +481,7 @@
   }
 
   // Envio ao painel: um pacote a cada 5s, só se algo mudou e o painel está aberto.
-  setInterval(() => {
+  relogio.setInterval(() => {
     if (!painelAberto()) return;
     if (!mudou && consulta.status !== 'ok') return;
     mudou = false;

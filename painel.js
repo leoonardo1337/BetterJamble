@@ -328,6 +328,13 @@
     return f;
   }
 
+  // Tique a cada segundo para a aba da live: escondida (janela coberta ou
+  // minimizada), ela tem os relógios travados pelo Chrome, e os nossos scripts
+  // de lá andam também com este tique (ritmo.js). O painel está à vista, então
+  // o relógio dele não trava.
+  // (vai mesmo sem sinal: é justamente o tique que traz o pulso de volta)
+  setInterval(() => mandar('painel-tique'), 1000);
+
   // Mais de 12 s sem pulso = a aba não está mais falando com o painel.
   // Repete a cada 4 s de propósito: é assim que o "há N min" da faixa anda.
   setInterval(() => {

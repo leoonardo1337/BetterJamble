@@ -14,6 +14,9 @@
 //   - rajadas de gema são juntadas numa janela de 250 ms.
 // ============================================================================
 (() => {
+  // relógios que também andam com o tique do painel (ritmo.js): a aba da live
+  // escondida não trava o que é periódico
+  const relogio = window.__bjRitmo || window;
   if (window.__jambleTransporteLoaded) return;
   window.__jambleTransporteLoaded = true;
 
@@ -49,9 +52,9 @@
   function agendar(completo) {
     if (completo) pedidoCompleto = true;
     if (!painelAberto) return;
-    if (completo) { clearTimeout(timer); timer = null; despachar(); return; }
+    if (completo) { relogio.clearTimeout(timer); timer = null; despachar(); return; }
     if (timer) return;
-    timer = setTimeout(despachar, INTERVALO);
+    timer = relogio.setTimeout(despachar, INTERVALO);
   }
 
   // Motivos que invalidam o que o painel tem na tela inteiro.
@@ -102,7 +105,7 @@
         break;
       case 'painel-fechou':
         painelAberto = false;
-        clearTimeout(timer);
+        relogio.clearTimeout(timer);
         timer = null;
         break;
       case 'pedir-estado':
@@ -189,13 +192,13 @@
     const naLive = !!(api && api.live && api.live());
     if (naLive !== naLiveAvisado) { naLiveAvisado = naLive; enviar('aba-estado', { naLive }); }
   }
-  setInterval(() => {
+  relogio.setInterval(() => {
     if (painelAberto) enviar('painel-pulso', { em: Date.now() });
     verificarAba();
   }, 4000);
   // Sem esperar o primeiro giro: entrar numa live acontece com a aba na frente.
   verificarAba();
-  setTimeout(verificarAba, 1200);
+  relogio.setTimeout(verificarAba, 1200);
   window.addEventListener('bj:atualizou', (ev) => {
     if (ev && ev.detail && ev.detail.motivo === 'nav') verificarAba();
   });

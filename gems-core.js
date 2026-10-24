@@ -16,6 +16,9 @@
 // a live aberta no navegador. O que já entrou fica em localStorage.
 // ============================================================================
 (() => {
+  // relógios que também andam com o tique do painel (ritmo.js): a aba da live
+  // escondida não trava o que é periódico
+  const relogio = window.__bjRitmo || window;
   if (window.__jambleGemsCoreLoaded) return;
   window.__jambleGemsCoreLoaded = true;
 
@@ -93,8 +96,8 @@
 
   // ---------------------------------------------------------------- persistência
   function salvar() {
-    clearTimeout(timerSalvar);
-    timerSalvar = setTimeout(() => {
+    relogio.clearTimeout(timerSalvar);
+    timerSalvar = relogio.setTimeout(() => {
       try {
         const ids = Object.keys(db.shows);
         if (ids.length > MAX_SHOWS) {
@@ -132,8 +135,8 @@
     if (avatares[userId] === url) return;
     avatares[userId] = url;
     avatarFalhou.delete(userId);
-    clearTimeout(timerFotos);
-    timerFotos = setTimeout(() => { salvarAvatares(); avisar('avatar'); }, 1000);
+    relogio.clearTimeout(timerFotos);
+    timerFotos = relogio.setTimeout(() => { salvarAvatares(); avisar('avatar'); }, 1000);
   }
 
   // ---------------------------------------------------------------- auth / fetch
@@ -326,7 +329,7 @@
             avataresEm[id] = Date.now() - FOTO_VALE + 3600000;
           }
         } catch { avatarFalhou.add(id); avataresEm[id] = Date.now() - FOTO_VALE + 3600000; }
-        finally { avatarOcupado--; setTimeout(bombearAvatares, 1500); }   // uma folga entre consultas
+        finally { avatarOcupado--; relogio.setTimeout(bombearAvatares, 1500); }   // uma folga entre consultas
       })();
     }
   }
@@ -1027,9 +1030,9 @@
 
   ['pushState', 'replaceState'].forEach((fn) => {
     const orig = history[fn];
-    history[fn] = function () { const r = orig.apply(this, arguments); aoNavegar(); setTimeout(aoNavegar, 0); return r; };
+    history[fn] = function () { const r = orig.apply(this, arguments); aoNavegar(); relogio.setTimeout(aoNavegar, 0); return r; };
   });
-  window.addEventListener('popstate', () => { aoNavegar(); setTimeout(aoNavegar, 0); });
+  window.addEventListener('popstate', () => { aoNavegar(); relogio.setTimeout(aoNavegar, 0); });
   window.addEventListener('jamble:compradores', () => { guardarCompradores(); avisar('compradores'); });
   // fotos atuais vindas da lista de espectadores (audiencia.js)
   window.addEventListener('bj:fotos', (ev) => {
@@ -1038,7 +1041,7 @@
   });
 
   // Rede de segurança: a navegação da Jamble é SPA e nem sempre passa pelos ganchos.
-  setInterval(() => { aoNavegar(); garantirCatalogo(); atualizarRanking(); conferirTitulo(); }, 1500);
+  relogio.setInterval(() => { aoNavegar(); garantirCatalogo(); atualizarRanking(); conferirTitulo(); }, 1500);
   aoNavegar();
   garantirCatalogo();
 

@@ -4,6 +4,9 @@
 // botão de atualizar do card "Anúncios" é clicado, para a contagem não ficar parada; se a
 // janela é estreita e o card nem aparece, as vendas são buscadas direto a cada 30 s.
 (() => {
+  // relógios que também andam com o tique do painel (ritmo.js): a aba da live
+  // escondida não trava o que é periódico
+  const relogio = window.__bjRitmo || window;
   if (window.__jambleLiveTotalLoaded) return;
   window.__jambleLiveTotalLoaded = true;
 
@@ -209,9 +212,9 @@
   // ---------- orquestração ----------
   let timer = null;
   const schedule = (ms) => {
-    clearTimeout(timer);
+    relogio.clearTimeout(timer);
     if (!ms) { Promise.resolve().then(run); return; }
-    timer = setTimeout(run, ms);
+    timer = relogio.setTimeout(run, ms);
   };
 
   // Busca (ou reaproveita) o resumo de uma live. Nunca dispara duas buscas para a mesma live.
@@ -257,7 +260,7 @@
       if (!sum && !sellerFor(showId)) { schedule(200); return; }  // ids ainda não chegaram
     }
     current.lastCount = countOf(soldButton());
-    setTimeout(prefetchNeighbors, 1200);
+    relogio.setTimeout(prefetchNeighbors, 1200);
   }
 
   // O resumo pode vir do cache sem buscar nada; mesmo assim precisamos da lista de
@@ -344,14 +347,14 @@
     if (achado.card.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
     const antes = Date.now();
     achado.botao.click();
-    setTimeout(() => {
+    relogio.setTimeout(() => {
       if (vendidosChegaramEm < antes && showIdFromUrl() === showId) ensureData(showId, true);
     }, 4000);
   }
 
-  setInterval(() => { if (!document.hidden) schedule(0); }, 20000);
-  setInterval(sincronizarAnuncios, 30000);
-  setInterval(garantirCompradores, 3000);
+  relogio.setInterval(() => { if (!document.hidden) schedule(0); }, 20000);
+  relogio.setInterval(sincronizarAnuncios, 30000);
+  relogio.setInterval(garantirCompradores, 3000);
   garantirCompradores();
   window.__jambleLiveDebug = { sincronizarAnuncios, botaoAtualizarAnuncios, cache, sellers, inflight, run, ensureData, paint, showIdFromUrl, sellerFor, soldButton, countOf, current };
   onNav();
