@@ -2134,7 +2134,8 @@
   // pela direita; depois a câmera segue só o vencedor. A corrida toma a janela
   // inteira do painel. O vencedor já vem sorteado da urna (com a chance de cada
   // um); a corrida só é montada para ele cruzar primeiro.
-  const CORRIDA_MS = 15000;        // relógio do tiro de largada até zerar
+  const CORRIDA_MS = 60000;        // relógio do tiro de largada até zerar (1 minuto)
+  const ARRANCADA_MS = 8000;       // nos últimos segundos o vencedor acelera e passa todo mundo
   const LARGADA_MS = 800;          // patos parados na linha antes do tiro
   const CHEGADA_MS = 1300;         // a chegada entrando pela direita antes de zerar
   const VENCEDOR_MS = 3800;        // os outros ficam para trás e o vencedor vai ao meio
@@ -2171,34 +2172,44 @@
     const n = corredores.length;
     BJPatos.preparar(corredores.map((x) => x.id));
 
-    // Vantagem de cada pato sobre o grupo, em corpos: nós aleatórios a cada
-    // ~1,5 s ligados por curvas suaves (as ultrapassagens). No fim, o vencedor
-    // está na frente e os outros atrás por margens diferentes.
+    // Vantagem de cada pato sobre o grupo, em corpos. Ela sai de algumas ondas
+    // lentas somadas (de 12 a 40 s cada), então a velocidade de cada pato muda
+    // devagar, sem tranco: um vai ganhando terreno, outro perde aos poucos. Nos
+    // últimos ARRANCADA_MS o vencedor dá uma arrancada suave e termina na frente
+    // de quem estiver liderando.
     // Com muita gente o bolo se espalha mais (no original, 60 patos ocupam metade
     // do rio na horizontal): a diferença cresce com o número de patos.
     const espalha = Math.min(4, 1 + n / 20);
-    const NOS = 10;
     const patos = corredores.map((x, i) => {
-      const nos = [0];
-      for (let k = 1; k < NOS; k++) nos.push((Math.random() * 2 - 1) * (0.45 + Math.random() * 0.55) * espalha);
-      return { id: x.id, nome: '@' + (x.usuario || '?'), ganha: x.id === vencedor.id, raia: i, nos, fase: Math.random() * 6.28 };
+      const ondas = [0, 1, 2].map((k) => ({
+        w: (2 * Math.PI) / ((k === 0 ? 28000 : k === 1 ? 17000 : 11000) * (0.75 + Math.random() * 0.5)),
+        f: Math.random() * 6.28,
+        a: (k === 0 ? 0.75 : k === 1 ? 0.4 : 0.18) * (0.6 + Math.random() * 0.8) * espalha,
+      }));
+      return { id: x.id, nome: '@' + (x.usuario || '?'), ganha: x.id === vencedor.id, raia: i, ondas, fase: Math.random() * 6.28, extra: 0 };
     });
-    const finais = patos.filter((x) => !x.ganha).map(() => 0.1 + Math.random() * 1.1 * espalha).sort((a, b) => a - b);
-    const topoFinal = (0.55 + Math.random() * 0.5) * espalha;
-    patos.filter((x) => !x.ganha).forEach((x, j) => { x.nos.push(topoFinal - finais[finais.length - 1 - j] - 0.12); });
-    patos.find((x) => x.ganha).nos.push(topoFinal);
+    const suave = (q) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, q)))) / 2;
+    // largada: as ondas entram aos poucos nos primeiros 4 s (todos saem juntos)
+    function ondas(pt, t) {
+      const tt = Math.max(0, Math.min(t, CORRIDA_MS));
+      let v = 0;
+      for (const o of pt.ondas) v += o.a * (Math.sin(o.w * tt + o.f) - Math.sin(o.f));
+      return v * suave(tt / 4000);
+    }
+    const lider = Math.max(...patos.filter((x) => !x.ganha).map((x) => ondas(x, CORRIDA_MS)), -Infinity);
+    const gv0 = patos.find((x) => x.ganha);
+    gv0.extra = Math.max(0, (isFinite(lider) ? lider : 0) + 0.6 - ondas(gv0, CORRIDA_MS));
+    function vantagem(pt, t) {
+      const v = ondas(pt, t);
+      return pt.ganha ? v + pt.extra * suave((t - (CORRIDA_MS - ARRANCADA_MS)) / (ARRANCADA_MS - 500)) : v;
+    }
+    const vantFinal = (pt) => vantagem(pt, CORRIDA_MS);
     // ordem de chegada, para o 2º e o 3º
-    const ordem = patos.slice().sort((a, b) => b.nos[NOS] - a.nos[NOS]);
+    const ordem = patos.slice().sort((a, b) => vantFinal(b) - vantFinal(a));
 
     const p = { ctx: med.ctx, cv, overlay: camada, inicio: performance.now(), raf: 0, rede: 0, fecha: 0, pecas: [], l: med.l, a: med.a, acabou: false };
     palco = p;
 
-    const suave = (q) => (1 - Math.cos(Math.PI * q)) / 2;
-    function vantagem(pt, t) {
-      const q = Math.max(0, Math.min(1, t / CORRIDA_MS)) * NOS;
-      const k = Math.min(NOS - 1, Math.floor(q));
-      return pt.nos[k] + (pt.nos[k + 1] - pt.nos[k]) * suave(q - k);
-    }
     function pilula(ctx, x, y, w, h, r, fundo, borda) {
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
@@ -2248,7 +2259,11 @@
       // O pato e o nome têm tamanho fixo (como no original): com pouca gente o
       // pato é grande; com muita, encolhe só um pouco e as raias se apertam, os
       // patos se amontoam uns por cima dos outros na mesma diagonal.
-      const h = a * Math.max(0.11, 0.2 * Math.pow(4 / Math.max(4, n), 0.22));   // altura do pato
+      // altura de referência (a do original) e o pato desenhado no dobro dela;
+      // a vantagem entre os patos continua medida na referência, senão o bolo
+      // ficaria largo demais para a tela
+      const hRef = a * Math.max(0.11, 0.2 * Math.pow(4 / Math.max(4, n), 0.22));
+      const h = Math.min(a * 0.42, hRef * 2);                    // altura do pato
       const yPrimeira = rioY + h * 0.5;                          // raia de trás
       const yUltima = a - h * 0.32;                              // raia da frente
       const dy = n > 1 ? (yUltima - yPrimeira) / (n - 1) : 0;
@@ -2260,9 +2275,9 @@
       const sx = dy * incl;
       // pato da raia de baixo, na largada; com o bolo espalhado, mais para dentro
       // para quem fica para trás não sair da tela pela esquerda
-      const x0 = Math.max(l * 0.06, w * 0.2) + (espalha - 1) * w * 0.9;
+      const x0 = Math.max(l * 0.06, w * 0.2) + (espalha - 1) * hRef * (130 / 118) * 0.9;
       const v = l * 0.075;                                       // px/s do rio passando
-      const corpo = w * 0.9;                                     // "um corpo" de vantagem
+      const corpo = hRef * (130 / 118) * 0.9;                    // "um corpo" de vantagem (na referência)
 
       // câmera: o grupo nada a v (o rio passa); os patos quase não saem do lugar na tela
       const fimRelogio = CORRIDA_MS;
@@ -2277,7 +2292,7 @@
       let xChegada = null;
       if (t > fimRelogio - CHEGADA_MS) {
         const k = (t - (fimRelogio - CHEGADA_MS)) / CHEGADA_MS;
-        const alvo = baseNoNariz(patos.find((x) => x.ganha).nos[NOS]);
+        const alvo = baseNoNariz(vantFinal(patos.find((x) => x.ganha)));
         const de = l * 1.05;
         xChegada = de + (alvo - de) * Math.min(k, 1.7);
       }
