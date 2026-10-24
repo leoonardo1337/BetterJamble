@@ -125,8 +125,25 @@
     if (!c) {
       c = document.createElement('canvas');
       const w = Math.round(h * ASPECTO);
-      c.width = w * dpr; c.height = h * dpr;
-      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+      // contorno preto em volta do pato todo (como os patos do original): a
+      // silhueta em preto é carimbada em volta, e o pato vai por cima, um
+      // pouco menor para o contorno caber dentro da imagem
+      const t = Math.max(1.2, h * 0.022) * dpr;          // espessura do contorno
+      const iw = c.width - 2 * t, ih = c.height - 2 * t;
+      const sil = document.createElement('canvas');
+      sil.width = c.width; sil.height = c.height;
+      const sx = sil.getContext('2d');
+      sx.drawImage(im, t, t, iw, ih);
+      sx.globalCompositeOperation = 'source-in';
+      sx.fillStyle = '#111';
+      sx.fillRect(0, 0, sil.width, sil.height);
+      const cx = c.getContext('2d');
+      for (let i = 0; i < 12; i++) {
+        const ang = (i / 12) * Math.PI * 2;
+        cx.drawImage(sil, Math.cos(ang) * t, Math.sin(ang) * t);
+      }
+      cx.drawImage(im, t, t, iw, ih);
       rasters.set(k, c);
       if (rasters.size > 500) rasters.delete(rasters.keys().next().value);
     }

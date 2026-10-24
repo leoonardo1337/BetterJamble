@@ -2536,18 +2536,25 @@
 
       // ---- patos, da raia de trás para a da frente
       const gv = patos.find((x) => x.ganha);
+      // pódio no fim: o vencedor no meio, o 2º à esquerda e o 3º à direita
+      const [segundo, terceiro] = ordem.filter((x) => !x.ganha);
+      const ym = rioY + (a - rioY) * 0.5;
+      const lado = Math.min(w * 1.6, l * 0.3);
+      const podio = [];
       patos.forEach((pt) => {
         let x = xPato(pt, t);
         if (p.ultimas) p.ultimas[pt.raia] = [pt.fuga ? (pt.ganha ? 2 : 1) : 0, Math.round(x - (n - 1 - pt.raia) * sx)];
         let y = yRaia(pt.raia);
         if (dv > 0) {
-          if (pt.ganha) {
-            // vai para o meio da tela, na altura do meio do rio
-            const xm = l / 2 - w / 2;
-            const ym = rioY + (a - rioY) * 0.5;
-            x += (xm - x) * suave(kv); y += (ym - y) * suave(kv);
+          const lugar = pt.ganha ? 1 : pt === segundo ? 2 : pt === terceiro ? 3 : 0;
+          if (lugar) {
+            // vão para o pódio: o vencedor no meio, um pouco mais alto
+            const xm = l / 2 - w / 2 + (lugar === 2 ? -lado : lugar === 3 ? lado : 0);
+            const yAlvo = ym + (lugar === 1 ? 0 : h * 0.18);
+            x += (xm - x) * suave(kv); y += (yAlvo - y) * suave(kv);
+            podio.push({ lugar, x: x + w / 2, y });
           } else {
-            x -= kv * kv * l * 0.9;     // ficam para trás
+            x -= kv * kv * l * 0.9;     // os outros ficam para trás
           }
         }
         const bob = Math.sin(agora / 260 + pt.fase);
@@ -2596,12 +2603,23 @@
         pilula(ctx, l / 2 - fw / 2, fy - tam, fw, tam * 1.8, tam * 0.5, '#fff', 3);
         ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(frase, l / 2, fy - tam + tam * 0.9 + 1);
-        const outros = ordem.filter((x) => !x.ganha).slice(0, 2).map((x, j) => (j + 2) + 'º ' + x.nome).join('   ');
-        if (outros) {
-          ctx.font = '600 ' + Math.round(tam * 0.5) + 'px ' + fonte;
-          ctx.fillStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-          const oy = rioY + (a - rioY) * 0.5 + h * 0.75;
-          ctx.strokeText(outros, l / 2, oy); ctx.fillText(outros, l / 2, oy);
+        ctx.textAlign = 'left';
+        ctx.globalAlpha = 1;
+      }
+      p.podio = podio;   // para depurar (window.__bjCorrida)
+      // medalhas do pódio, embaixo de cada pato (1º ouro, 2º prata, 3º bronze)
+      if (dv > 0 && podio.length) {
+        const r = Math.max(14, Math.min(26, h * 0.16));
+        ctx.globalAlpha = Math.min(1, dv / 600);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '800 ' + Math.round(r * 0.95) + 'px ' + fonte;
+        for (const m of podio) {
+          const cy = m.y + h * 0.3 + r;
+          ctx.fillStyle = m.lugar === 1 ? '#ffc62b' : m.lugar === 2 ? '#d7dbe0' : '#d9945a';
+          ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(m.x, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#000';
+          ctx.fillText(m.lugar + 'º', m.x, cy + 1);
         }
         ctx.textAlign = 'left';
         ctx.globalAlpha = 1;
