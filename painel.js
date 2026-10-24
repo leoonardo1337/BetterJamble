@@ -2787,73 +2787,36 @@
     alvo.appendChild(bloco);
   }
 
-  // Aura do vencedor (tipo a do Goku): uma névoa dourada translúcida que
-  // envolve o card retangular e sobe em pontas que se curvam e mudam o tempo
-  // todo, como fumaça. São três camadas (de fora para dentro, cada vez mais
-  // clara e opaca), cada uma um contorno do card empurrado para fora por ondas
-  // que andam com o tempo; em cima as pontas sobem bem mais. Canvas atrás do
-  // card, que se desliga sozinho quando o card sai da tela.
+  // Aura do vencedor: um brilho dourado fraco colado no card retangular e uma
+  // fumaça clara saindo da borda (mais de cima e dos lados), que sobe devagar
+  // fazendo curvas, cresce e some. Tudo bem translúcido, para não pesar.
+  // Canvas atrás do card, que se desliga sozinho quando o card sai da tela.
   function auraDeFogo(card) {
-    const MARGEM = 60, ACIMA = 120;
+    const MARGEM = 60, ACIMA = 140;
     const cv = el('canvas', 'aura-fogo');
     cv.setAttribute('aria-hidden', 'true');
-    const fases = [Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28];
-    let ligado = false;
-    // onda suave entre 0 e 1 que anda com o tempo (u = posição no contorno)
-    const onda = (u, t, f) => {
-      // u em px de contorno: uma ponta a cada ~40-60 px, que vai andando
-      const v = Math.sin(u / 21 + t * 1.3 + f) + 0.65 * Math.sin(u / 11.5 - t * 2.1 + f * 2) + 0.35 * Math.sin(u / 6.7 + t * 3.1 + f * 3);
-      return (v / 1.95 + 1) / 2;
-    };
-    // contorno do card (retângulo) em N pontos, cada um com a direção para fora
-    function contorno(l, a, n) {
-      const per = 2 * (l + a);
-      const pts = [];
-      for (let i = 0; i < n; i++) {
-        let d = (i / n) * per;
-        let x, y, nx, ny, lado;
-        if (d < l) { x = d; y = 0; nx = 0; ny = -1; lado = 'topo'; }
-        else if ((d -= l) < a) { x = l; y = d; nx = 1; ny = 0; lado = 'dir'; }
-        else if ((d -= a) < l) { x = l - d; y = a; nx = 0; ny = 1; lado = 'baixo'; }
-        else { d -= l; x = 0; y = a - d; nx = -1; ny = 0; lado = 'esq'; }
-        pts.push({ x, y, nx, ny, lado, u: (i / n) * per, k: y / a });
-      }
-      return pts;
-    }
-    function camada(ctx, pts, t, f, escala, cor, alfa, blur) {
-      ctx.save();
-      ctx.filter = 'blur(' + blur + 'px)';
-      ctx.globalAlpha = alfa;
-      ctx.fillStyle = cor;
-      ctx.beginPath();
-      const q = pts.map((p) => {
-        const o = onda(p.u, t, f);
-        let dx = p.nx, dy = p.ny, dist;
-        if (p.lado === 'topo') dist = 8 + Math.pow(o, 2.6) * 150;          // pontas subindo
-        else if (p.lado === 'baixo') dist = 6 + o * 10;
-        else {
-          dist = 8 + Math.pow(o, 1.8) * 40;
-          dy = -0.35 - (1 - p.k) * 0.5;                                     // os lados também puxam para cima
-          const m = Math.hypot(dx, dy); dx /= m; dy /= m;
-          dist *= 1 + (1 - p.k) * 0.8;
-        }
-        dist *= escala;
-        return [MARGEM + p.x + dx * dist, ACIMA + p.y + dy * dist];
+    const fumaca = [];
+    let ligado = false, antes = 0, sobra = 0;
+    function soltar(l, a) {
+      const r = Math.random();
+      let x, y;
+      if (r < 0.6) { x = Math.random() * l; y = 0; }                       // de cima
+      else if (r < 0.8) { x = 0; y = Math.random() * a * 0.7; }            // lado esquerdo, metade de cima
+      else { x = l; y = Math.random() * a * 0.7; }                         // lado direito
+      fumaca.push({
+        x0: MARGEM + x, y: ACIMA + y, x: MARGEM + x,
+        sobe: 22 + Math.random() * 26,                                     // px por segundo
+        raio: 8 + Math.random() * 8, cresce: 10 + Math.random() * 12,     // px por segundo
+        vida: 0, dura: 2.2 + Math.random() * 1.6,                          // segundos
+        f: 0.6 + Math.random() * 0.9, amp: 8 + Math.random() * 16, fase: Math.random() * 6.28,
+        clara: Math.random() < 0.5,
       });
-      // curva suave passando pelos pontos médios
-      for (let i = 0; i < q.length; i++) {
-        const a1 = q[i], b1 = q[(i + 1) % q.length];
-        const mx = (a1[0] + b1[0]) / 2, my = (a1[1] + b1[1]) / 2;
-        if (i === 0) ctx.moveTo(mx, my); else ctx.quadraticCurveTo(a1[0], a1[1], mx, my);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
     }
     function quadro(ms) {
       if (!cv.isConnected) { if (ligado) return; requestAnimationFrame(quadro); return; }
       ligado = true;
-      const t = ms / 1000;
+      const dt = Math.min(0.05, antes ? (ms - antes) / 1000 : 0.016);
+      antes = ms;
       const r = card.getBoundingClientRect();
       const l = r.width, a = r.height;
       const W = l + MARGEM * 2, H = a + ACIMA + MARGEM;
@@ -2866,12 +2829,36 @@
       const ctx = cv.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      const pts = contorno(l, a, 140);
-      ctx.globalCompositeOperation = 'lighter';
-      camada(ctx, pts, t * 0.9, fases[0], 1.0, '#ffb92e', 0.28, 14);
-      camada(ctx, pts, t * 1.15, fases[1], 0.7, '#ffd66b', 0.32, 10);
-      camada(ctx, pts, t * 1.4, fases[2], 0.42, '#fff1c4', 0.38, 7);
-      ctx.globalCompositeOperation = 'source-over';
+      // brilho fraco e retangular, respirando devagar
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,205,90,.55)';
+      ctx.shadowBlur = 22 + Math.sin(ms / 900) * 6;
+      ctx.fillStyle = 'rgba(255,205,90,.12)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(MARGEM, ACIMA, l, a, 18); else ctx.rect(MARGEM, ACIMA, l, a);
+      ctx.fill();
+      ctx.restore();
+      // fumaça: umas 14 baforadas por segundo para cada 100 px de largura
+      sobra += dt * (l / 100) * 14;
+      while (sobra >= 1) { soltar(l, a); sobra--; }
+      for (const p of fumaca) {
+        p.vida += dt;
+        const k = p.vida / p.dura;
+        if (k >= 1) continue;
+        p.y -= p.sobe * dt;
+        p.x = p.x0 + Math.sin(p.vida * p.f * 2 + p.fase) * p.amp * Math.min(1, k * 2);
+        const raio = p.raio + p.cresce * p.vida;
+        // aparece rápido e some devagar
+        const alfa = (k < 0.2 ? k / 0.2 : (1 - k) / 0.8) * 0.13;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, raio);
+        const cor = p.clara ? '255,246,220' : '255,214,130';
+        g.addColorStop(0, 'rgba(' + cor + ',' + alfa + ')');
+        g.addColorStop(0.6, 'rgba(' + cor + ',' + alfa * 0.45 + ')');
+        g.addColorStop(1, 'rgba(' + cor + ',0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x, p.y, raio, 0, Math.PI * 2); ctx.fill();
+      }
+      for (let i = fumaca.length - 1; i >= 0; i--) if (fumaca[i].vida >= fumaca[i].dura) fumaca.splice(i, 1);
       requestAnimationFrame(quadro);
     }
     requestAnimationFrame(quadro);
