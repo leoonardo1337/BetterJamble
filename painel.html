@@ -643,6 +643,9 @@
   .sorteio-grade > .sel-grupo > .sel-cards{display:grid;grid-template-rows:subgrid;grid-row:span 2;gap:6px}
   .sorteio-grade > .sorteio-lado{grid-column:3;grid-row:1 / -1;display:flex;flex-direction:column}
   .sorteio-lado .sel-rot{margin-bottom:8px}
+  /* as opções esticam até perto do botão (a coluna tem a altura dos dois grupos ao lado) */
+  .sorteio-grade > .sorteio-lado > .sel-toggles{flex:1}
+  .sorteio-grade > .sorteio-lado .sel-toggle{flex:1}
   .sortear-col{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;margin-top:auto;padding-top:14px}
   /* opções liga/desliga no mesmo formato dos cards, com marcador quadrado */
   .sel-toggles{display:flex;flex-direction:column;gap:6px;min-width:0}
