@@ -348,7 +348,9 @@
       sombra = { c, rx: rx + 1, ry: ry + 1 };
       return sombra;
     }
-    const arena = () => ({ x0: 22 * E, y0: 30 * E, x1: W - 22 * E, y1: H - 18 * E });
+    // à direita fica o ranking de quem está de pé: o campo termina antes dele
+    const larguraRanking = () => Math.round(Math.max(200, Math.min(300, W * 0.22)));
+    const arena = () => ({ x0: 22 * E, y0: 30 * E, x1: W - larguraRanking() - 30, y1: H - 18 * E });
 
     function comecarCampo() {
       if (fase !== 'saguao') return;
@@ -684,6 +686,45 @@
       if (ti < 140) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; explosao(bx, by, ti / 140, '#ffffff', 50 * k0); ctx.restore(); }
     }
 
+    // Ranking à direita, numa caixa do jogo: quem está de pé, do mais inteiro
+    // para o mais machucado, com o ícone do Pokémon, o @, a barrinha e o %.
+    // Cabe o que der na altura; o resto vira "+N".
+    function desenharRanking(e) {
+      const rw = larguraRanking(), x0 = W - rw - 12, y0 = 70, alt = H - y0 - 14;
+      caixaTexto(x0, y0, rw, alt);
+      const vivos = e.vivos.filter((p) => !p.morto && !p.caindo).sort((a, b) => b.hp - a.hp || (b.kos || 0) - (a.kos || 0));
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.font = '11px "Press Start 2P",monospace'; ctx.fillStyle = '#383838';
+      ctx.fillText('VIVOS: ' + vivos.length, x0 + 16, y0 + 24);
+      ctx.fillStyle = '#a0a8b8'; ctx.fillRect(x0 + 12, y0 + 40, rw - 24, 2);
+      const linha = 34, cabem = Math.max(1, Math.floor((alt - 60) / linha));
+      const mostra = vivos.length > cabem ? cabem - 1 : cabem;
+      vivos.slice(0, mostra).forEach((p, i) => {
+        const y = y0 + 50 + i * linha;
+        const im = estaticos[p.dex];
+        if (im && im.complete && im.naturalWidth) ctx.drawImage(im, x0 + 10, y - 2, 30, 30);
+        ctx.fillStyle = '#383838'; ctx.font = '9px "Press Start 2P",monospace';
+        const nome = '@' + p.usuario;
+        const max = Math.floor((rw - 104) / 9);
+        ctx.fillText(nome.length > max ? nome.slice(0, max - 1) + '.' : nome, x0 + 44, y + 7);
+        if (p.kos) { ctx.fillStyle = '#3c8c3c'; ctx.textAlign = 'right'; ctx.fillText('Nv' + (50 + p.kos), x0 + rw - 14, y + 7); ctx.textAlign = 'left'; }
+        // barrinha de HP no estilo do jogo, com a porcentagem
+        const bx = x0 + 44, bw = rw - 104, by = y + 17;
+        ctx.fillStyle = '#f8b030'; ctx.font = '7px "Press Start 2P",monospace'; ctx.fillText('HP', bx, by + 3);
+        ctx.fillStyle = '#506858'; ctx.fillRect(bx + 18, by, bw - 18, 6);
+        ctx.fillStyle = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838';
+        ctx.fillRect(bx + 19, by + 1, Math.max(0, (bw - 20) * p.hp), 4);
+        ctx.fillStyle = '#383838'; ctx.font = '8px "Press Start 2P",monospace'; ctx.textAlign = 'right';
+        ctx.fillText(Math.max(1, Math.round(p.hp * 100)) + '%', x0 + rw - 14, by + 4);
+        ctx.textAlign = 'left';
+      });
+      if (vivos.length > mostra) {
+        ctx.fillStyle = '#707880'; ctx.font = '9px "Press Start 2P",monospace'; ctx.textAlign = 'center';
+        ctx.fillText('+' + (vivos.length - mostra) + ' vivos', x0 + rw / 2, y0 + 50 + mostra * linha + 10);
+        ctx.textAlign = 'left';
+      }
+    }
+
     function quadro(agora) {
       if (parado || fase !== 'campo') return;
       const ini = performance.now();
@@ -730,13 +771,17 @@
       const tw = ctx.measureText(txt).width + 40;
       caixaTexto(W / 2 - tw / 2, 14, tw, 46);
       ctx.fillStyle = '#383838'; ctx.fillText(txt, W / 2, 38);
+      // narração embaixo, à esquerda (a direita é do ranking)
       if (e.log.length) {
-        const lw = Math.min(520, W * 0.46), lh = 26 + e.log.length * 22;
-        caixaTexto(W - lw - 16, H - lh - 14, lw, lh);
+        const lw = Math.min(520, (W - larguraRanking()) * 0.6), lh = 26 + e.log.length * 22;
+        caixaTexto(16, H - lh - 14, lw, lh);
         ctx.font = '11px "Press Start 2P",monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = '#383838';
-        e.log.forEach((l, i) => { ctx.globalAlpha = 1 - i * 0.2; ctx.fillText(l.slice(0, 44), W - lw + 2, H - lh + 2 + i * 22); });
+        // cada letra da fonte de jogo tem 11 px: corta na largura da caixa
+        const cabe = Math.max(10, Math.floor((lw - 40) / 11));
+        e.log.forEach((l, i) => { ctx.globalAlpha = 1 - i * 0.2; ctx.fillText(l.length > cabe ? l.slice(0, cabe - 1) + '.' : l, 34, H - lh + 2 + i * 22); });
         ctx.globalAlpha = 1;
       }
+      desenharRanking(e);
       if (e.acabou) {
         const k = Math.min(1, (agora - e.acabou) / 300);
         ctx.font = '22px "Press Start 2P",monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
