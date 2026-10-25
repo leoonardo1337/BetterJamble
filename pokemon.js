@@ -985,31 +985,35 @@
         + '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
         + '<img class="pk-spr pk-spr-op" alt=""><img class="pk-spr pk-spr-eu" alt="">'
         + '<div class="pk-hp pk-hp-op"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
-        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div></div>'
+        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
         + '</div><div class="pk-texto"><div></div></div>';
       camada.appendChild(d);
       if (cv) { cv.classList.add('saindo'); depois(400, () => cv && cv.remove()); }
       const $ = (s) => d.querySelector(s);
       d.querySelectorAll('.pk-plat').forEach((pl) => { pl.style.backgroundImage = 'url("' + urlPlataforma() + '")'; });
+      // O lado do vencedor é sorteado: metade das vezes ele fica embaixo (de
+      // costas), metade em cima (de frente). Antes ficava sempre embaixo e dava
+      // para saber quem ia ganhar antes do fim. 'eu' = embaixo, 'op' = em cima.
+      const ladoGanha = Math.random() < 0.5 ? 'eu' : 'op', ladoPerde = ladoGanha === 'eu' ? 'op' : 'eu';
+      const quemNo = { [ladoGanha]: vencedor, [ladoPerde]: outro };
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
-      sprOp.src = animado(outro.dex, false); sprOp.onerror = () => { sprOp.src = estatico(outro.dex); };
-      sprEu.src = animado(vencedor.dex, true); sprEu.onerror = () => { sprEu.src = estatico(vencedor.dex); sprEu.classList.add('sem-costas'); };
-      $('.pk-hp-op .nv').textContent = nivel(outro);
-      $('.pk-hp-eu .nv').textContent = nivel(vencedor);
-      $('.pk-hp-num').textContent = vencedor.vida + '/' + vencedor.vida;
-      $('.pk-hp-op .n').textContent = '@' + outro.usuario;
-      $('.pk-hp-eu .n').textContent = '@' + vencedor.usuario;
+      sprOp.src = animado(quemNo.op.dex, false); sprOp.onerror = () => { sprOp.src = estatico(quemNo.op.dex); };
+      sprEu.src = animado(quemNo.eu.dex, true); sprEu.onerror = () => { sprEu.src = estatico(quemNo.eu.dex); sprEu.classList.add('sem-costas'); };
+      ['op', 'eu'].forEach((l) => {
+        $('.pk-hp-' + l + ' .nv').textContent = nivel(quemNo[l]);
+        $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario;
+      });
       const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
-      const nOp = nomeDe(outro.dex) + ' de @' + outro.usuario, nEu = nomeDe(vencedor.dex) + ' de @' + vencedor.usuario;
-      // Roteiro de ~20 s: 8 ações alternadas (o adversário começa) e o golpe
-      // final é sempre do vencedor. Quem está abaixo da metade pode se curar
-      // (uma vez por lado, 25% de chance a cada vez); o adversário nunca cai antes do
-      // fim e o vencedor nunca chega a zero.
+      const nomeNo = (l) => nomeDe(quemNo[l].dex) + ' de @' + quemNo[l].usuario;
+      // Roteiro de ~20 s: 8 ações alternadas (quem perde começa) e o golpe
+      // final é sempre do vencedor, esteja ele em cima ou embaixo. Quem está
+      // abaixo da metade pode se curar (uma vez por lado, 25% de chance a cada
+      // vez); quem perde nunca cai antes do fim e o vencedor nunca chega a zero.
       const ACOES = 8;
       const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false };
       const passos = [{ txt: 'Restam 2! O duelo final vai começar!' }];
       for (let k = 0; k < ACOES; k++) {
-        const quem = k % 2 === 0 ? 'op' : 'eu', outro = quem === 'op' ? 'eu' : 'op', nome = quem === 'op' ? nOp : nEu;
+        const quem = k % 2 === 0 ? ladoPerde : ladoGanha, outro = quem === 'op' ? 'eu' : 'op', nome = nomeNo(quem);
         const ultima = k === ACOES - 1;
         if (!ultima && !curou[quem] && hp[quem] < 50 && Math.random() < 0.25) {
           curou[quem] = true;
@@ -1018,12 +1022,12 @@
           continue;
         }
         let forte = false;
-        if (ultima) { hp.op = 0; forte = Math.random() < 0.3; }
-        else hp[outro] = Math.max(outro === 'op' ? 15 : 8, hp[outro] - Math.round(alea(16, 30)));
+        if (ultima) { hp[ladoPerde] = 0; forte = Math.random() < 0.3; }
+        else hp[outro] = Math.max(outro === ladoPerde ? 15 : 8, hp[outro] - Math.round(alea(16, 30)));
         const golpe = forte ? 'usou ' + escolherDe(ESPECIAIS)[0] : escolherDe(GOLPES);
         passos.push({ txt: nome + ' ' + golpe + '!', alvo: outro, [outro]: hp[outro], forte });
       }
-      passos.push({ txt: nOp + ' desmaiou!', desmaia: true });
+      passos.push({ txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true });
       let i = 0;
       const tocar = () => {
         if (parado) return;
@@ -1038,7 +1042,7 @@
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
           if (s.forte) d.classList.add('clarao');
           depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) (s.forte ? som.impacto : som.golpe)(s.alvo === 'op' ? 0.4 : -0.4); });
-          depois(800, () => { if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(vencedor.vida * s.eu / 100) + '/' + vencedor.vida; } if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
+          depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
         }
         if (s.cura) {
           // cura: brilho verde subindo em volta do Pokémon e a barra enchendo
@@ -1052,12 +1056,12 @@
           spr.classList.add('curando');
           if (som) som.cura(s.cura === 'op' ? 0.4 : -0.4);
           depois(700, () => {
-            if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(vencedor.vida * s.eu / 100) + '/' + vencedor.vida; }
+            if (s.eu != null) vida('eu', s.eu);
             if (s.op != null) vida('op', s.op);
           });
           depois(1600, () => { brilho.remove(); spr.classList.remove('curando'); });
         }
-        if (s.desmaia) { sprOp.classList.add('desmaia'); if (som) som.nocaute(0.4); }
+        if (s.desmaia) { (ladoPerde === 'op' ? sprOp : sprEu).classList.add('desmaia'); if (som) som.nocaute(ladoPerde === 'op' ? 0.4 : -0.4); }
         i++;
         if (i < passos.length) depois(s.desmaia ? 1600 : 2100, tocar);
         else depois(1700, mostrarVencedor);
