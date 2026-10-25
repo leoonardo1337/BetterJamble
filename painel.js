@@ -3391,6 +3391,9 @@
     rod.append(el('span', null, 'Ilus. BetterJamble'), el('span', 'tcg-raro', n ? '★ 1/' + nf(n) : '★'));
     miolo.appendChild(rod);
     frente.appendChild(miolo);
+    // foil: o arco-íris holográfico por cima da carta inteira (fica na frente,
+    // então some quando o verso está virado)
+    frente.appendChild(el('div', 'tcg-foil'));
     c.append(verso, frente, el('div', 'tcg-reflexo'));
     // O giro de entrada toca uma vez só: quando termina (ou quando o mouse já
     // mexe no card) ele fica desligado de vez. Antes, tirar o mouse religava a
