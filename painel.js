@@ -3330,17 +3330,82 @@
     alvo.appendChild(bloco);
   }
 
+  // Card do vencedor no formato de carta TCG (CSS: .tcg). Sem números de
+  // gasto da pessoa (gemas, envios, itens, valor, bilhetes): só o lugar,
+  // quantos participaram e a chance que ela tinha. Entra virando do verso; com
+  // o mouse em cima, inclina e o brilho holográfico acompanha.
+  const SVG_GEMA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l4 5-9 11L3 9z"/><path class="g2" d="M3 9h18M9.5 4L8 9l4 11 4-11-1.5-5"/></svg>';
+  function cardTcg(res) {
+    const v = res.vencedor;
+    const c = el('div', 'tcg' + (res.restaurado ? ' sem-giro' : ''));
+    c.setAttribute('aria-label', 'Vencedor do sorteio: @' + v.usuario);
+    const verso = el('div', 'tcg-face tcg-verso');
+    verso.innerHTML = SVG_GEMA;
+    const frente = el('div', 'tcg-face tcg-frente');
+    const miolo = el('div', 'tcg-miolo');
+    miolo.appendChild(el('div', 'tcg-estagio', 'VENCEDOR DO SORTEIO'));
+    const cab = el('div', 'tcg-cab');
+    cab.appendChild(el('div', 'tcg-nome', '@' + v.usuario));
+    cab.appendChild(el('div', 'tcg-hp', '1º'));
+    const tipo = el('div', 'tcg-tipo'); tipo.innerHTML = SVG_GEMA; cab.appendChild(tipo);
+    miolo.appendChild(cab);
+    // arte: a foto de perfil (ou as iniciais) com o holográfico por cima
+    const arte = el('div', 'tcg-arte');
+    const ini = el('div', 'tcg-ini', iniciais(v.usuario));
+    arte.appendChild(ini);
+    if (v.avatar) {
+      const im = el('img');
+      im.alt = ''; im.decoding = 'async'; im.referrerPolicy = 'no-referrer';
+      im.onload = () => ini.remove();
+      im.onerror = () => im.remove();
+      im.src = v.avatar;
+      arte.appendChild(im);
+    }
+    arte.appendChild(el('div', 'tcg-holo'));
+    arte.appendChild(el('div', 'tcg-brilhos'));
+    miolo.appendChild(arte);
+    const comp = sorteio.tipo === 'compradores';
+    miolo.appendChild(el('div', 'tcg-faixa', (comp ? 'Sorteio de compradores' : 'Sorteio de gemas') + ' · '
+      + (sorteio.escopo === 'vendedor' ? 'Todas as lives' : 'Nesta live')));
+    const ataques = el('div', 'tcg-ataques');
+    const ataque = (custo, nome, desc, valor) => {
+      const a = el('div', 'tcg-atq');
+      const cu = el('div', 'tcg-custo');
+      custo.forEach((k) => cu.appendChild(el('i', k)));
+      const tx = el('div', 'tcg-tx');
+      tx.appendChild(el('b', null, nome));
+      tx.appendChild(el('span', null, desc));
+      a.append(cu, tx, el('div', 'tcg-dano', valor));
+      return a;
+    };
+    const n = res.participantes || 0;
+    ataques.appendChild(ataque(['azul'], 'Sorte Grande', n ? 'Saiu da urna entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') + '.' : 'Saiu da urna neste sorteio.', '1º'));
+    ataques.appendChild(el('div', 'tcg-linha'));
+    const ch = res.chance || 0;
+    ataques.appendChild(ataque(['ouro', 'ouro'], 'Golpe de Sorte', 'A chance que tinha de ganhar este sorteio.',
+      ch ? (ch < 1 ? ch.toFixed(1).replace('.', ',') : Math.round(ch)) + '%' : '—'));
+    miolo.appendChild(ataques);
+    miolo.appendChild(el('div', 'tcg-sabor', (n ? 'Venceu entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') : 'Venceu o sorteio')
+      + ' na live de ' + vendedorArroba() + ' em ' + new Date().toLocaleDateString('pt-BR') + '.'));
+    const rod = el('div', 'tcg-rodape');
+    rod.append(el('span', null, 'Ilus. BetterJamble'), el('span', 'tcg-raro', n ? '★ 1/' + nf(n) : '★'));
+    miolo.appendChild(rod);
+    frente.appendChild(miolo);
+    c.append(verso, frente, el('div', 'tcg-reflexo'));
+    // inclina com o mouse; o reflexo e o holográfico acompanham
+    c.addEventListener('mousemove', (e) => {
+      const r = c.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+      c.classList.add('mexendo');
+      c.style.transform = 'rotateY(' + ((px - 0.5) * 22).toFixed(1) + 'deg) rotateX(' + ((0.5 - py) * 22).toFixed(1) + 'deg)';
+      c.style.setProperty('--mx', (px * 100).toFixed(1) + '%'); c.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+    });
+    c.addEventListener('mouseleave', () => { c.classList.remove('mexendo'); c.style.transform = ''; });
+    return c;
+  }
+
   function pintarResultado(res) {
     const alvo = limpar($('resultado'));
-    const v = res.vencedor;
-    // card de ouro com aura no lugar do troféu (CSS: .card-ouro)
-    const bloco = el('div', 'resultado ganhou card-ouro');
-    const caixa = el('div', 'caixa-av');
-    caixa.appendChild(avatar(v.avatar, v.usuario, v.id, 'av-xg'));
-    bloco.appendChild(caixa);
-    const info = el('div', 'info');
-    info.appendChild(el('div', 'nome', '@' + v.usuario));
-    bloco.appendChild(info);
+    const bloco = cardTcg(res);   // o palco cresce sozinho com o card (CSS: .palco:has(.tcg))
     if (!presenca) { $('palco').classList.remove('com-presenca'); alvo.appendChild(bloco); return; }
 
     // card + área de presença empilhados no meio do palco
