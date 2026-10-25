@@ -294,14 +294,59 @@
     }
 
     // ---------------------------------------------------------- campo
-    let cv, ctx, W = 0, H = 0, E = 3, mapa = null, estado = null;
+    // O que pesa em tela cheia é pintar pixels: como na corrida de patos, a
+    // batalha desenha numa resolução interna de até LARGURA_MAX e o navegador
+    // estica (fica igual, é pixel art). Com muita gente, um pouco menos.
+    let cv, ctx, W = 0, H = 0, E = 3, mapa = null, estado = null, cssW = 0, cssH = 0;
+    const LARGURA_MAX = pessoas.length > 60 ? 1280 : 1440;
     function medir() {
       const r = cv.getBoundingClientRect();
-      W = Math.max(1, Math.round(r.width)); H = Math.max(1, Math.round(r.height));
+      cssW = Math.round(r.width); cssH = Math.round(r.height);
+      const k = Math.min(1, LARGURA_MAX / Math.max(1, r.width));
+      W = Math.max(1, Math.round(r.width * k)); H = Math.max(1, Math.round(r.height * k));
       cv.width = W; cv.height = H;
       ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
       E = Math.max(2, Math.round(Math.min(W, H) / 260));
       mapa = fazerMapa(Math.ceil(W / E), Math.ceil(H / E));
+      etiquetas.clear(); sombra = null;
+    }
+    // Etiqueta pronta de cada Pokémon (caixa bege, borda e o @): um drawImage
+    // por quadro em vez de medir e escrever o texto toda vez.
+    const etiquetas = new Map();   // id -> {c, w, h, fs}
+    let sombra = null, esperandoFonte = false;
+    function etiquetaDe(p) {
+      let t = etiquetas.get(p.id);
+      if (t) return t;
+      const k0 = estado.tam, fs = Math.max(7, Math.round(9 * k0));
+      const medida = document.createElement('canvas').getContext('2d');
+      medida.font = fs + 'px "Press Start 2P",monospace';
+      // quem já derrubou alguém mostra o nível (Nv51, Nv52...)
+      const nome = '@' + p.usuario + (p.kos ? ' Nv' + (50 + p.kos) : '');
+      const w = Math.ceil(Math.max(medida.measureText(nome).width + 10, 50 * k0)), h = fs + 13;
+      const c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
+      const x = c.getContext('2d');
+      x.beginPath(); x.roundRect(1, 1, w, h, 3); x.fillStyle = '#f8f8d8'; x.fill();
+      x.lineWidth = Math.max(1, E * 0.7); x.strokeStyle = '#506858'; x.stroke();
+      x.font = fs + 'px "Press Start 2P",monospace'; x.fillStyle = '#383838'; x.textAlign = 'center'; x.textBaseline = 'top';
+      x.fillText(nome, 1 + w / 2, 4);
+      t = { c, w, h, fs };
+      etiquetas.set(p.id, t);
+      // a fonte de jogo pode não ter carregado ainda: refaz todas uma vez
+      // quando ela chegar (antes, refazia a cada quadro e pesava)
+      if (!esperandoFonte && document.fonts && document.fonts.load) {
+        esperandoFonte = true;
+        document.fonts.load(fs + 'px "Press Start 2P"').then(() => etiquetas.clear(), () => {});
+      }
+      return t;
+    }
+    function sombraPronta() {
+      if (sombra) return sombra;
+      const k0 = estado.tam, rx = Math.ceil(24 * k0), ry = Math.ceil(7 * k0);
+      const c = document.createElement('canvas'); c.width = rx * 2 + 2; c.height = ry * 2 + 2;
+      const x = c.getContext('2d');
+      x.fillStyle = 'rgba(24,56,32,.3)'; x.beginPath(); x.ellipse(rx + 1, ry + 1, rx, ry, 0, 0, 6.29); x.fill();
+      sombra = { c, rx: rx + 1, ry: ry + 1 };
+      return sombra;
     }
     const arena = () => ({ x0: 22 * E, y0: 30 * E, x1: W - 22 * E, y1: H - 18 * E });
 
@@ -339,13 +384,34 @@
       p.trocaAlvo = agora + alea(2500, 5000);
     }
     function narrar(t) { estado.log.unshift(t); estado.log = estado.log.slice(0, 4); }
-    function ferir(p, dano, agora, deAlguem) {
+    // quantos ainda estão de pé (conferido a cada golpe: dois golpes no mesmo
+    // quadro podiam levar de 3 para 1 e o duelo ficava sem adversário)
+    const emPe = () => { let n = 0; for (const x of estado.vivos) if (!x.morto && !x.caindo) n++; return n; };
+    function ferir(p, dano, agora, atacante) {
       if (p.caindo) return;
       const antes = p.hp;
-      p.hp = Math.max(p.ganha ? 0.22 : 0, p.hp - dano);   // o vencedor sorteado nunca desmaia
+      // o vencedor sorteado nunca desmaia; e com 2 de pé ninguém mais cai no
+      // campo: os dois últimos se resolvem no duelo final
+      const piso = p.ganha ? 0.22 : emPe() <= 2 ? 0.05 : 0;
+      p.hp = Math.max(piso, p.hp - dano);
       p.treme = agora;
-      if (deAlguem) estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * 120)) });
-      if (p.hp <= 0) { p.caindo = agora; narrar('@' + p.usuario + ' desmaiou!'); }
+      if (atacante) estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * 120)) });
+      if (p.hp <= 0) derrubar(p, agora, atacante);
+    }
+    // Recompensa por nocaute: quem derruba alguém sobe de nível, bate 10% mais
+    // forte e ataca 8% mais rápido, acumulando até 4 nocautes. Não muda quem
+    // ganha (já sorteado): muda a história da briga.
+    const MAX_BONUS = 4;
+    const bonus = (p) => Math.min(p.kos || 0, MAX_BONUS);
+    function derrubar(q, agora, atacante) {
+      q.hp = 0; q.caindo = agora;
+      estado.ultimoCaido = q;
+      if (atacante && !atacante.caindo) {
+        atacante.kos = (atacante.kos || 0) + 1;
+        etiquetas.delete(atacante.id);   // a etiqueta passa a mostrar o nível novo
+        estado.numeros.push({ x: atacante.x, y: atacante.y - 86 * estado.tam, ini: agora, txt: 'SUBIU!', cor: '#7ad151' });
+        narrar('@' + atacante.usuario + ' derrubou @' + q.usuario + '!');
+      } else narrar('@' + q.usuario + ' desmaiou!');
     }
     function iniciarEspecial(p, q, agora) {
       const [nome, cor] = escolherDe(ESPECIAIS);
@@ -372,14 +438,14 @@
         s.bateu = true;
         const q = s.para;
         q.treme = agora;
-        if (q.ganha) {
+        // o vencedor aguenta; e se já só restam 2 de pé, o alvo também aguenta
+        if (q.ganha || emPe() <= 2 || s.de.caindo) {
           q.hp = Math.min(q.hp, 0.12);
           estado.numeros.push({ x: q.x, y: q.y - 80 * estado.tam, ini: agora, txt: 'AGUENTOU!', grande: true });
           narrar('@' + q.usuario + ' aguentou o ' + s.nome + '!');
         } else {
-          q.hp = 0; q.caindo = agora;
           estado.numeros.push({ x: q.x, y: q.y - 80 * estado.tam, ini: agora, txt: 'NOCAUTE!', grande: true });
-          narrar('@' + q.usuario + ' caiu com UM golpe!');
+          derrubar(q, agora, s.de);
         }
       }
       if (t >= CARGA_MS + IMPACTO_MS) estado.especial = null;
@@ -418,8 +484,8 @@
           }
           if (agora > p.recarga) {
             p.investida = agora;
-            p.recarga = agora + alea(700, 1300);
-            ferir(q, alea(0.1, 0.2) * furia * (q.ganha ? 0.6 : 1), agora, p);
+            p.recarga = agora + alea(700, 1300) * (1 - 0.08 * bonus(p));
+            ferir(q, alea(0.1, 0.2) * furia * (1 + 0.1 * bonus(p)) * (q.ganha ? 0.6 : 1), agora, p);
             ferir(p, alea(0.02, 0.05) * furia * (p.ganha ? 0.6 : 1), agora, null);
             q.vx += (dx / d) * 260; q.vy += (dy / d) * 260;
             e.faiscas.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - 30 * e.tam, ini: agora, cor: escolherDe(CORES) });
@@ -469,33 +535,35 @@
       const anda = Math.hypot(p.vx, p.vy) > 15;
       const pulo = anda ? Math.abs(Math.sin(agora / 110 + p.fase)) * 5 * k0 : Math.sin(agora / 300 + p.fase) * 1.5;
       ctx.globalAlpha = (p.caindo && Math.floor(agora / 70) % 2) ? alfa * 0.3 : alfa;
-      ctx.fillStyle = 'rgba(24,56,32,.3)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 4, 24 * k0, 7 * k0, 0, 0, 6.29); ctx.fill();
+      const sb = sombraPronta();
+      ctx.drawImage(sb.c, Math.round(p.x - sb.rx), Math.round(p.y + 4 - sb.ry));
       const anim = quadroAnimado(p.dex, agora, p.fase);
       const im = estaticos[p.dex];
       if (anim || (im && im.complete && im.naturalWidth)) {
         ctx.save();
-        ctx.translate(p.x + dx, p.y + 6 - pulo + dy);
+        ctx.translate(Math.round(p.x + dx), Math.round(p.y + 6 - pulo + dy));
         if (escala !== 1) ctx.scale(escala, escala);
         // os sprites de frente olham para a esquerda: vira quando anda para a direita
         if (p.olha > 0) ctx.scale(-1, 1);
-        if (p.treme && agora - p.treme < 120) ctx.filter = 'brightness(2.2)';
-        if (anim) { const k = 1.4 * k0; ctx.drawImage(anim, -anim.width * k / 2, -anim.height * k, anim.width * k, anim.height * k); }
-        else { const t2 = 72 * k0; ctx.drawImage(im, -t2 / 2, -t2, t2, t2); }
+        let sw, sh, fonte;
+        if (anim) { const k = 1.4 * k0; sw = anim.width * k; sh = anim.height * k; fonte = anim; }
+        else { sw = sh = 72 * k0; fonte = im; }
+        ctx.drawImage(fonte, -sw / 2, -sh, sw, sh);
+        // clarão de quando apanha: o mesmo sprite somado por cima (o filtro
+        // de brilho, com dezenas de golpes por quadro, era o que pesava)
+        if (p.treme && agora - p.treme < 120) {
+          ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.8;
+          ctx.drawImage(fonte, -sw / 2, -sh, sw, sh);
+        }
         ctx.restore();
       }
-      // etiqueta no estilo da caixa de HP do jogo: nome e barrinha
-      const fs = Math.max(7, Math.round(9 * k0));
-      ctx.font = fs + 'px "Press Start 2P",monospace';
-      const nome = '@' + p.usuario;
-      const nw = Math.max(ctx.measureText(nome).width + 10, 50 * k0);
-      const ty = p.y + 9;
-      pilula(p.x - nw / 2, ty, nw, fs + 13, 3, '#f8f8d8', '#506858');
-      ctx.fillStyle = '#383838'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(nome, p.x, ty + 3);
-      const bw = nw - 10;
-      pilula(p.x - bw / 2, ty + fs + 6, bw, 4, 2, '#506858');
-      const cor = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838';
-      if (p.hp > 0) pilula(p.x - bw / 2 + 1, ty + fs + 7, (bw - 2) * p.hp, 2, 1, cor);
+      // etiqueta no estilo da caixa de HP do jogo (pronta) e a barrinha de HP
+      const tg = etiquetaDe(p);
+      const ty = Math.round(p.y + 9), tx = Math.round(p.x - tg.w / 2 - 1);
+      ctx.drawImage(tg.c, tx, ty);
+      const bw = tg.w - 10, by = ty + tg.fs + 7;
+      ctx.fillStyle = '#506858'; ctx.fillRect(tx + 6, by, bw, 4);
+      if (p.hp > 0) { ctx.fillStyle = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838'; ctx.fillRect(tx + 7, by + 1, (bw - 2) * p.hp, 2); }
       ctx.globalAlpha = 1;
     }
     function caixaTexto(x, y, w, h) {
@@ -618,7 +686,14 @@
 
     function quadro(agora) {
       if (parado || fase !== 'campo') return;
-      if (Math.round(cv.getBoundingClientRect().width) !== W || Math.round(cv.getBoundingClientRect().height) !== H) medir();
+      const ini = performance.now();
+      desenharCampo(agora);
+      // custo médio de cada quadro (para depurar: __bjBatalha.estado.msQuadro)
+      if (estado) estado.msQuadro = (estado.msQuadro || 0) * 0.95 + (performance.now() - ini) * 0.05;
+      if (fase === 'campo' && !parado) requestAnimationFrame(quadro);
+    }
+    function desenharCampo(agora) {
+      if (cv.clientWidth !== cssW || cv.clientHeight !== cssH) medir();
       passo(agora);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(mapa, 0, 0, mapa.width * E, mapa.height * E);
@@ -643,7 +718,7 @@
         const k = (agora - n.ini) / (n.grande ? 1300 : 700);
         if (k >= 1) return false;
         ctx.font = (n.grande ? 20 : 12) + 'px "Press Start 2P",monospace';
-        ctx.globalAlpha = 1 - k * k; ctx.lineWidth = n.grande ? 6 : 4; ctx.strokeStyle = '#000'; ctx.fillStyle = n.grande ? '#ffd84a' : '#fff';
+        ctx.globalAlpha = 1 - k * k; ctx.lineWidth = n.grande ? 6 : 4; ctx.strokeStyle = '#000'; ctx.fillStyle = n.cor || (n.grande ? '#ffd84a' : '#fff');
         ctx.strokeText(n.txt, n.x, n.y - k * 26); ctx.fillText(n.txt, n.x, n.y - k * 26);
         return true;
       });
@@ -668,9 +743,8 @@
         ctx.globalAlpha = k; ctx.lineWidth = 7; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ffd84a';
         ctx.strokeText('RESTAM 2! DUELO FINAL!', W / 2, H / 2); ctx.fillText('RESTAM 2! DUELO FINAL!', W / 2, H / 2);
         ctx.globalAlpha = 1;
-        if (agora - e.acabou > 1800) { comecarDuelo(); return; }
+        if (agora - e.acabou > 1800) comecarDuelo();
       }
-      requestAnimationFrame(quadro);
     }
 
     // ---------------------------------------------------------- duelo final
@@ -680,8 +754,11 @@
     function comecarDuelo() {
       if (fase === 'duelo' || fase === 'vencedor') return;
       fase = 'duelo';
+      // o adversário é quem sobrou de pé (se por algum motivo não houver, o
+      // último que caiu; nunca alguém qualquer da lista)
       const resto = estado ? estado.vivos.filter((p) => !p.morto && !p.caindo && !p.ganha) : [];
-      const outro = resto[0] || pessoas.find((p) => p !== vencedor);
+      const outro = resto[0] || (estado && estado.ultimoCaido) || pessoas.find((p) => p !== vencedor);
+      const nivel = (p) => 'Nv' + (50 + ((estado && (estado.vivos.find((x) => x.id === p.id) || {}).kos) || 0));
       if (!outro) { mostrarVencedor(); return; }
       const d = el('div', 'pk-duelo');
       d.innerHTML = '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
@@ -695,6 +772,8 @@
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
       sprOp.src = animado(outro.dex, false); sprOp.onerror = () => { sprOp.src = estatico(outro.dex); };
       sprEu.src = animado(vencedor.dex, true); sprEu.onerror = () => { sprEu.src = estatico(vencedor.dex); sprEu.classList.add('sem-costas'); };
+      $('.pk-hp-op .pk-hp-l span:last-child').textContent = nivel(outro);
+      $('.pk-hp-eu .pk-hp-l span:last-child').textContent = nivel(vencedor);
       $('.pk-hp-op .n').textContent = '@' + outro.usuario; $('.pk-hp-op .pk-hp-p').textContent = nomeDe(outro.dex);
       $('.pk-hp-eu .n').textContent = '@' + vencedor.usuario; $('.pk-hp-eu .pk-hp-p').textContent = nomeDe(vencedor.dex);
       const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
