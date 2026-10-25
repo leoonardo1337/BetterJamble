@@ -234,7 +234,15 @@
     let ac;
     try { ac = new Ctx(); } catch (e) { return nada; }
     if (ac.state === 'suspended') ac.resume().catch(() => {});
-    const mestre = ac.createGain(); mestre.gain.value = mudo ? 0 : 0.8; mestre.connect(ac.destination);
+    // volume geral ~6 dB acima do antigo (0,8), para ouvir bem no alto-falante
+    // do notebook e o celular captar; o limitador na saída segura os picos
+    // para o som não estourar quando vários efeitos tocam juntos
+    const VOLUME = 1.6;
+    const limitador = ac.createDynamicsCompressor();
+    limitador.threshold.value = -10; limitador.knee.value = 6; limitador.ratio.value = 12;
+    limitador.attack.value = 0.003; limitador.release.value = 0.25;
+    limitador.connect(ac.destination);
+    const mestre = ac.createGain(); mestre.gain.value = mudo ? 0 : VOLUME; mestre.connect(limitador);
     const efeitos = ac.createGain(); efeitos.gain.value = 0.55; efeitos.connect(mestre);
     const musicaG = ac.createGain(); musicaG.gain.value = 0.42; musicaG.connect(mestre);
     let tocando = null, tocandoNome = '';
@@ -318,7 +326,7 @@
       alternar() {
         mudo = !mudo;
         try { localStorage.setItem('bj-som-corrida', mudo ? 'mudo' : 'som'); } catch (e) { /* sem storage */ }
-        mestre.gain.setTargetAtTime(mudo ? 0 : 0.8, ac.currentTime, 0.05);
+        mestre.gain.setTargetAtTime(mudo ? 0 : VOLUME, ac.currentTime, 0.05);
       },
       fechar() {
         try { mestre.gain.setTargetAtTime(0, ac.currentTime, 0.15); } catch (e) { /* já fechado */ }
@@ -471,8 +479,8 @@
       const k0 = estado.tam, fs = Math.max(7, Math.round(9 * k0));
       const medida = document.createElement('canvas').getContext('2d');
       medida.font = fs + 'px "Press Start 2P",monospace';
-      // quem já derrubou alguém mostra o nível (Nv51, Nv52...)
-      const nome = '@' + p.usuario + (p.kos ? ' Nv' + (50 + p.kos) : '');
+      // só o nome: o nível aparece na barra lateral, não no campo
+      const nome = '@' + p.usuario;
       const w = Math.ceil(Math.max(medida.measureText(nome).width + 10, 50 * k0)), h = fs + 13;
       const c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
       const x = c.getContext('2d');
@@ -572,7 +580,6 @@
       if (som) som.nocaute(lado(q));
       if (atacante && !atacante.caindo) {
         atacante.kos = (atacante.kos || 0) + 1;
-        etiquetas.delete(atacante.id);   // a etiqueta passa a mostrar o nível novo
         estado.numeros.push({ x: atacante.x, y: atacante.y - 86 * estado.tam, ini: agora, txt: 'SUBIU!', cor: '#7ad151' });
         narrar('@' + atacante.usuario + ' derrubou @' + q.usuario + '!');
         if (som) setTimeout(() => som && som.subiu(lado(atacante)), 350);
@@ -864,7 +871,7 @@
       for (let yy = -H; yy < H; yy += 18) { ctx.beginPath(); ctx.moveTo(cx0, yy); ctx.lineTo(W, yy + coluna()); ctx.lineTo(W, yy + coluna() + 8); ctx.lineTo(cx0, yy + 8); ctx.closePath(); ctx.fill(); }
       ctx.fillStyle = '#283048'; ctx.fillRect(cx0, 0, 4, H);
       caixaTexto(x0, y0, rw, alt);
-      const vivos = e.vivos.filter((p) => !p.morto && !p.caindo).sort((a, b) => b.hp * b.vida - a.hp * a.vida || (b.kos || 0) - (a.kos || 0));
+      const vivos = e.vivos.filter((p) => !p.morto && !p.caindo).sort((a, b) => b.hp - a.hp || (b.kos || 0) - (a.kos || 0));
       ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
       ctx.font = '11px "Press Start 2P",monospace'; ctx.fillStyle = '#383838';
       ctx.fillText('VIVOS: ' + vivos.length, x0 + 16, y0 + 24);
@@ -887,7 +894,7 @@
         ctx.fillStyle = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838';
         ctx.fillRect(bx + 19, by + 1, Math.max(0, (bw - 20) * p.hp), 4);
         ctx.fillStyle = '#383838'; ctx.font = '8px "Press Start 2P",monospace'; ctx.textAlign = 'right';
-        ctx.fillText(String(Math.max(1, Math.round(p.hp * p.vida))), x0 + rw - 14, by + 4);   // HP em pontos
+        ctx.fillText(Math.max(1, Math.round(p.hp * 100)) + '%', x0 + rw - 14, by + 4);   // HP em porcentagem
         ctx.textAlign = 'left';
       });
       if (vivos.length > mostra) {
