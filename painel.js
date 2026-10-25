@@ -3379,7 +3379,7 @@
       return a;
     };
     const n = res.participantes || 0;
-    ataques.appendChild(ataque(['azul'], 'Sorte Grande', n ? 'Saiu da urna entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') + '.' : 'Saiu da urna neste sorteio.', '1º'));
+    ataques.appendChild(ataque(['azul'], 'Sorte Grande', n ? 'Sorteado entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') + '.' : 'Sorteado nesta live.', '1º'));
     ataques.appendChild(el('div', 'tcg-linha'));
     const ch = res.chance || 0;
     ataques.appendChild(ataque(['ouro', 'ouro'], 'Golpe de Sorte', 'A chance que tinha de ganhar este sorteio.',
@@ -3392,10 +3392,14 @@
     miolo.appendChild(rod);
     frente.appendChild(miolo);
     c.append(verso, frente, el('div', 'tcg-reflexo'));
+    // O giro de entrada toca uma vez só: quando termina (ou quando o mouse já
+    // mexe no card) ele fica desligado de vez. Antes, tirar o mouse religava a
+    // animação e o card mostrava o verso e girava de novo.
+    c.addEventListener('animationend', (e) => { if (e.animationName === 'tcgVirar') c.classList.add('sem-giro'); });
     // inclina com o mouse; o reflexo e o holográfico acompanham
     c.addEventListener('mousemove', (e) => {
       const r = c.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
-      c.classList.add('mexendo');
+      c.classList.add('mexendo', 'sem-giro');
       c.style.transform = 'rotateY(' + ((px - 0.5) * 22).toFixed(1) + 'deg) rotateX(' + ((0.5 - py) * 22).toFixed(1) + 'deg)';
       c.style.setProperty('--mx', (px * 100).toFixed(1) + '%'); c.style.setProperty('--my', (py * 100).toFixed(1) + '%');
     });

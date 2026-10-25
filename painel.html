@@ -906,8 +906,31 @@
   .tcg-verso svg{width:42%;filter:drop-shadow(0 0 12px rgba(76,179,240,.8))}
   .tcg-verso svg path{fill:var(--bj-acento);stroke:#fff;stroke-width:1.2;stroke-linejoin:round}
   .tcg-verso svg .g2{fill:none;stroke-width:1}
-  .tcg-frente{background:#f5cf3b;padding:calc(var(--w)*.035)}
-  .tcg-miolo{position:relative;height:100%;border-radius:calc(var(--w)*.025);overflow:hidden;display:flex;flex-direction:column;
+  /* moldura de ouro metálico com glitter: pontinhos de vários tamanhos que
+     cintilam (::before) e um reflexo que passa de tempos em tempos (::after);
+     os dois ficam embaixo do miolo, então só aparecem na borda */
+  .tcg-frente{padding:calc(var(--w)*.045);
+    background:linear-gradient(135deg,#8a6312 0%,#f3d273 18%,#fff4c8 30%,#dcaa36 45%,#a8781a 60%,#f6d77a 76%,#fff2c0 86%,#94690f 100%)}
+  .tcg-frente::before,.tcg-frente::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none}
+  .tcg-frente::before{
+    background-image:
+      radial-gradient(circle,rgba(255,255,255,.95) 0 1px,transparent 1.5px),
+      radial-gradient(circle,rgba(255,246,200,.9) 0 .7px,transparent 1.2px),
+      radial-gradient(circle,rgba(255,255,255,.85) 0 1.4px,transparent 2px),
+      radial-gradient(circle,rgba(255,226,120,.9) 0 .8px,transparent 1.3px);
+    background-size:11px 13px,7px 9px,23px 19px,15px 17px;
+    background-position:0 0,4px 6px,9px 3px,2px 10px;
+    mix-blend-mode:screen;animation:tcgGlitter 1.6s steps(4) infinite}
+  @keyframes tcgGlitter{
+    0%{opacity:.9;background-position:0 0,4px 6px,9px 3px,2px 10px}
+    25%{opacity:.5;background-position:3px 2px,1px 3px,4px 9px,7px 4px}
+    50%{opacity:1;background-position:6px 5px,5px 1px,13px 6px,10px 13px}
+    75%{opacity:.6;background-position:2px 8px,3px 7px,6px 12px,4px 2px}
+    100%{opacity:.9;background-position:0 0,4px 6px,9px 3px,2px 10px}}
+  .tcg-frente::after{background:linear-gradient(115deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 60%);
+    background-size:300% 100%;animation:tcgReflexoBorda 3.6s ease-in-out infinite}
+  @keyframes tcgReflexoBorda{0%{background-position:130% 0}55%,100%{background-position:-30% 0}}
+  .tcg-miolo{z-index:1;position:relative;height:100%;border-radius:calc(var(--w)*.025);overflow:hidden;display:flex;flex-direction:column;
     padding:calc(var(--w)*.03) calc(var(--w)*.035);background:linear-gradient(160deg,#fbe7a0,#f1c95a 40%,#e0b043 70%,#f6dd8a)}
   .tcg-estagio{font:italic 700 calc(var(--w)*.032)/1 var(--bj-ui);color:#5b4310;letter-spacing:.02em}
   .tcg-cab{display:flex;align-items:baseline;gap:6px;margin-top:2px}
