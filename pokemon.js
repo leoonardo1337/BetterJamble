@@ -204,6 +204,149 @@
     return c;
   }
 
+  // ------------------------------------------------------------ som
+  // Músicas em arquivo (sons/), se existirem: o tema de batalha no campo, o
+  // do duelo final e a fanfarra da vitória. Os efeitos (golpe, nocaute,
+  // subiu de nível, especial) são gerados na hora com Web Audio, no timbre de
+  // Game Boy: tocam dezenas de vezes numa briga cheia e assim não pesam.
+  // M liga/desliga (a mesma escolha da corrida de patos).
+  const MUSICAS = { campo: 'sons/pokemon-batalha.mp3', duelo: 'sons/pokemon-duelo.mp3', vitoria: 'sons/pokemon-vitoria.mp3' };
+  const buffersMusica = {};
+  let carregandoMusicas = null;
+  function carregarMusicas() {
+    if (carregandoMusicas) return carregandoMusicas;
+    const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!Off || !window.fetch) return (carregandoMusicas = Promise.resolve());
+    const dec = new Off(2, 1, 44100);
+    carregandoMusicas = Promise.all(Object.entries(MUSICAS).map(([k, url]) => fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('sem ' + k))))
+      .then((b) => dec.decodeAudioData(b))
+      .then((b) => { buffersMusica[k] = b; })
+      .catch(() => { /* sem o arquivo: só os efeitos */ })));
+    return carregandoMusicas;
+  }
+  function criarSom() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    let mudo = false;
+    try { mudo = localStorage.getItem('bj-som-corrida') === 'mudo'; } catch (e) { /* sem storage */ }
+    const nada = { musica() {}, golpe() {}, nocaute() {}, subiu() {}, carga() {}, impacto() {}, alternar() {}, fechar() {} };
+    if (!Ctx) return nada;
+    let ac;
+    try { ac = new Ctx(); } catch (e) { return nada; }
+    if (ac.state === 'suspended') ac.resume().catch(() => {});
+    const mestre = ac.createGain(); mestre.gain.value = mudo ? 0 : 0.8; mestre.connect(ac.destination);
+    const efeitos = ac.createGain(); efeitos.gain.value = 0.55; efeitos.connect(mestre);
+    const musicaG = ac.createGain(); musicaG.gain.value = 0.42; musicaG.connect(mestre);
+    let tocando = null, tocandoNome = '';
+    const ruido = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const dd = ruido.getChannelData(0); for (let i = 0; i < dd.length; i++) dd[i] = Math.random() * 2 - 1;
+    const saida = (pan) => {
+      if (!ac.createStereoPanner) return efeitos;
+      const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan || 0)); p.connect(efeitos); return p;
+    };
+    const tom = (tipo, f0, f1, ini, dura, vol, destino) => {
+      const o = ac.createOscillator(); o.type = tipo;
+      o.frequency.setValueAtTime(f0, ini); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), ini + dura);
+      const g = ac.createGain(); g.gain.setValueAtTime(vol, ini); g.gain.exponentialRampToValueAtTime(0.001, ini + dura);
+      o.connect(g); g.connect(destino); o.start(ini); o.stop(ini + dura + 0.02);
+    };
+    const chiado = (ini, dura, vol, freq, destino, tipo) => {
+      const s = ac.createBufferSource(); s.buffer = ruido;
+      const f = ac.createBiquadFilter(); f.type = tipo || 'bandpass'; f.frequency.value = freq; f.Q.value = 1.2;
+      const g = ac.createGain(); g.gain.setValueAtTime(vol, ini); g.gain.exponentialRampToValueAtTime(0.001, ini + dura);
+      s.connect(f); f.connect(g); g.connect(destino); s.start(ini); s.stop(ini + dura + 0.02);
+    };
+    // golpes no máximo ~14 por segundo (numa briga cheia, mais que isso vira barulho)
+    let ultimoGolpe = 0;
+    return {
+      // troca a música (com um corte suave); sem o arquivo, mantém a que está tocando
+      musica(nome, laco = true) {
+        const b = buffersMusica[nome];
+        if (!b || tocandoNome === nome) return;
+        const t = ac.currentTime;
+        if (tocando) {
+          const velho = tocando;
+          velho.g.gain.setTargetAtTime(0, t, 0.25);
+          setTimeout(() => { try { velho.s.stop(); } catch (e) { /* já parou */ } }, 1500);
+        }
+        const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.4); g.connect(musicaG);
+        const s = ac.createBufferSource(); s.buffer = b; s.loop = laco; s.connect(g); s.start(t);
+        tocando = { s, g }; tocandoNome = nome;
+      },
+      golpe(pan) {
+        const t = ac.currentTime;
+        if (t - ultimoGolpe < 0.07) return;
+        ultimoGolpe = t;
+        const o = saida(pan);
+        chiado(t, 0.09, 0.5, 1400 + Math.random() * 900, o);
+        tom('square', 160, 55, t, 0.08, 0.22, o);
+      },
+      // desmaio: o tom descendo com vibrato, como no jogo
+      nocaute(pan) {
+        const t = ac.currentTime, o = saida(pan);
+        const os = ac.createOscillator(); os.type = 'square';
+        os.frequency.setValueAtTime(900, t); os.frequency.exponentialRampToValueAtTime(110, t + 0.55);
+        const lfo = ac.createOscillator(); lfo.frequency.value = 22; const pr = ac.createGain(); pr.gain.value = 40; lfo.connect(pr); pr.connect(os.frequency);
+        const g = ac.createGain(); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+        os.connect(g); g.connect(o); os.start(t); lfo.start(t); os.stop(t + 0.62); lfo.stop(t + 0.62);
+      },
+      // subiu de nível: três notinhas subindo
+      subiu(pan) {
+        const t = ac.currentTime, o = saida(pan);
+        [1047, 1319, 1568].forEach((f, i) => tom('square', f, f, t + i * 0.07, 0.09, 0.07, o));
+      },
+      // carga do especial: um tom subindo e tremendo
+      carga(pan) {
+        const t = ac.currentTime, o = saida(pan);
+        const os = ac.createOscillator(); os.type = 'sawtooth';
+        os.frequency.setValueAtTime(180, t); os.frequency.exponentialRampToValueAtTime(1400, t + 0.85);
+        const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.7); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+        const lfo = ac.createOscillator(); lfo.frequency.value = 18; const pr = ac.createGain(); pr.gain.value = 0.05; lfo.connect(pr); pr.connect(g.gain);
+        os.connect(g); g.connect(o); os.start(t); lfo.start(t); os.stop(t + 0.92); lfo.stop(t + 0.92);
+      },
+      // impacto do especial: estrondo grave com chiado
+      impacto(pan) {
+        const t = ac.currentTime, o = saida(pan);
+        chiado(t, 0.6, 0.7, 900, o, 'lowpass');
+        tom('sine', 110, 30, t, 0.45, 0.6, o);
+      },
+      alternar() {
+        mudo = !mudo;
+        try { localStorage.setItem('bj-som-corrida', mudo ? 'mudo' : 'som'); } catch (e) { /* sem storage */ }
+        mestre.gain.setTargetAtTime(mudo ? 0 : 0.8, ac.currentTime, 0.05);
+      },
+      fechar() {
+        try { mestre.gain.setTargetAtTime(0, ac.currentTime, 0.15); } catch (e) { /* já fechado */ }
+        setTimeout(() => ac.close().catch(() => {}), 700);
+      },
+    };
+  }
+
+  // Plataforma do duelo (Diamond/Pearl): beirada de terra clara com contorno
+  // marrom, grama por cima e a borda da grama em pontas (tufos), em SVG.
+  let urlPlat = '';
+  function urlPlataforma() {
+    if (urlPlat) return urlPlat;
+    const rnd = semente(42), w = 300, cx = 150;
+    let tufos = '';
+    for (let i = 0; i <= 46; i++) {
+      const a = Math.PI * (0.94 + 1.12 * (i / 46));   // da esquerda, por cima, até a direita
+      const x = cx + Math.cos(a) * 138, y = 44 + Math.sin(a) * 25;
+      const alto = 8 + rnd() * 9, larg = 4 + rnd() * 3, cor = i % 3 ? '#5cb840' : '#86d858';
+      tufos += '<path d="M' + (x - larg).toFixed(1) + ' ' + (y + 3).toFixed(1) + 'L' + (x + rnd() * 3 - 1.5).toFixed(1) + ' ' + (y - alto).toFixed(1) + 'L' + (x + larg).toFixed(1) + ' ' + (y + 3).toFixed(1) + 'Z" fill="' + cor + '"/>';
+    }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' 90" preserveAspectRatio="none">'
+      + '<ellipse cx="150" cy="54" rx="146" ry="32" fill="#e8d48a" stroke="#a07a30" stroke-width="3"/>'
+      + '<ellipse cx="150" cy="58" rx="132" ry="22" fill="#d8bc6c"/>'
+      + tufos
+      + '<ellipse cx="150" cy="46" rx="138" ry="26" fill="#6cc84a"/>'
+      + '<ellipse cx="150" cy="43" rx="112" ry="17" fill="#84d860"/>'
+      + '<ellipse cx="135" cy="40" rx="60" ry="7" fill="#9ce672" opacity=".7"/>'
+      + '</svg>';
+    urlPlat = 'data:image/svg+xml,' + encodeURIComponent(svg);
+    return urlPlat;
+  }
+
   // ------------------------------------------------------------ batalha
   const GOLPES = ['usou INVESTIDA', 'usou CHOQUE DO TROVAO', 'usou LANCA-CHAMAS', "usou JATO D'AGUA", 'usou FOLHA NAVALHA', 'usou PSIQUICO', 'usou MORDIDA', 'usou ATAQUE RAPIDO'];
   const CORES = ['#ffd23f', '#ff6b3d', '#4cb3f0', '#7ad151', '#c77dff', '#ff5aa5'];
@@ -238,6 +381,8 @@
       unicos.slice(0, MAX_ANIMADOS).forEach(pedirAnimado);
     }
     carregarSprites();
+    carregarMusicas();
+    let som = null;   // criado no Iniciar (o navegador só deixa tocar depois de um clique)
 
     // ---------------------------------------------------------- saguão
     const saguao = el('div', 'pk-saguao');
@@ -267,7 +412,7 @@
     function pintarSub() {
       const n = pessoas.filter((p) => p.escolheu).length;
       sub.textContent = pessoas.length + ' ' + (pessoas.length === 1 ? 'treinador' : 'treinadores') + ' · '
-        + n + ' ' + (n === 1 ? 'escolheu' : 'escolheram') + ' · quem não escolher fica com um aleatório (?)';
+        + n + ' ' + (n === 1 ? 'escolheu' : 'escolheram') + ' · quem não escolher fica com um aleatório (?) · M liga/desliga o som';
     }
     pessoas.forEach((p) => lista.appendChild(cartao(p)));
     pintarSub();
@@ -359,6 +504,8 @@
     function comecarCampo() {
       if (fase !== 'saguao') return;
       fase = 'campo';
+      som = criarSom();
+      carregarMusicas().then(() => { if (som && fase === 'campo') som.musica('campo'); });
       saguao.classList.add('saindo');
       depois(300, () => saguao.remove());
       cv = el('canvas', 'pk-campo');
@@ -395,6 +542,7 @@
     // quantos ainda estão de pé (conferido a cada golpe: dois golpes no mesmo
     // quadro podiam levar de 3 para 1 e o duelo ficava sem adversário)
     const emPe = () => { let n = 0; for (const x of estado.vivos) if (!x.morto && !x.caindo) n++; return n; };
+    const lado = (p) => (W ? (p.x / W) * 2 - 1 : 0);
     function ferir(p, dano, agora, atacante) {
       if (p.caindo) return;
       const antes = p.hp;
@@ -405,7 +553,7 @@
       // uma fatia menor da barra com o mesmo golpe
       p.hp = Math.max(piso, p.hp - dano * 100 / p.vida);
       p.treme = agora;
-      if (atacante) estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * p.vida)) });
+      if (atacante) { estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * p.vida)) }); if (som) som.golpe(lado(p)); }
       if (p.hp <= 0) derrubar(p, agora, atacante);
     }
     // Recompensa por nocaute: quem derruba alguém sobe de nível, bate 10% mais
@@ -416,11 +564,13 @@
     function derrubar(q, agora, atacante) {
       q.hp = 0; q.caindo = agora;
       estado.ultimoCaido = q;
+      if (som) som.nocaute(lado(q));
       if (atacante && !atacante.caindo) {
         atacante.kos = (atacante.kos || 0) + 1;
         etiquetas.delete(atacante.id);   // a etiqueta passa a mostrar o nível novo
         estado.numeros.push({ x: atacante.x, y: atacante.y - 86 * estado.tam, ini: agora, txt: 'SUBIU!', cor: '#7ad151' });
         narrar('@' + atacante.usuario + ' derrubou @' + q.usuario + '!');
+        if (som) setTimeout(() => som && som.subiu(lado(atacante)), 350);
       } else narrar('@' + q.usuario + ' desmaiou!');
     }
     function iniciarEspecial(p, q, agora) {
@@ -428,6 +578,7 @@
       estado.especial = { de: p, para: q, ini: agora, nome, cor, bateu: false };
       p.olha = q.x > p.x ? 1 : -1;
       narrar('@' + p.usuario + ' usou ' + nome + '!');
+      if (som) som.carga(lado(p));
     }
     function avancarEspecial(agora) {
       const s = estado.especial, t = agora - s.ini;
@@ -446,6 +597,7 @@
       }
       if (!s.bateu && t >= CARGA_MS) {
         s.bateu = true;
+        if (som) som.impacto(lado(s.para));
         const q = s.para;
         q.treme = agora;
         // o vencedor aguenta; e se já só restam 2 de pé, o alvo também aguenta
@@ -814,6 +966,7 @@
     function comecarDuelo() {
       if (fase === 'duelo' || fase === 'vencedor') return;
       fase = 'duelo';
+      if (som) som.musica('duelo');
       // o adversário é quem sobrou de pé (se por algum motivo não houver, o
       // último que caiu; nunca alguém qualquer da lista)
       const resto = estado ? estado.vivos.filter((p) => !p.morto && !p.caindo && !p.ganha) : [];
@@ -823,12 +976,13 @@
       const d = el('div', 'pk-duelo');
       d.innerHTML = '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
         + '<img class="pk-spr pk-spr-op" alt=""><img class="pk-spr pk-spr-eu" alt="">'
-        + '<div class="pk-hp pk-hp-op"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div>'
-        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div>'
+        + '<div class="pk-hp pk-hp-op"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
+        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div></div>'
         + '<div class="pk-texto"><div></div></div>';
       camada.appendChild(d);
       if (cv) { cv.classList.add('saindo'); depois(400, () => cv && cv.remove()); }
       const $ = (s) => d.querySelector(s);
+      d.querySelectorAll('.pk-plat').forEach((pl) => { pl.style.backgroundImage = 'url("' + urlPlataforma() + '")'; });
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
       sprOp.src = animado(outro.dex, false); sprOp.onerror = () => { sprOp.src = estatico(outro.dex); };
       sprEu.src = animado(vencedor.dex, true); sprEu.onerror = () => { sprEu.src = estatico(vencedor.dex); sprEu.classList.add('sem-costas'); };
@@ -862,10 +1016,10 @@
           const limpa = (x) => { x.classList.remove('golpeia', 'golpeia-op', 'apanha'); void x.offsetWidth; };
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
           if (s.forte) d.classList.add('clarao');
-          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); });
+          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) (s.forte ? som.impacto : som.golpe)(s.alvo === 'op' ? 0.4 : -0.4); });
           depois(800, () => { if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(vencedor.vida * s.eu / 100) + '/' + vencedor.vida; } if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
         }
-        if (s.desmaia) sprOp.classList.add('desmaia');
+        if (s.desmaia) { sprOp.classList.add('desmaia'); if (som) som.nocaute(0.4); }
         i++;
         if (i < passos.length) depois(s.desmaia ? 1600 : 2100, tocar);
         else depois(1700, mostrarVencedor);
@@ -877,6 +1031,7 @@
     function mostrarVencedor() {
       if (fase === 'vencedor') return;
       fase = 'vencedor';
+      if (som) som.musica('vitoria', false);
       camada.querySelectorAll('.pk-duelo, .pk-campo, .pk-saguao').forEach((x) => { x.classList.add('saindo'); depois(400, () => x.remove()); });
       const v = el('div', 'pk-vencedor');
       const cf = el('canvas', 'pk-confete');
@@ -906,6 +1061,7 @@
     const tecla = (ev) => {
       if (parado) return;
       if (ev.key === 'Escape') { ev.preventDefault(); op.aoFim && op.aoFim(); }
+      else if ((ev.key === 'm' || ev.key === 'M') && som) som.alternar();
       else if (fase === 'saguao' && (ev.key === 'Enter' || ev.key === ' ') && document.activeElement !== btn) { ev.preventDefault(); comecarCampo(); }
     };
     document.addEventListener('keydown', tecla);
@@ -917,6 +1073,7 @@
       get estado() { return estado; },   // para depurar
       parar() {
         parado = true;
+        if (som) { som.fechar(); som = null; }
         timers.forEach(clearTimeout); timers.clear();
         document.removeEventListener('keydown', tecla);
       },

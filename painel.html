@@ -783,15 +783,24 @@
   .pk-iniciar:focus-visible{outline:3px solid #fff;outline-offset:4px}
   .pk-campo{position:absolute;inset:0;width:100%;height:100%;display:block}
   /* duelo final: tela de batalha do Ruby/Emerald */
-  .pk-duelo{position:absolute;inset:0;background:linear-gradient(#f8f8f8 0,#d8f0f8 40%,#b8e0a0 40%,#a0d088 100%)}
+  /* duelo final: a tela de batalha do Diamond/Pearl/Platinum. Fundo em faixas
+     horizontais (turquesa em cima, verde embaixo), plataformas de grama com a
+     borda em pontas sobre uma beirada de terra (SVG feito no pokemon.js) */
+  .pk-duelo{position:absolute;inset:0;
+    background:
+      repeating-linear-gradient(to bottom,rgba(255,255,255,0) 0 7px,rgba(255,255,255,.12) 7px 9px),
+      linear-gradient(to bottom,
+        #a6f2ea 0%,#7ae6dc 4%,#a6f2ea 6%,#52d6ce 10%,#86e8de 13%,#3ec8c4 18%,#6cdcd4 21%,#36beba 27%,#5ad2ca 31%,
+        #2eb8b6 36%,#4ccac4 39%,#8ce6d6 43%,#c4f4b8 45%,#b6ee8e 46%,#94e06a 50%,#b2ec88 53%,#82d65a 58%,#a2e67a 62%,
+        #74cc4e 68%,#94de6c 72%,#6cc448 78%,#88d864 100%)}
   .pk-duelo.clarao{animation:pk-clarao .5s ease}
   @keyframes pk-clarao{0%,100%{filter:none}20%{filter:brightness(2.6)}}
-  .pk-plat{position:absolute;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,#c8e8a0,#88c060 60%,#70a848);box-shadow:inset 0 -6px 0 #589038}
-  .pk-plat-op{right:10%;top:34%;width:32%;height:9%}
-  .pk-plat-eu{left:6%;bottom:24%;width:38%;height:10%}
+  .pk-plat{position:absolute;background-size:100% 100%;background-repeat:no-repeat}
+  .pk-plat-op{right:3%;top:39%;width:44%;height:16%}
+  .pk-plat-eu{left:-4%;bottom:19%;width:56%;height:18%}
   .pk-spr{position:absolute;transform-origin:50% 100%;object-fit:contain}
-  .pk-spr-op{right:calc(10% + 16% - 110px);top:calc(34% - 175px);width:220px;height:220px}
-  .pk-spr-eu{left:calc(6% + 19% - 150px);bottom:calc(24% + 10% - 40px);width:300px;height:300px}
+  .pk-spr-op{right:calc(3% + 22% - 110px);top:calc(39% + 7% - 205px);width:220px;height:220px}
+  .pk-spr-eu{left:calc(-4% + 28% - 160px);bottom:calc(19% + 7%);width:320px;height:320px}
   .pk-spr-eu.sem-costas{transform:scaleX(-1)}
   .pk-spr.golpeia{animation:pk-golpe-eu .45s ease}
   .pk-spr.golpeia-op{animation:pk-golpe-op .45s ease}
@@ -800,17 +809,22 @@
   .pk-spr.apanha{animation:pk-pisca .6s steps(1)}
   @keyframes pk-pisca{0%,30%,60%{opacity:0}15%,45%,75%,100%{opacity:1}}
   .pk-spr.desmaia{transition:transform .6s ease-in,opacity .6s ease;transform:translateY(140px);opacity:0}
-  .pk-hp{position:absolute;background:#f8f8d8;border:4px solid #506858;border-radius:14px 4px 14px 4px;padding:14px 18px 12px;
-    box-shadow:5px 5px 0 #283828;min-width:300px}
-  .pk-hp-op{left:6%;top:9%;width:min(36%,440px)}
-  .pk-hp-eu{right:6%;bottom:32%;width:min(38%,460px)}
-  .pk-hp-l{display:flex;justify-content:space-between;gap:10px;font-size:clamp(11px,1.3vw,15px);margin-bottom:10px}
+  /* caixas de HP: prateadas, encostadas na borda da tela e com a ponta
+     cortada em diagonal; o contorno escuro é uma sombra sem desfoque no
+     elemento de fora (o clip-path do de dentro cortaria uma borda comum) */
+  .pk-hp{position:absolute;filter:drop-shadow(0 3px 0 #383838) drop-shadow(3px 0 0 #505050) drop-shadow(-3px 0 0 #505050) drop-shadow(0 -3px 0 #505050)}
+  .pk-hp-caixa{background:linear-gradient(#fcfcfc 0,#ececec 45%,#d4d4d4 100%);padding:12px 40px 12px 18px}
+  .pk-hp-op{left:0;top:7%;width:min(52%,560px)}
+  .pk-hp-op .pk-hp-caixa{clip-path:polygon(0 0,91% 0,100% 100%,0 100%)}
+  .pk-hp-eu{right:0;bottom:24%;width:min(52%,560px)}
+  .pk-hp-eu .pk-hp-caixa{clip-path:polygon(0 0,100% 0,100% 100%,7% 100%);padding:12px 18px 12px 52px}
+  .pk-hp-l{display:flex;justify-content:space-between;gap:10px;font-size:clamp(12px,1.5vw,18px);color:#404040;margin-bottom:6px;text-shadow:1px 1px 0 #b8b8b8}
   .pk-hp-l .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pk-hp-p{font-size:10px;color:#606060;margin-bottom:8px}
-  .pk-hp-b{display:flex;align-items:center;gap:8px;font-size:10px;color:#f8b030}
-  .pk-hp-t{flex:1;height:12px;background:#506858;border-radius:6px;padding:2px}
-  .pk-hp-v{width:100%;height:100%;border-radius:4px;background:#58d080;transition:width .6s steps(14),background .2s}
-  .pk-hp-num{font-size:12px;text-align:right;margin-top:8px}
+  .pk-hp-p{font-size:9px;color:#707070;margin-bottom:6px}
+  .pk-hp-b{display:flex;align-items:center;gap:6px;margin-left:auto;width:78%;background:#404040;border-radius:4px;padding:3px 4px;font-size:10px;color:#f8b800}
+  .pk-hp-t{flex:1;height:9px;background:#203820;border-radius:3px;padding:1px}
+  .pk-hp-v{width:100%;height:100%;border-radius:2px;background:#48e048;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);transition:width .6s steps(14),background .2s}
+  .pk-hp-num{width:fit-content;margin:6px 0 0 auto;font-size:clamp(12px,1.4vw,16px);color:#404040;background:#f4f4f4;border:2px solid #9a9a9a;border-radius:4px;padding:5px 12px}
   .pk-texto{position:absolute;left:0;right:0;bottom:0;height:22%;background:#283048;border-top:6px solid #c84038;padding:14px;display:flex}
   .pk-texto div{flex:1;background:#f8f8f8;border:4px solid #a0a8b8;border-radius:8px;font-size:clamp(13px,1.6vw,18px);line-height:1.9;padding:14px 22px}
   /* vencedor */
