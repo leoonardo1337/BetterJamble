@@ -224,7 +224,8 @@
   function batalhar(op) {
     const camada = op.camada;
     let fase = 'saguao', parado = false;
-    const pessoas = op.participantes.map((p) => ({ ...p, escolheu: !!p.dex, dex: p.dex || dexDoId(p.id) }));
+    // vida: HP máximo de cada um (100 a 250, vem do painel pela fatia da urna)
+    const pessoas = op.participantes.map((p) => ({ ...p, escolheu: !!p.dex, dex: p.dex || dexDoId(p.id), vida: Math.max(1, Math.round(p.vida || 100)) }));
     const vencedor = pessoas.find((p) => p.id === op.vencedorId) || pessoas[0];
     const timers = new Set();
     const depois = (ms, fn) => { const t = setTimeout(() => { timers.delete(t); if (!parado) fn(); }, ms); timers.add(t); return t; };
@@ -250,7 +251,7 @@
     function cartao(p) {
       const c = el('div', 'pk-card' + (p.id === vencedor.id ? '' : ''));
       const im = el('img', 'pk-card-img'); im.alt = ''; im.loading = 'lazy'; im.width = 64; im.height = 64;
-      c.append(im, el('div', 'pk-card-nome', '@' + p.usuario), el('div', 'pk-card-poke'));
+      c.append(im, el('div', 'pk-card-nome', '@' + p.usuario), el('div', 'pk-card-poke'), el('div', 'pk-card-hp', 'HP ' + p.vida));
       cards.set(p.id, c);
       pintarCartao(p);
       return c;
@@ -366,8 +367,10 @@
       const A = arena();
       // com muita gente os Pokémon diminuem (mas não somem)
       const tam = Math.max(0.5, Math.min(1, Math.sqrt(50 / Math.max(1, pessoas.length))));
+      // o dano acompanha a vida média: a briga dura o mesmo, quem tem mais vida aguenta mais
+      const vidaMedia = pessoas.reduce((a, p) => a + p.vida, 0) / Math.max(1, pessoas.length);
       estado = {
-        t0: performance.now(), ultimo: performance.now(), log: [], faiscas: [], numeros: [], especial: null, tam,
+        t0: performance.now(), ultimo: performance.now(), log: [], faiscas: [], numeros: [], especial: null, tam, escalaDano: vidaMedia / 100,
         vivos: pessoas.map((p) => ({
           ...p, hp: 1, x: alea(A.x0 + 20, A.x1 - 20), y: alea(A.y0 + 30, A.y1 - 10), vx: 0, vy: 0,
           vel: alea(70, 105) * (0.7 + 0.3 * tam), alvo: null, trocaAlvo: 0, recarga: alea(600, 1600), fase: alea(0, 6.28),
@@ -398,9 +401,11 @@
       // o vencedor sorteado nunca desmaia; e com 2 de pé ninguém mais cai no
       // campo: os dois últimos se resolvem no duelo final
       const piso = p.ganha ? 0.22 : emPe() <= 2 ? 0.05 : 0;
-      p.hp = Math.max(piso, p.hp - dano);
+      // o dano vem em pontos de uma vida de 100: quem tem mais vida perde
+      // uma fatia menor da barra com o mesmo golpe
+      p.hp = Math.max(piso, p.hp - dano * 100 / p.vida);
       p.treme = agora;
-      if (atacante) estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * 120)) });
+      if (atacante) estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * p.vida)) });
       if (p.hp <= 0) derrubar(p, agora, atacante);
     }
     // Recompensa por nocaute: quem derruba alguém sobe de nível, bate 10% mais
@@ -490,8 +495,8 @@
           if (agora > p.recarga) {
             p.investida = agora;
             p.recarga = agora + alea(700, 1300) * (1 - 0.08 * bonus(p));
-            ferir(q, alea(0.1, 0.2) * furia * (1 + 0.1 * bonus(p)) * (q.ganha ? 0.6 : 1), agora, p);
-            ferir(p, alea(0.02, 0.05) * furia * (p.ganha ? 0.6 : 1), agora, null);
+            ferir(q, alea(0.1, 0.2) * e.escalaDano * furia * (1 + 0.1 * bonus(p)) * (q.ganha ? 0.6 : 1), agora, p);
+            ferir(p, alea(0.02, 0.05) * e.escalaDano * furia * (p.ganha ? 0.6 : 1), agora, null);
             q.vx += (dx / d) * 260; q.vy += (dy / d) * 260;
             e.faiscas.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - 30 * e.tam, ini: agora, cor: escolherDe(CORES) });
             if (Math.random() < 0.3) narrar('@' + p.usuario + ' ' + escolherDe(GOLPES) + '!');
@@ -702,7 +707,7 @@
       for (let yy = -H; yy < H; yy += 18) { ctx.beginPath(); ctx.moveTo(cx0, yy); ctx.lineTo(W, yy + coluna()); ctx.lineTo(W, yy + coluna() + 8); ctx.lineTo(cx0, yy + 8); ctx.closePath(); ctx.fill(); }
       ctx.fillStyle = '#283048'; ctx.fillRect(cx0, 0, 4, H);
       caixaTexto(x0, y0, rw, alt);
-      const vivos = e.vivos.filter((p) => !p.morto && !p.caindo).sort((a, b) => b.hp - a.hp || (b.kos || 0) - (a.kos || 0));
+      const vivos = e.vivos.filter((p) => !p.morto && !p.caindo).sort((a, b) => b.hp * b.vida - a.hp * a.vida || (b.kos || 0) - (a.kos || 0));
       ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
       ctx.font = '11px "Press Start 2P",monospace'; ctx.fillStyle = '#383838';
       ctx.fillText('VIVOS: ' + vivos.length, x0 + 16, y0 + 24);
@@ -725,7 +730,7 @@
         ctx.fillStyle = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838';
         ctx.fillRect(bx + 19, by + 1, Math.max(0, (bw - 20) * p.hp), 4);
         ctx.fillStyle = '#383838'; ctx.font = '8px "Press Start 2P",monospace'; ctx.textAlign = 'right';
-        ctx.fillText(Math.max(1, Math.round(p.hp * 100)) + '%', x0 + rw - 14, by + 4);
+        ctx.fillText(String(Math.max(1, Math.round(p.hp * p.vida))), x0 + rw - 14, by + 4);   // HP em pontos
         ctx.textAlign = 'left';
       });
       if (vivos.length > mostra) {
@@ -819,7 +824,7 @@
       d.innerHTML = '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
         + '<img class="pk-spr pk-spr-op" alt=""><img class="pk-spr pk-spr-eu" alt="">'
         + '<div class="pk-hp pk-hp-op"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div>'
-        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num">120/120</div></div>'
+        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div>'
         + '<div class="pk-texto"><div></div></div>';
       camada.appendChild(d);
       if (cv) { cv.classList.add('saindo'); depois(400, () => cv && cv.remove()); }
@@ -829,6 +834,7 @@
       sprEu.src = animado(vencedor.dex, true); sprEu.onerror = () => { sprEu.src = estatico(vencedor.dex); sprEu.classList.add('sem-costas'); };
       $('.pk-hp-op .pk-hp-l span:last-child').textContent = nivel(outro);
       $('.pk-hp-eu .pk-hp-l span:last-child').textContent = nivel(vencedor);
+      $('.pk-hp-num').textContent = vencedor.vida + '/' + vencedor.vida;
       $('.pk-hp-op .n').textContent = '@' + outro.usuario; $('.pk-hp-op .pk-hp-p').textContent = nomeDe(outro.dex);
       $('.pk-hp-eu .n').textContent = '@' + vencedor.usuario; $('.pk-hp-eu .pk-hp-p').textContent = nomeDe(vencedor.dex);
       const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
@@ -857,7 +863,7 @@
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
           if (s.forte) d.classList.add('clarao');
           depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); });
-          depois(800, () => { if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(1.2 * s.eu) + '/120'; } if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
+          depois(800, () => { if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(vencedor.vida * s.eu / 100) + '/' + vencedor.vida; } if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
         }
         if (s.desmaia) sprOp.classList.add('desmaia');
         i++;

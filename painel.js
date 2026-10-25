@@ -2985,9 +2985,17 @@
     embaralhar(lista);
     const p = { overlay: camada, pecas: [], acabou: false, fecha: 0, rede: 0, raf: 0 };
     palco = p;
+    // Vida proporcional (sorteio por quantidade): piso de 100 HP e sobe com a
+    // fatia da urna, comparada com a pessoa do meio (mediana) — cada vez mais
+    // devagar, até 250. Na mediana ~150; 3x a mediana ~200; 8x ou mais, 250.
+    // Em "1 por pessoa", todo mundo com 100. Não muda quem ganha (já sorteado).
+    const bilhetes = lista.map((x) => Number(x.bilhetes) || 1).sort((a, b) => a - b);
+    const mediana = bilhetes.length ? bilhetes[Math.floor((bilhetes.length - 1) / 2)] : 1;
+    const vidaDe = (x) => (sorteio.modo !== 'peso' ? 100
+      : Math.round(Math.min(250, 100 + 50 * Math.log2(1 + (Number(x.bilhetes) || 1) / Math.max(1, mediana)))));
     const ctrl = BJPokemon.batalhar({
       camada,
-      participantes: lista.map((x) => ({ id: x.id, usuario: x.usuario || '?', dex: escolhaPokemon(x.id, x.usuario) })),
+      participantes: lista.map((x) => ({ id: x.id, usuario: x.usuario || '?', dex: escolhaPokemon(x.id, x.usuario), vida: vidaDe(x) })),
       vencedorId: vencedor.id,
       aoFim: () => {
         if (p.acabou) return;
