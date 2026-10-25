@@ -1013,24 +1013,45 @@
       // final é sempre do vencedor, esteja ele em cima ou embaixo. Quem está
       // abaixo da metade pode se curar (uma vez por lado, 25% de chance a cada
       // vez); quem perde nunca cai antes do fim e o vencedor nunca chega a zero.
-      const ACOES = 8;
-      const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false };
-      const passos = [{ txt: 'Restam 2! O duelo final vai começar!' }];
-      for (let k = 0; k < ACOES; k++) {
-        const quem = k % 2 === 0 ? ladoPerde : ladoGanha, outro = quem === 'op' ? 'eu' : 'op', nome = nomeNo(quem);
-        const ultima = k === ACOES - 1;
-        if (!ultima && !curou[quem] && hp[quem] < 50 && Math.random() < 0.25) {
-          curou[quem] = true;
-          hp[quem] = Math.min(100, hp[quem] + Math.round(alea(30, 45)));
-          passos.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
-          continue;
+      // Duelo igual para os dois: mesma vida (barra cheia), mesmo dano por
+      // golpe (22 a 35%), mesmo piso (8%) e mesma chance de cura (12%, abaixo
+      // da metade, uma vez por lado). O golpe final também é um golpe normal:
+      // ele só sai quando quem perde está ao alcance dele. Até lá os dois seguem
+      // trocando golpes (8 a 10 ações de 1,8 s: ~20 s).
+      const ACOES = 8, MAX_ACOES = 12, DANO_MIN = 22, DANO_MAX = 35;
+      const roteiro = () => {
+        const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false };
+        const lista = [{ txt: 'Restam 2! O duelo final vai começar!' }];
+        for (let k = 0; k < MAX_ACOES; k++) {
+          const quem = k % 2 === 0 ? ladoPerde : ladoGanha, outro = quem === 'op' ? 'eu' : 'op', nome = nomeNo(quem);
+          // golpe final: a vez do vencedor, já passou do mínimo de ações e
+          // quem perde está ao alcance de um golpe normal
+          const final = quem === ladoGanha && k >= ACOES - 1 && hp[ladoPerde] <= DANO_MAX;
+          if (!final && k < ACOES && !curou[quem] && hp[quem] < 50 && Math.random() < 0.12) {
+            curou[quem] = true;
+            hp[quem] = Math.min(100, hp[quem] + Math.round(alea(30, 45)));
+            lista.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
+            continue;
+          }
+          if (final) hp[ladoPerde] = 0;
+          else hp[outro] = Math.max(8, hp[outro] - Math.round(alea(DANO_MIN, DANO_MAX)));
+          // no duelo não tem especial: os dois só usam golpes normais, até o último
+          lista.push({ txt: nome + ' ' + escolherDe(GOLPES) + '!', alvo: outro, [outro]: hp[outro] });
+          if (final) {
+            lista.push({ txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true });
+            return lista;
+          }
         }
-        // no duelo não tem especial: os dois só usam golpes normais, até o último
-        if (ultima) hp[ladoPerde] = 0;
-        else hp[outro] = Math.max(outro === ladoPerde ? 15 : 8, hp[outro] - Math.round(alea(16, 30)));
-        passos.push({ txt: nome + ' ' + escolherDe(GOLPES) + '!', alvo: outro, [outro]: hp[outro] });
+        return null;   // não fechou dentro do limite de ações: sorteia outro
+      };
+      let passos = null;
+      for (let tentativa = 0; !passos && tentativa < 500; tentativa++) passos = roteiro();
+      if (!passos) {
+        // quase impossível (500 roteiros seguidos sem servir): vai um sem a regra do último golpe
+        passos = [{ txt: 'Restam 2! O duelo final vai começar!' },
+          { txt: nomeNo(ladoGanha) + ' ' + escolherDe(GOLPES) + '!', alvo: ladoPerde, [ladoPerde]: 0 },
+          { txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true }];
       }
-      passos.push({ txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true });
       let i = 0;
       const tocar = () => {
         if (parado) return;
@@ -1065,7 +1086,7 @@
         }
         if (s.desmaia) { (ladoPerde === 'op' ? sprOp : sprEu).classList.add('desmaia'); if (som) som.nocaute(ladoPerde === 'op' ? 0.4 : -0.4); }
         i++;
-        if (i < passos.length) depois(s.desmaia ? 1600 : 2100, tocar);
+        if (i < passos.length) depois(s.desmaia ? 1600 : 1800, tocar);
         else depois(1700, mostrarVencedor);
       };
       depois(450, tocar);
