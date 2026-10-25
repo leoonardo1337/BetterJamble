@@ -2948,20 +2948,38 @@
   function escolhaPokemon(id, usuario) {
     return (id && escolhasPokemon.id[id]) || escolhasPokemon.nome[String(usuario || '').toLowerCase()] || 0;
   }
+  // Só quem está na urna do sorteio pode escolher: com o saguão aberto, quem
+  // está na batalha; senão, quem está na urna agora (mesmo tipo, período e
+  // filtro de gema da tela Sorteio, sem os que ficaram de fora).
+  function estaNaUrna(id, usuario) {
+    const u = String(usuario || '').toLowerCase();
+    const bate = (r) => (id && r.id === id) || (u && String(r.usuario || '').toLowerCase() === u);
+    const base = baseDaUrna();
+    return !!base && calcularUrna(base).lista.some(bate);
+  }
   function comandoPokemon(m) {
     const r = /^\s*!pok[eé]mon(?:\s+(.*))?$/i.exec((m && m.texto) || '');
     if (!r || !window.BJPokemon) return;
-    const dex = BJPokemon.buscar(r[1]);
+    // "!pokemon pikachu por favor": tenta o texto todo, depois as duas e a
+    // primeira palavra
+    const palavras = String(r[1] || '').trim().split(/\s+/);
+    const dex = BJPokemon.buscar(r[1]) || BJPokemon.buscar(palavras.slice(0, 2).join(' ')) || BJPokemon.buscar(palavras[0]);
     if (!dex) return;
-    if (m.userId) escolhasPokemon.id[m.userId] = dex;
-    if (m.usuario) escolhasPokemon.nome[String(m.usuario).toLowerCase()] = dex;
-    // não deixa crescer sem fim: fica com as 3000 escolhas mais recentes
+    if (batalhaAtiva && batalhaAtiva.fase === 'saguao') {
+      if (!batalhaAtiva.escolher(m.userId, m.usuario, dex)) return;   // não está nesta batalha
+    } else if (!estaNaUrna(m.userId, m.usuario)) return;
+    // apaga e grava de novo: assim a escolha vai para o fim (a mais recente)
+    // e não é a primeira a sair quando passar do limite
+    const chave = { id: m.userId, nome: String(m.usuario || '').toLowerCase() };
     for (const k of ['id', 'nome']) {
+      if (!chave[k]) continue;
+      delete escolhasPokemon[k][chave[k]];
+      escolhasPokemon[k][chave[k]] = dex;
+      // não deixa crescer sem fim: fica com as 3000 escolhas mais recentes
       const ch = Object.keys(escolhasPokemon[k]);
       if (ch.length > 3000) ch.slice(0, ch.length - 3000).forEach((x) => delete escolhasPokemon[k][x]);
     }
     try { localStorage.setItem(LS_POKEMON, JSON.stringify(escolhasPokemon)); } catch {}
-    if (batalhaAtiva) batalhaAtiva.escolher(m.userId, m.usuario, dex);
   }
 
   // Igual à corrida de patos: a batalha toma a janela inteira. Antes dela, o
@@ -3526,7 +3544,8 @@
 
   function receberChat(lista) {
     if (!Array.isArray(lista)) return;
-    lista.forEach(comandoPokemon);
+    // um erro no comando não pode atrapalhar a confirmação de presença
+    lista.forEach((m) => { try { comandoPokemon(m); } catch (e) { /* ignora a mensagem */ } });
     if (!presenca) return;
     for (const m of lista) {
       const ehDele = (presenca.userId && m.userId === presenca.userId)
