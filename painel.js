@@ -3399,14 +3399,20 @@
     // mexe no card) ele fica desligado de vez. Antes, tirar o mouse religava a
     // animação e o card mostrava o verso e girava de novo.
     c.addEventListener('animationend', (e) => { if (e.animationName === 'tcgVirar') c.classList.add('sem-giro'); });
-    // inclina com o mouse; o reflexo e o holográfico acompanham
-    c.addEventListener('mousemove', (e) => {
-      const r = c.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    // inclina com o mouse; o reflexo e o holográfico acompanham. No máximo uma
+    // atualização por quadro (o mouse manda bem mais eventos que isso).
+    let mouse = null, pedido = 0;
+    const aplicar = () => {
+      pedido = 0;
+      if (!mouse) return;
+      const r = c.getBoundingClientRect(), px = (mouse.x - r.left) / r.width, py = (mouse.y - r.top) / r.height;
       c.classList.add('mexendo', 'sem-giro');
       c.style.transform = 'rotateY(' + ((px - 0.5) * 22).toFixed(1) + 'deg) rotateX(' + ((0.5 - py) * 22).toFixed(1) + 'deg)';
+      c.style.setProperty('--px', px.toFixed(3)); c.style.setProperty('--py', py.toFixed(3));
       c.style.setProperty('--mx', (px * 100).toFixed(1) + '%'); c.style.setProperty('--my', (py * 100).toFixed(1) + '%');
-    });
-    c.addEventListener('mouseleave', () => { c.classList.remove('mexendo'); c.style.transform = ''; });
+    };
+    c.addEventListener('mousemove', (e) => { mouse = { x: e.clientX, y: e.clientY }; if (!pedido) pedido = requestAnimationFrame(aplicar); });
+    c.addEventListener('mouseleave', () => { mouse = null; c.classList.remove('mexendo'); c.style.transform = ''; });
     return c;
   }
 
