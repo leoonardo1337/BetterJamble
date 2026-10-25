@@ -1021,11 +1021,10 @@
           passos.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
           continue;
         }
-        let forte = false;
-        if (ultima) { hp[ladoPerde] = 0; forte = Math.random() < 0.3; }
+        // no duelo não tem especial: os dois só usam golpes normais, até o último
+        if (ultima) hp[ladoPerde] = 0;
         else hp[outro] = Math.max(outro === ladoPerde ? 15 : 8, hp[outro] - Math.round(alea(16, 30)));
-        const golpe = forte ? 'usou ' + escolherDe(ESPECIAIS)[0] : escolherDe(GOLPES);
-        passos.push({ txt: nome + ' ' + golpe + '!', alvo: outro, [outro]: hp[outro], forte });
+        passos.push({ txt: nome + ' ' + escolherDe(GOLPES) + '!', alvo: outro, [outro]: hp[outro] });
       }
       passos.push({ txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true });
       let i = 0;
@@ -1040,9 +1039,8 @@
           // uma animação por vez em cada sprite (duas classes juntas, só uma tocava)
           const limpa = (x) => { x.classList.remove('golpeia', 'golpeia-op', 'apanha'); void x.offsetWidth; };
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
-          if (s.forte) d.classList.add('clarao');
-          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) (s.forte ? som.impacto : som.golpe)(s.alvo === 'op' ? 0.4 : -0.4); });
-          depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
+          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) som.golpe(s.alvo === 'op' ? 0.4 : -0.4); });
+          depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); });
         }
         if (s.cura) {
           // cura: brilho verde subindo em volta do Pokémon e a barra enchendo
