@@ -307,7 +307,7 @@
       cv.width = W; cv.height = H;
       ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
       E = Math.max(2, Math.round(Math.min(W, H) / 260));
-      mapa = fazerMapa(Math.ceil(W / E), Math.ceil(H / E));
+      mapa = fazerMapa(Math.ceil((W - coluna()) / E), Math.ceil(H / E));   // o campo é só a parte da esquerda
       etiquetas.clear(); sombra = null;
     }
     // Etiqueta pronta de cada Pokémon (caixa bege, borda e o @): um drawImage
@@ -348,9 +348,12 @@
       sombra = { c, rx: rx + 1, ry: ry + 1 };
       return sombra;
     }
-    // à direita fica o ranking de quem está de pé: o campo termina antes dele
+    // A tela é dividida: à esquerda o campo; à direita a coluna do ranking
+    // de quem está de pé, com fundo próprio (nada por cima do campo).
     const larguraRanking = () => Math.round(Math.max(200, Math.min(300, W * 0.22)));
-    const arena = () => ({ x0: 22 * E, y0: 30 * E, x1: W - larguraRanking() - 30, y1: H - 18 * E });
+    const coluna = () => larguraRanking() + 24;
+    const meioCampo = () => (W - coluna()) / 2;
+    const arena = () => ({ x0: 22 * E, y0: 30 * E, x1: W - coluna() - 22 * E, y1: H - 18 * E });
 
     function comecarCampo() {
       if (fase !== 'saguao') return;
@@ -690,7 +693,14 @@
     // para o mais machucado, com o ícone do Pokémon, o @, a barrinha e o %.
     // Cabe o que der na altura; o resto vira "+N".
     function desenharRanking(e) {
-      const rw = larguraRanking(), x0 = W - rw - 12, y0 = 70, alt = H - y0 - 14;
+      const rw = larguraRanking(), cx0 = W - coluna(), x0 = cx0 + 12, y0 = 12, alt = H - 24;
+      // fundo da coluna: o azul dos menus do jogo, com uma borda separando do campo
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#5878b8'); g.addColorStop(1, '#384c88');
+      ctx.fillStyle = g; ctx.fillRect(cx0, 0, coluna(), H);
+      ctx.fillStyle = 'rgba(255,255,255,.06)';
+      for (let yy = -H; yy < H; yy += 18) { ctx.beginPath(); ctx.moveTo(cx0, yy); ctx.lineTo(W, yy + coluna()); ctx.lineTo(W, yy + coluna() + 8); ctx.lineTo(cx0, yy + 8); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#283048'; ctx.fillRect(cx0, 0, 4, H);
       caixaTexto(x0, y0, rw, alt);
       const vivos = e.vivos.filter((p) => !p.morto && !p.caindo).sort((a, b) => b.hp - a.hp || (b.kos || 0) - (a.kos || 0));
       ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
@@ -769,11 +779,11 @@
       ctx.font = '16px "Press Start 2P",monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const txt = 'RESTAM ' + restam;
       const tw = ctx.measureText(txt).width + 40;
-      caixaTexto(W / 2 - tw / 2, 14, tw, 46);
-      ctx.fillStyle = '#383838'; ctx.fillText(txt, W / 2, 38);
-      // narração embaixo, à esquerda (a direita é do ranking)
+      caixaTexto(meioCampo() - tw / 2, 14, tw, 46);
+      ctx.fillStyle = '#383838'; ctx.fillText(txt, meioCampo(), 38);
+      // narração embaixo, à esquerda do campo
       if (e.log.length) {
-        const lw = Math.min(520, (W - larguraRanking()) * 0.6), lh = 26 + e.log.length * 22;
+        const lw = Math.min(560, (W - coluna()) * 0.62), lh = 26 + e.log.length * 22;
         caixaTexto(16, H - lh - 14, lw, lh);
         ctx.font = '11px "Press Start 2P",monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = '#383838';
         // cada letra da fonte de jogo tem 11 px: corta na largura da caixa
@@ -786,7 +796,7 @@
         const k = Math.min(1, (agora - e.acabou) / 300);
         ctx.font = '22px "Press Start 2P",monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.globalAlpha = k; ctx.lineWidth = 7; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ffd84a';
-        ctx.strokeText('RESTAM 2! DUELO FINAL!', W / 2, H / 2); ctx.fillText('RESTAM 2! DUELO FINAL!', W / 2, H / 2);
+        ctx.strokeText('RESTAM 2! DUELO FINAL!', meioCampo(), H / 2); ctx.fillText('RESTAM 2! DUELO FINAL!', meioCampo(), H / 2);
         ctx.globalAlpha = 1;
         if (agora - e.acabou > 1800) comecarDuelo();
       }
