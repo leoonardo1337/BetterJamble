@@ -82,8 +82,36 @@
   // espera a mensagem do vencedor e cada segundo conta.
   window.addEventListener('bj:chat', (ev) => {
     const lista = ev && ev.detail && ev.detail.mensagens;
-    if (painelAberto && lista && lista.length) enviar('painel-chat', { mensagens: lista });
+    if (!lista || !lista.length) return;
+    if (painelAberto) enviar('painel-chat', { mensagens: lista });
+    else guardarPendentes(lista);
   });
+
+  // Comandos "!pokemon" que chegam com o painel fechado: a aba guarda (os
+  // últimos 300, de até 12 h, também no localStorage para sobreviver a uma
+  // recarga) e entrega quando o painel abrir. Vão marcados como pendentes:
+  // o painel só usa para a escolha do Pokémon, nunca como presença.
+  const LS_PENDENTES = 'jamble:pokemon-pendentes';
+  const MAX_PENDENTES = 300, IDADE_PENDENTES = 12 * 3600 * 1000;
+  const ehComandoPokemon = (m) => /^\s*!pok[eé]mon(\s|$)/i.test(String((m && m.texto) || ''));
+  let pendentes = [];
+  try { pendentes = JSON.parse(localStorage.getItem(LS_PENDENTES) || '[]') || []; } catch { pendentes = []; }
+  function salvarPendentes() { try { localStorage.setItem(LS_PENDENTES, JSON.stringify(pendentes)); } catch {} }
+  function guardarPendentes(lista) {
+    const novos = lista.filter(ehComandoPokemon)
+      .map((m) => ({ id: m.id, userId: m.userId, usuario: m.usuario, texto: m.texto, t: m.t || Date.now() }));
+    if (!novos.length) return;
+    const limite = Date.now() - IDADE_PENDENTES;
+    pendentes = pendentes.concat(novos).filter((m) => m.t >= limite).slice(-MAX_PENDENTES);
+    salvarPendentes();
+  }
+  function entregarPendentes() {
+    const limite = Date.now() - IDADE_PENDENTES;
+    const lista = pendentes.filter((m) => m.t >= limite);
+    pendentes = [];
+    salvarPendentes();
+    if (lista.length) enviar('painel-chat', { mensagens: lista, pendentes: true });
+  }
 
   // ---------------------------------------------------------------- recepção
   window.addEventListener('message', (ev) => {
@@ -102,6 +130,7 @@
         painelAberto = true;
         ultimoSeq = 0;
         agendar(true);
+        entregarPendentes();
         break;
       case 'painel-fechou':
         painelAberto = false;
@@ -114,6 +143,7 @@
         agendar(true);
         // O painel pode ter aberto depois do buraco: ele precisa saber mesmo assim.
         if (lacunas.length) enviar('painel-lacuna', { lista: lacunas });
+        entregarPendentes();
         break;
       case 'escopo':
         if (api) api.definirEscopo(p.escopo);

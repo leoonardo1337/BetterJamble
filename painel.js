@@ -171,6 +171,7 @@
         absorver(payload);
         desenhar();
         marcarConexao('ligado');
+        aplicarPokemonPendentes();
         break;
       case 'painel-sorteio':
         mostrarSorteio(payload);
@@ -184,7 +185,10 @@
         desenharResgate();
         break;
       case 'painel-chat':
-        receberChat(payload && payload.mensagens);
+        // comandos "!pokemon" guardados pela aba com o painel fechado: só
+        // escolha de Pokémon (são antigos, nunca contam como presença)
+        if (payload && payload.pendentes) { pokemonPendentes.push(...(payload.mensagens || [])); aplicarPokemonPendentes(); }
+        else receberChat(payload && payload.mensagens);
         break;
       case 'painel-urna':
         if (payload && payload.escopo) {
@@ -201,6 +205,7 @@
           }
         }
         desenharSorteio();
+        aplicarPokemonPendentes();
         break;
       case 'painel-pulso':
         ultimoPulso = Date.now();
@@ -2956,6 +2961,22 @@
     const bate = (r) => (id && r.id === id) || (u && String(r.usuario || '').toLowerCase() === u);
     const base = baseDaUrna();
     return !!base && calcularUrna(base).lista.some(bate);
+  }
+  // Comandos que chegaram com o painel fechado esperam a urna carregar (sem
+  // ela não dá para saber quem pode escolher) e entram na ordem em que foram
+  // digitados. Se a urna não chegar em 30 s, são descartados.
+  const pokemonPendentes = [];
+  let pendentesDesde = 0;
+  function aplicarPokemonPendentes() {
+    if (!pokemonPendentes.length) { pendentesDesde = 0; return; }
+    if (!pendentesDesde) pendentesDesde = Date.now();
+    if (!dados || !baseDaUrna()) {
+      if (Date.now() - pendentesDesde > 30000) pokemonPendentes.length = 0;
+      return;
+    }
+    const lista = pokemonPendentes.splice(0).sort((a, b) => (a.t || 0) - (b.t || 0));
+    pendentesDesde = 0;
+    lista.forEach((m) => { try { comandoPokemon(m); } catch (e) { /* ignora a mensagem */ } });
   }
   function comandoPokemon(m) {
     const r = /^\s*!pok[eé]mon(?:\s+(.*))?$/i.exec((m && m.texto) || '');
