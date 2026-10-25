@@ -761,8 +761,12 @@
     if (!isFinite(inicio)) return [];
     // a live inteira, do começo até agora: em lives longas as janelas só ficam
     // mais estreitas no gráfico. Live encerrada: termina no fim dela, mesmo
-    // que a pessoa abra a página dias depois.
-    const agora = a.encerradaEm ? Math.min(Date.now(), a.encerradaEm) : Date.now();
+    // que a pessoa abra a página dias depois. Sem fim marcado mas sem nada novo
+    // há mais de 30 min: termina no último dado (senão uma live de 2 h aberta
+    // no dia seguinte virava uma linha reta de 16 h e o começo sumia).
+    const ultimoDado = Math.max(am.length ? am[am.length - 1][0] : 0, mins.length ? mins[mins.length - 1][0] + 60000 : 0);
+    const agora = a.encerradaEm ? Math.min(Date.now(), a.encerradaEm)
+      : ultimoDado && Date.now() - ultimoDado > 30 * 60000 ? ultimoDado : Date.now();
     const t0 = Math.floor(inicio / passo) * passo;
     const lista = [];
     let ia = 0;

@@ -375,6 +375,19 @@
     try { localStorage.setItem(LS, JSON.stringify(db)); } catch {}
   }
 
+  // O fim vem do gems-core (título "Live encerrada" ou is_over). O aviso
+  // bj:live-status sai uma vez só: se ele se perdeu (aba fechada antes de
+  // gravar, armazenamento cheio...), a live nunca fechava aqui e o gráfico
+  // seguia até agora. Por isso o estado dele é conferido sempre.
+  function sincronizarFim() {
+    const id = showAtual || showIdDaUrl();
+    const sh = id && db[id];
+    const api = window.BetterJamble;
+    if (!sh || sh.encerradaEm || !api || !api.estadoDaLive) return;
+    const est = api.estadoDaLive(id);
+    if (est && est.fim) encerrarLive(id, est.fim);
+  }
+
   window.addEventListener('bj:live-status', (ev) => {
     const d = ev && ev.detail;
     if (!d || !d.showId) return;
@@ -390,6 +403,7 @@
     const variacao = Math.round((Math.random() * 2 - 1) * VARIACAO);
     const proxima = () => agendar(INTERVALO + variacao);
 
+    sincronizarFim();
     const id = showAtual || showIdDaUrl();
     if (id && db[id] && db[id].encerradaEm) {
       // live fechada: nada a consultar (confere de novo de vez em quando, caso volte)
@@ -516,6 +530,7 @@
 
   // Envio ao painel: um pacote a cada 5s, só se algo mudou e o painel está aberto.
   relogio.setInterval(() => {
+    sincronizarFim();
     if (!painelAberto()) return;
     if (!mudou && consulta.status !== 'ok') return;
     mudou = false;
