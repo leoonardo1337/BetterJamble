@@ -759,9 +759,10 @@
     const mins = a.minutos || [];
     const inicio = Math.min(am.length ? am[0][0] : Infinity, mins.length ? mins[0][0] : Infinity, desde || Infinity);
     if (!isFinite(inicio)) return [];
-    const agora = Date.now();
     // a live inteira, do começo até agora: em lives longas as janelas só ficam
-    // mais estreitas no gráfico
+    // mais estreitas no gráfico. Live encerrada: termina no fim dela, mesmo
+    // que a pessoa abra a página dias depois.
+    const agora = a.encerradaEm ? Math.min(Date.now(), a.encerradaEm) : Date.now();
     const t0 = Math.floor(inicio / passo) * passo;
     const lista = [];
     let ia = 0;

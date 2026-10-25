@@ -144,6 +144,7 @@
     if (Array.isArray(d.events)) {
       d.events.forEach((e) => {
         if (!e || e.event_type !== 'LIKE' || !e.show_id) return;
+        if (db[e.show_id] && db[e.show_id].encerradaEm) return;
         const sh = live(e.show_id);
         contar(sh, agora, 1);
         const uid = e.user_id || (e.liker_profile || {}).id;
@@ -159,6 +160,14 @@
     if (show && show.id) {
       showAtual = show.id;
       if (show.seller_id) sh.seller = sellerAtual = show.seller_id;
+      if (show.has_started && !show.is_over) sh.noAr = agora;
+    }
+    if (d.seller && d.seller.id) sh.seller = sellerAtual = d.seller.id;
+    // Live encerrada: a gravação para. Quem volta numa live que já acabou
+    // (no dia seguinte, por exemplo) continua recebendo pacotes da página, e
+    // antes eles entravam no gráfico, que crescia sem fim.
+    if (sh.encerradaEm || (show && show.is_over)) return;
+    if (show && show.id) {
       if (typeof show.audience_count === 'number') {
         const ult = sh.amostras[sh.amostras.length - 1];
         // guarda quando muda ou a cada 30s, para o gráfico não ter buracos
@@ -176,7 +185,6 @@
       }
       if (show.has_started && !sh.comecou) sh.comecou = Math.round((show.started_at || 0) * 1000) || agora;
     }
-    if (d.seller && d.seller.id) sh.seller = sellerAtual = d.seller.id;
 
     if (Array.isArray(d.messages)) {
       // O "snapshot" que chega ao conectar traz o histórico recente do chat:
@@ -331,7 +339,11 @@
   function encerrarLive(showId, fim) {
     const sh = db[showId];
     if (!sh || sh.encerradaEm) return;
+    // com fim provisório (a aba não estava aberta quando acabou), a última vez
+    // em que a conexão mostrou a live no ar é a melhor estimativa
+    fim = Math.max(fim, sh.noAr || 0);
     sh.encerradaEm = fim;
+    cortarDepoisDoFim(sh);
     Object.values(sh.pessoas || {}).forEach((p) => {
       const ultima = p.s[p.s.length - 1];
       if (!ultima || ultima[1] !== null) return;
@@ -341,6 +353,28 @@
     });
     salvar();
   }
+  // Tira do gráfico o que foi gravado depois do fim (amostras de audiência,
+  // minutos de interação, entradas/saídas): uma live tem começo e fim.
+  function cortarDepoisDoFim(sh) {
+    const fim = sh.encerradaEm;
+    if (!fim) return false;
+    let mudouAlgo = false;
+    const am = sh.amostras || [];
+    sh.amostras = am.filter((x) => x[0] <= fim);
+    if (sh.amostras.length !== am.length) mudouAlgo = true;
+    Object.keys(sh.min || {}).forEach((k) => { if (Number(k) > fim) { delete sh.min[k]; mudouAlgo = true; } });
+    if (sh.eventos) {
+      const ne = sh.eventos.length;
+      sh.eventos = sh.eventos.filter((e) => !e || e.t <= fim);
+      if (sh.eventos.length !== ne) mudouAlgo = true;
+    }
+    return mudouAlgo;
+  }
+  // lives já gravadas (antes desta versão a gravação não parava no fim)
+  if (Object.values(db).filter((sh) => sh && cortarDepoisDoFim(sh)).length) {
+    try { localStorage.setItem(LS, JSON.stringify(db)); } catch {}
+  }
+
   window.addEventListener('bj:live-status', (ev) => {
     const d = ev && ev.detail;
     if (!d || !d.showId) return;
