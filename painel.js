@@ -2274,9 +2274,17 @@
     let ac;
     try { ac = new Ctx(); } catch (e) { return nada; }
     if (ac.state === 'suspended') ac.resume().catch(() => {});
+    // volume geral ~6 dB acima do antigo (0,8), para ouvir bem no alto-falante
+    // do notebook e o celular captar; o limitador na saída segura os picos
+    // para o som não estourar quando vários efeitos tocam juntos
+    const VOLUME = 1.6;
+    const limitador = ac.createDynamicsCompressor();
+    limitador.threshold.value = -10; limitador.knee.value = 6; limitador.ratio.value = 12;
+    limitador.attack.value = 0.003; limitador.release.value = 0.25;
+    limitador.connect(ac.destination);
     const mestre = ac.createGain();
-    mestre.gain.value = mudo ? 0 : 0.8;
-    mestre.connect(ac.destination);
+    mestre.gain.value = mudo ? 0 : VOLUME;
+    mestre.connect(limitador);
     const alea = (a, b) => a + Math.random() * (b - a);
     const panear = (no, v) => {
       if (!ac.createStereoPanner) { no.connect(mestre); return; }
@@ -2403,7 +2411,7 @@
       alternar() {
         mudo = !mudo;
         try { localStorage.setItem('bj-som-corrida', mudo ? 'mudo' : 'som'); } catch (e) { /* sem storage */ }
-        mestre.gain.setTargetAtTime(mudo ? 0 : 0.8, ac.currentTime, 0.05);
+        mestre.gain.setTargetAtTime(mudo ? 0 : VOLUME, ac.currentTime, 0.05);
         return mudo;
       },
       fechar() {
