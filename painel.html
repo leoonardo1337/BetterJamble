@@ -808,6 +808,16 @@
   @keyframes pk-golpe-op{50%{translate:-60px 40px}}
   .pk-spr.apanha{animation:pk-pisca .6s steps(1)}
   @keyframes pk-pisca{0%,30%,60%{opacity:0}15%,45%,75%,100%{opacity:1}}
+  /* cura no duelo: o Pokémon pulsa verde e brilhos sobem em volta dele */
+  .pk-spr.curando{animation:pk-curando .8s ease-in-out 2}
+  @keyframes pk-curando{50%{filter:brightness(1.4) drop-shadow(0 0 14px #7dff8a)}}
+  .pk-cura{position:absolute;pointer-events:none;width:240px;height:220px}
+  .pk-cura-op{right:calc(3% + 22% - 120px);top:calc(39% + 7% - 215px)}
+  .pk-cura-eu{left:calc(-4% + 28% - 120px);bottom:calc(19% + 7%)}
+  .pk-cura i{position:absolute;bottom:10%;width:10px;height:10px;background:#a8ffb0;
+    clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);
+    filter:drop-shadow(0 0 4px #4cff6a);opacity:0;animation:pk-sobe 1s ease-out forwards}
+  @keyframes pk-sobe{0%{opacity:0;transform:translateY(0) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translateY(-150px) scale(1.2)}}
   .pk-spr.desmaia{transition:transform .6s ease-in,opacity .6s ease;transform:translateY(140px);opacity:0}
   /* caixas de HP: prateadas, encostadas na borda da tela e com a ponta
      cortada em diagonal; o contorno escuro é uma sombra sem desfoque no

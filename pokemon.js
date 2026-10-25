@@ -229,7 +229,7 @@
     const Ctx = window.AudioContext || window.webkitAudioContext;
     let mudo = false;
     try { mudo = localStorage.getItem('bj-som-corrida') === 'mudo'; } catch (e) { /* sem storage */ }
-    const nada = { musica() {}, golpe() {}, nocaute() {}, subiu() {}, carga() {}, impacto() {}, alternar() {}, fechar() {} };
+    const nada = { musica() {}, golpe() {}, nocaute() {}, subiu() {}, cura() {}, carga() {}, impacto() {}, alternar() {}, fechar() {} };
     if (!Ctx) return nada;
     let ac;
     try { ac = new Ctx(); } catch (e) { return nada; }
@@ -294,6 +294,11 @@
       subiu(pan) {
         const t = ac.currentTime, o = saida(pan);
         [1047, 1319, 1568].forEach((f, i) => tom('square', f, f, t + i * 0.07, 0.09, 0.07, o));
+      },
+      // cura: arpejo suave subindo, duas vezes
+      cura(pan) {
+        const t = ac.currentTime, o = saida(pan);
+        [523, 659, 784, 1047, 784, 1047, 1319, 1568].forEach((f, i) => tom('triangle', f, f, t + i * 0.08, 0.16, 0.09, o));
       },
       // carga do especial: um tom subindo e tremendo
       carga(pan) {
@@ -993,16 +998,29 @@
       $('.pk-hp-eu .n').textContent = '@' + vencedor.usuario; $('.pk-hp-eu .pk-hp-p').textContent = nomeDe(vencedor.dex);
       const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
       const nOp = nomeDe(outro.dex) + ' de @' + outro.usuario, nEu = nomeDe(vencedor.dex) + ' de @' + vencedor.usuario;
-      const especial = Math.random() < 0.25 ? escolherDe(ESPECIAIS)[0] : null;
-      const vEu1 = Math.round(alea(30, 60)), vOp1 = Math.round(alea(35, 60));
-      const passos = [
-        { txt: 'Restam 2! O duelo final vai começar!' },
-        { txt: nOp + ' ' + escolherDe(GOLPES) + '!', alvo: 'eu', eu: vEu1 },
-        { txt: nEu + ' ' + escolherDe(GOLPES) + '!', alvo: 'op', op: vOp1 },
-        { txt: nOp + ' ' + escolherDe(GOLPES) + '!', alvo: 'eu', eu: Math.max(8, vEu1 - Math.round(alea(15, 25))) },
-        { txt: nEu + (especial ? ' usou ' + especial + '!' : ' ' + escolherDe(GOLPES) + '!'), alvo: 'op', op: 0, forte: !!especial },
-        { txt: nOp + ' desmaiou!', desmaia: true },
-      ];
+      // Roteiro de ~20 s: 8 ações alternadas (o adversário começa) e o golpe
+      // final é sempre do vencedor. Quem está abaixo da metade pode se curar
+      // (uma vez por lado, 25% de chance a cada vez); o adversário nunca cai antes do
+      // fim e o vencedor nunca chega a zero.
+      const ACOES = 8;
+      const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false };
+      const passos = [{ txt: 'Restam 2! O duelo final vai começar!' }];
+      for (let k = 0; k < ACOES; k++) {
+        const quem = k % 2 === 0 ? 'op' : 'eu', outro = quem === 'op' ? 'eu' : 'op', nome = quem === 'op' ? nOp : nEu;
+        const ultima = k === ACOES - 1;
+        if (!ultima && !curou[quem] && hp[quem] < 50 && Math.random() < 0.25) {
+          curou[quem] = true;
+          hp[quem] = Math.min(100, hp[quem] + Math.round(alea(30, 45)));
+          passos.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
+          continue;
+        }
+        let forte = false;
+        if (ultima) { hp.op = 0; forte = Math.random() < 0.3; }
+        else hp[outro] = Math.max(outro === 'op' ? 15 : 8, hp[outro] - Math.round(alea(16, 30)));
+        const golpe = forte ? 'usou ' + escolherDe(ESPECIAIS)[0] : escolherDe(GOLPES);
+        passos.push({ txt: nome + ' ' + golpe + '!', alvo: outro, [outro]: hp[outro], forte });
+      }
+      passos.push({ txt: nOp + ' desmaiou!', desmaia: true });
       let i = 0;
       const tocar = () => {
         if (parado) return;
@@ -1018,6 +1036,23 @@
           if (s.forte) d.classList.add('clarao');
           depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) (s.forte ? som.impacto : som.golpe)(s.alvo === 'op' ? 0.4 : -0.4); });
           depois(800, () => { if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(vencedor.vida * s.eu / 100) + '/' + vencedor.vida; } if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
+        }
+        if (s.cura) {
+          // cura: brilho verde subindo em volta do Pokémon e a barra enchendo
+          const spr = s.cura === 'op' ? sprOp : sprEu;
+          const brilho = el('div', 'pk-cura ' + (s.cura === 'op' ? 'pk-cura-op' : 'pk-cura-eu'));
+          for (let b = 0; b < 14; b++) {
+            const pt = el('i'); pt.style.left = (8 + Math.random() * 84) + '%'; pt.style.animationDelay = (Math.random() * 0.7).toFixed(2) + 's';
+            brilho.appendChild(pt);
+          }
+          d.appendChild(brilho);
+          spr.classList.add('curando');
+          if (som) som.cura(s.cura === 'op' ? 0.4 : -0.4);
+          depois(700, () => {
+            if (s.eu != null) { vida('eu', s.eu); $('.pk-hp-num').textContent = Math.round(vencedor.vida * s.eu / 100) + '/' + vencedor.vida; }
+            if (s.op != null) vida('op', s.op);
+          });
+          depois(1600, () => { brilho.remove(); spr.classList.remove('curando'); });
         }
         if (s.desmaia) { sprOp.classList.add('desmaia'); if (som) som.nocaute(0.4); }
         i++;
