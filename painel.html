@@ -927,13 +927,16 @@
   @keyframes tcgGlitter{0%{transform:translate(0,0)}25%{transform:translate(37px,51px)}50%{transform:translate(13px,71px)}75%{transform:translate(61px,23px)}}
   /* foil: arco-íris holográfico sobre a carta inteira, mais leve que na arte
      para não apagar os textos; com o mouse, acompanha a posição */
-  .tcg-foil{position:absolute;inset:0;z-index:2;border-radius:inherit;pointer-events:none;mix-blend-mode:color-dodge;opacity:.3;overflow:hidden}
-  .tcg-foil::before,.tcg-holo::before{content:"";position:absolute;inset:-75%;will-change:transform;
+  /* no miolo: sem z-index e antes da arte, então a foto fica por cima dele
+     (e ele por cima dos textos); na moldura: embaixo do miolo */
+  .tcg-foil{position:absolute;inset:0;border-radius:inherit;pointer-events:none;mix-blend-mode:color-dodge;opacity:.3;overflow:hidden}
+  .tcg-foil-borda{z-index:0}
+  .tcg-foil::before{content:"";position:absolute;inset:-75%;will-change:transform;
     background:linear-gradient(115deg,transparent 18%,rgba(255,0,140,.6) 30%,rgba(255,220,0,.6) 38%,rgba(0,255,170,.6) 46%,rgba(0,160,255,.6) 54%,rgba(170,0,255,.55) 62%,transparent 74%);
     animation:tcgDeriva 4s ease-in-out infinite alternate}
   @keyframes tcgDeriva{from{transform:translate(20%,8%)}to{transform:translate(-20%,-8%)}}
   /* com o mouse, o degradê vai para o lado do mouse (--px/--py de 0 a 1) */
-  .tcg.mexendo .tcg-foil::before,.tcg.mexendo .tcg-holo::before{animation:none;transition:transform .12s ease-out;
+  .tcg.mexendo .tcg-foil::before{animation:none;transition:transform .12s ease-out;
     transform:translate(calc((.5 - var(--px,.5)) * 40%),calc((.5 - var(--py,.5)) * 16%))}
   .tcg-frente::after{inset:0 auto 0 -60%;width:60%;border-radius:0;will-change:transform;
     background:linear-gradient(115deg,rgba(255,255,255,0) 20%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 80%);
@@ -955,14 +958,9 @@
   .tcg-arte img,.tcg-ini{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .tcg-ini{display:flex;align-items:center;justify-content:center;font:800 calc(var(--w)*.2)/1 var(--bj-ui);color:#f3d273;
     background:radial-gradient(circle at 50% 40%,#5a3d0b,#1e1402 75%)}
-  .tcg-holo{position:absolute;inset:0;pointer-events:none;mix-blend-mode:color-dodge;opacity:.55;overflow:hidden;}
-  .tcg-brilhos{position:absolute;inset:-90px 0 0 -90px;pointer-events:none;mix-blend-mode:screen;opacity:.8;background-size:90px 90px;will-change:transform;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.8' numOctaves='1' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .97 0 0 0 0 .86 12 0 0 0 -8.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
-    animation:tcgCintila .9s steps(1) infinite}
-  @keyframes tcgCintila{0%{transform:translate(0,0)}33%{transform:translate(41px,17px)}66%{transform:translate(19px,63px)}}
   /* quem pediu menos movimento no sistema vê o card parado */
   @media (prefers-reduced-motion:reduce){
-    .tcg,.tcg *,.tcg-frente::before,.tcg-frente::after,.tcg-foil::before,.tcg-holo::before{animation:none !important}
+    .tcg,.tcg *,.tcg-frente::before,.tcg-frente::after,.tcg-foil::before{animation:none !important}
   }
   .tcg-faixa{margin-top:calc(var(--w)*.015);text-align:center;font:italic 600 calc(var(--w)*.03)/1.3 var(--bj-ui);color:#4a3608;padding:2px 0;
     background:linear-gradient(90deg,transparent,#f8e6a8 18%,#f8e6a8 82%,transparent)}

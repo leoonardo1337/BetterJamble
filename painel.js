@@ -3361,9 +3361,7 @@
       im.src = v.avatar;
       arte.appendChild(im);
     }
-    arte.appendChild(el('div', 'tcg-holo'));
-    arte.appendChild(el('div', 'tcg-brilhos'));
-    miolo.appendChild(arte);
+    miolo.appendChild(arte);   // a foto fica limpa: sem foil nem glitter por cima
     const comp = sorteio.tipo === 'compradores';
     miolo.appendChild(el('div', 'tcg-faixa', (comp ? 'Sorteio de compradores' : 'Sorteio de gemas') + ' · '
       + (sorteio.escopo === 'vendedor' ? 'Todas as lives' : 'Nesta live')));
@@ -3390,10 +3388,12 @@
     const rod = el('div', 'tcg-rodape');
     rod.append(el('span', null, 'Ilus. BetterJamble'), el('span', 'tcg-raro', n ? '★ 1/' + nf(n) : '★'));
     miolo.appendChild(rod);
+    // Foil (o arco-íris holográfico) na carta toda, menos na foto: uma camada
+    // na moldura (embaixo do miolo) e outra no miolo, antes da arte, para a
+    // foto ficar por cima dela. As duas ficam na frente, então somem com o verso.
+    miolo.prepend(el('div', 'tcg-foil'));
     frente.appendChild(miolo);
-    // foil: o arco-íris holográfico por cima da carta inteira (fica na frente,
-    // então some quando o verso está virado)
-    frente.appendChild(el('div', 'tcg-foil'));
+    frente.appendChild(el('div', 'tcg-foil tcg-foil-borda'));
     c.append(verso, frente, el('div', 'tcg-reflexo'));
     // O giro de entrada toca uma vez só: quando termina (ou quando o mouse já
     // mexe no card) ele fica desligado de vez. Antes, tirar o mouse religava a
