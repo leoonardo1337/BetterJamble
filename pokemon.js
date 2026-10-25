@@ -979,11 +979,14 @@
       const nivel = (p) => 'Nv' + (50 + ((estado && (estado.vivos.find((x) => x.id === p.id) || {}).kos) || 0));
       if (!outro) { mostrarVencedor(); return; }
       const d = el('div', 'pk-duelo');
-      d.innerHTML = '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
+      // a cena (em cima) é medida em unidades da própria cena, como a tela do
+      // jogo: tudo mantém a proporção em qualquer tamanho de janela
+      d.innerHTML = '<div class="pk-cena"><div class="pk-ceu"></div>'
+        + '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
         + '<img class="pk-spr pk-spr-op" alt=""><img class="pk-spr pk-spr-eu" alt="">'
-        + '<div class="pk-hp pk-hp-op"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
-        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span>Nv50</span></div><div class="pk-hp-p"></div><div class="pk-hp-b">HP<div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div></div>'
-        + '<div class="pk-texto"><div></div></div>';
+        + '<div class="pk-hp pk-hp-op"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
+        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div></div>'
+        + '</div><div class="pk-texto"><div></div></div>';
       camada.appendChild(d);
       if (cv) { cv.classList.add('saindo'); depois(400, () => cv && cv.remove()); }
       const $ = (s) => d.querySelector(s);
@@ -991,11 +994,11 @@
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
       sprOp.src = animado(outro.dex, false); sprOp.onerror = () => { sprOp.src = estatico(outro.dex); };
       sprEu.src = animado(vencedor.dex, true); sprEu.onerror = () => { sprEu.src = estatico(vencedor.dex); sprEu.classList.add('sem-costas'); };
-      $('.pk-hp-op .pk-hp-l span:last-child').textContent = nivel(outro);
-      $('.pk-hp-eu .pk-hp-l span:last-child').textContent = nivel(vencedor);
+      $('.pk-hp-op .nv').textContent = nivel(outro);
+      $('.pk-hp-eu .nv').textContent = nivel(vencedor);
       $('.pk-hp-num').textContent = vencedor.vida + '/' + vencedor.vida;
-      $('.pk-hp-op .n').textContent = '@' + outro.usuario; $('.pk-hp-op .pk-hp-p').textContent = nomeDe(outro.dex);
-      $('.pk-hp-eu .n').textContent = '@' + vencedor.usuario; $('.pk-hp-eu .pk-hp-p').textContent = nomeDe(vencedor.dex);
+      $('.pk-hp-op .n').textContent = '@' + outro.usuario;
+      $('.pk-hp-eu .n').textContent = '@' + vencedor.usuario;
       const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
       const nOp = nomeDe(outro.dex) + ' de @' + outro.usuario, nEu = nomeDe(vencedor.dex) + ' de @' + vencedor.usuario;
       // Roteiro de ~20 s: 8 ações alternadas (o adversário começa) e o golpe
@@ -1045,7 +1048,7 @@
             const pt = el('i'); pt.style.left = (8 + Math.random() * 84) + '%'; pt.style.animationDelay = (Math.random() * 0.7).toFixed(2) + 's';
             brilho.appendChild(pt);
           }
-          d.appendChild(brilho);
+          $('.pk-cena').appendChild(brilho);
           spr.classList.add('curando');
           if (som) som.cura(s.cura === 'op' ? 0.4 : -0.4);
           depois(700, () => {
