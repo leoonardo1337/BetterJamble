@@ -976,7 +976,6 @@
       // último que caiu; nunca alguém qualquer da lista)
       const resto = estado ? estado.vivos.filter((p) => !p.morto && !p.caindo && !p.ganha) : [];
       const outro = resto[0] || (estado && estado.ultimoCaido) || pessoas.find((p) => p !== vencedor);
-      const nivel = (p) => 'Nv' + (50 + ((estado && (estado.vivos.find((x) => x.id === p.id) || {}).kos) || 0));
       if (!outro) { mostrarVencedor(); return; }
       const d = el('div', 'pk-duelo');
       // a cena (em cima) é medida em unidades da própria cena, como a tela do
@@ -999,10 +998,8 @@
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
       sprOp.src = animado(quemNo.op.dex, false); sprOp.onerror = () => { sprOp.src = estatico(quemNo.op.dex); };
       sprEu.src = animado(quemNo.eu.dex, true); sprEu.onerror = () => { sprEu.src = estatico(quemNo.eu.dex); sprEu.classList.add('sem-costas'); };
-      ['op', 'eu'].forEach((l) => {
-        $('.pk-hp-' + l + ' .nv').textContent = nivel(quemNo[l]);
-        $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario;
-      });
+      // os dois entram iguais: mesmo nível (Nv50) e HP cheio
+      ['op', 'eu'].forEach((l) => { $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario; });
       const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
       const nomeNo = (l) => nomeDe(quemNo[l].dex) + ' de @' + quemNo[l].usuario;
       // Roteiro de ~20 s: 8 ações alternadas (quem perde começa) e o golpe
@@ -1021,11 +1018,10 @@
           passos.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
           continue;
         }
-        let forte = false;
-        if (ultima) { hp[ladoPerde] = 0; forte = Math.random() < 0.3; }
+        // no duelo não tem especial: os dois só usam golpes normais, até o último
+        if (ultima) hp[ladoPerde] = 0;
         else hp[outro] = Math.max(outro === ladoPerde ? 15 : 8, hp[outro] - Math.round(alea(16, 30)));
-        const golpe = forte ? 'usou ' + escolherDe(ESPECIAIS)[0] : escolherDe(GOLPES);
-        passos.push({ txt: nome + ' ' + golpe + '!', alvo: outro, [outro]: hp[outro], forte });
+        passos.push({ txt: nome + ' ' + escolherDe(GOLPES) + '!', alvo: outro, [outro]: hp[outro] });
       }
       passos.push({ txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true });
       let i = 0;
@@ -1040,9 +1036,8 @@
           // uma animação por vez em cada sprite (duas classes juntas, só uma tocava)
           const limpa = (x) => { x.classList.remove('golpeia', 'golpeia-op', 'apanha'); void x.offsetWidth; };
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
-          if (s.forte) d.classList.add('clarao');
-          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) (s.forte ? som.impacto : som.golpe)(s.alvo === 'op' ? 0.4 : -0.4); });
-          depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); d.classList.remove('clarao'); });
+          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) som.golpe(s.alvo === 'op' ? 0.4 : -0.4); });
+          depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); });
         }
         if (s.cura) {
           // cura: brilho verde subindo em volta do Pokémon e a barra enchendo
