@@ -112,9 +112,10 @@
     subida: { nome: 'Descida', sub: 'Os nomes descem e o vencedor cai no meio' },
     feixes: { nome: 'Feixes', sub: 'Feixes levam os nomes ao centro' },
     patos: { nome: 'Corrida de patos', sub: 'Cada pessoa é um pato; o primeiro a cruzar ganha' },
+    pokemon: { nome: 'Batalha Pokémon', sub: 'Cada pessoa é um Pokémon; o último de pé ganha' },
   };
   function lerAnim() {
-    try { const v = localStorage.getItem('bj-anim-sorteio'); return v === 'feixes' || v === 'patos' ? v : 'subida'; } catch { return 'subida'; }
+    try { const v = localStorage.getItem('bj-anim-sorteio'); return v === 'feixes' || v === 'patos' || v === 'pokemon' ? v : 'subida'; } catch { return 'subida'; }
   }
   // Ranking: de gemas ou de compradores (ordenado por valor ou por compras) e
   // o olho que deixa só o ranking na tela (e, em compradores, esconde os valores).
@@ -1889,6 +1890,7 @@
     const pronto = () => { pintarResultado(ultimoResultado); desenharSorteio(); };
     if (sorteio.anim === 'feixes') girar(r.participantes || [], r.vencedor, pronto);
     else if (sorteio.anim === 'patos') correrPatos(r.participantes || [], r.vencedor, pronto);
+    else if (sorteio.anim === 'pokemon') batalharPokemon(r.participantes || [], r.vencedor, pronto);
     else girarSubida(r.participantes || [], r.vencedor, pronto);
   }
 
@@ -2934,6 +2936,72 @@
     iniciar.addEventListener('click', p.iniciar);
   }
 
+  // ------------------------------------------------------- batalha pokémon
+  // "!pokemon nome" no chat escolhe o Pokémon da pessoa na batalha. A escolha
+  // fica guardada (por id, e pelo @ como reserva) e vale para os próximos
+  // sorteios; quem nunca escolheu recebe um sorteado pelo id. Escolher não
+  // muda a chance de ninguém: o vencedor já sai do sorteio antes da batalha.
+  const LS_POKEMON = 'bj-pokemon-escolhas';
+  let escolhasPokemon = (() => { try { return JSON.parse(localStorage.getItem(LS_POKEMON) || '') || {}; } catch { return {}; } })();
+  if (!escolhasPokemon.id) escolhasPokemon = { id: {}, nome: {} };
+  let batalhaAtiva = null;
+  function escolhaPokemon(id, usuario) {
+    return (id && escolhasPokemon.id[id]) || escolhasPokemon.nome[String(usuario || '').toLowerCase()] || 0;
+  }
+  function comandoPokemon(m) {
+    const r = /^\s*!pok[eé]mon(?:\s+(.*))?$/i.exec((m && m.texto) || '');
+    if (!r || !window.BJPokemon) return;
+    const dex = BJPokemon.buscar(r[1]);
+    if (!dex) return;
+    if (m.userId) escolhasPokemon.id[m.userId] = dex;
+    if (m.usuario) escolhasPokemon.nome[String(m.usuario).toLowerCase()] = dex;
+    // não deixa crescer sem fim: fica com as 3000 escolhas mais recentes
+    for (const k of ['id', 'nome']) {
+      const ch = Object.keys(escolhasPokemon[k]);
+      if (ch.length > 3000) ch.slice(0, ch.length - 3000).forEach((x) => delete escolhasPokemon[k][x]);
+    }
+    try { localStorage.setItem(LS_POKEMON, JSON.stringify(escolhasPokemon)); } catch {}
+    if (batalhaAtiva) batalhaAtiva.escolher(m.userId, m.usuario, dex);
+  }
+
+  // Igual à corrida de patos: a batalha toma a janela inteira. Antes dela, o
+  // saguão mostra cada participante com o seu Pokémon e o botão Iniciar.
+  function batalharPokemon(participantes, vencedor, pronto) {
+    const fim = () => {
+      girando = false;
+      $('btnSortear').classList.remove('girando');
+      pronto();
+    };
+    if (!participantes.length || !vencedor || !window.BJPokemon) { pararPalco(); fim(); return; }
+    pararPalco();
+    limpar($('resultado'));
+    const camada = el('div', 'pk-camada');
+    camada.setAttribute('role', 'dialog');
+    camada.setAttribute('aria-label', 'Batalha Pokémon');
+    document.body.appendChild(camada);
+    // todo mundo da urna entra; o vencedor sempre
+    const lista = participantes.filter((x) => x.id !== vencedor.id);
+    lista.push(participantes.find((x) => x.id === vencedor.id) || { id: vencedor.id, usuario: vencedor.usuario });
+    embaralhar(lista);
+    const p = { overlay: camada, pecas: [], acabou: false, fecha: 0, rede: 0, raf: 0 };
+    palco = p;
+    const ctrl = BJPokemon.batalhar({
+      camada,
+      participantes: lista.map((x) => ({ id: x.id, usuario: x.usuario || '?', dex: escolhaPokemon(x.id, x.usuario) })),
+      vencedorId: vencedor.id,
+      aoFim: () => {
+        if (p.acabou) return;
+        p.acabou = true;
+        camada.classList.add('saindo');
+        fim();
+        p.fecha = setTimeout(() => { if (palco === p) pararPalco(); }, 420);
+      },
+    });
+    batalhaAtiva = ctrl;
+    p.soltar = () => { ctrl.parar(); if (batalhaAtiva === ctrl) batalhaAtiva = null; };
+    window.__bjBatalha = ctrl;   // para depurar
+  }
+
   function embaralhar(v) {
     for (let i = v.length - 1; i > 0; i--) {
       const j = (Math.random() * (i + 1)) | 0;
@@ -3371,7 +3439,9 @@
   }
 
   function receberChat(lista) {
-    if (!presenca || !Array.isArray(lista)) return;
+    if (!Array.isArray(lista)) return;
+    lista.forEach(comandoPokemon);
+    if (!presenca) return;
     for (const m of lista) {
       const ehDele = (presenca.userId && m.userId === presenca.userId)
         || (presenca.usuario && String(m.usuario || '').toLowerCase() === presenca.usuario);

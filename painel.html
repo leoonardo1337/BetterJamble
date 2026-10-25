@@ -747,6 +747,79 @@
   .corrida-iniciar:active{transform:translate(-50%,-46%);box-shadow:0 2px 0 #000}
   .corrida-iniciar:focus-visible{outline:3px solid #fff;outline-offset:4px}
 
+  /* ------------------------------------------------------- batalha pokémon */
+  /* fonte de jogo (Press Start 2P, licença OFL, em fontes/) */
+  @font-face{font-family:"Press Start 2P";src:url(fontes/PressStart2P.woff2) format("woff2");font-display:block}
+  .pk-camada{position:fixed;inset:0;z-index:90;background:#000;overflow:hidden;animation:cair .2s ease-out;
+    font-family:"Press Start 2P",monospace;color:#383838;image-rendering:pixelated}
+  .pk-camada.saindo{opacity:0;transition:opacity .4s ease}
+  .pk-camada .saindo{opacity:0;transition:opacity .35s ease}
+  .pk-camada img{image-rendering:pixelated}
+  /* saguão: escolha do Pokémon (grama do jogo ao fundo, janela no estilo do menu) */
+  .pk-saguao{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px 16px 28px;
+    background-size:96px 96px;background-color:#88d070}
+  .pk-janela{width:min(1100px,100%);min-height:0;flex:1;display:flex;flex-direction:column;gap:12px;
+    background:#f8f8f8;border:6px solid #506070;border-radius:14px;padding:18px;box-shadow:0 0 0 3px #a0a8b8 inset,6px 6px 0 rgba(24,56,32,.45)}
+  .pk-titulo{font-size:clamp(13px,1.7vw,20px);line-height:1.6;text-align:center;color:#383838}
+  .pk-titulo b{color:#d03028;font-weight:400}
+  .pk-sub{font-size:10px;line-height:1.6;text-align:center;color:#707880}
+  .pk-lista{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;
+    align-content:start;padding:4px}
+  .pk-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 6px 10px;border-radius:10px;
+    background:#e8f0f8;border:3px solid #a0b0c8;text-align:center;min-width:0}
+  .pk-card.escolheu{background:#f0f8e0;border-color:#78b058}
+  .pk-card.trocou{animation:pk-pula .5s ease}
+  @keyframes pk-pula{0%{transform:scale(1)}30%{transform:scale(1.12)}60%{transform:scale(.96)}100%{transform:scale(1)}}
+  .pk-card-img{width:64px;height:64px;object-fit:contain}
+  .pk-card-nome{font-size:9px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pk-card-poke{font-size:8px;color:#707880;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pk-card.escolheu .pk-card-poke{color:#3c8c3c}
+  .pk-iniciar{flex:none;font-family:"Press Start 2P",monospace;font-size:clamp(16px,2vw,22px);color:#f8f8f8;background:#d03028;
+    border:5px solid #383838;border-radius:12px;padding:16px 46px;cursor:pointer;box-shadow:0 6px 0 #383838;
+    transition:transform .1s ease,box-shadow .1s ease}
+  .pk-iniciar:hover{transform:translateY(-2px);box-shadow:0 8px 0 #383838}
+  .pk-iniciar:active{transform:translateY(4px);box-shadow:0 2px 0 #383838}
+  .pk-iniciar:focus-visible{outline:3px solid #fff;outline-offset:4px}
+  .pk-campo{position:absolute;inset:0;width:100%;height:100%;display:block}
+  /* duelo final: tela de batalha do Ruby/Emerald */
+  .pk-duelo{position:absolute;inset:0;background:linear-gradient(#f8f8f8 0,#d8f0f8 40%,#b8e0a0 40%,#a0d088 100%)}
+  .pk-duelo.clarao{animation:pk-clarao .5s ease}
+  @keyframes pk-clarao{0%,100%{filter:none}20%{filter:brightness(2.6)}}
+  .pk-plat{position:absolute;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,#c8e8a0,#88c060 60%,#70a848);box-shadow:inset 0 -6px 0 #589038}
+  .pk-plat-op{right:10%;top:34%;width:32%;height:9%}
+  .pk-plat-eu{left:6%;bottom:24%;width:38%;height:10%}
+  .pk-spr{position:absolute;transform-origin:50% 100%;object-fit:contain}
+  .pk-spr-op{right:calc(10% + 16% - 110px);top:calc(34% - 175px);width:220px;height:220px}
+  .pk-spr-eu{left:calc(6% + 19% - 150px);bottom:calc(24% + 10% - 40px);width:300px;height:300px}
+  .pk-spr-eu.sem-costas{transform:scaleX(-1)}
+  .pk-spr.golpeia{animation:pk-golpe-eu .45s ease}
+  .pk-spr.golpeia-op{animation:pk-golpe-op .45s ease}
+  @keyframes pk-golpe-eu{50%{translate:60px -40px}}
+  @keyframes pk-golpe-op{50%{translate:-60px 40px}}
+  .pk-spr.apanha{animation:pk-pisca .6s steps(1)}
+  @keyframes pk-pisca{0%,30%,60%{opacity:0}15%,45%,75%,100%{opacity:1}}
+  .pk-spr.desmaia{transition:transform .6s ease-in,opacity .6s ease;transform:translateY(140px);opacity:0}
+  .pk-hp{position:absolute;background:#f8f8d8;border:4px solid #506858;border-radius:14px 4px 14px 4px;padding:14px 18px 12px;
+    box-shadow:5px 5px 0 #283828;min-width:300px}
+  .pk-hp-op{left:6%;top:9%;width:min(36%,440px)}
+  .pk-hp-eu{right:6%;bottom:32%;width:min(38%,460px)}
+  .pk-hp-l{display:flex;justify-content:space-between;gap:10px;font-size:clamp(11px,1.3vw,15px);margin-bottom:10px}
+  .pk-hp-l .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pk-hp-p{font-size:10px;color:#606060;margin-bottom:8px}
+  .pk-hp-b{display:flex;align-items:center;gap:8px;font-size:10px;color:#f8b030}
+  .pk-hp-t{flex:1;height:12px;background:#506858;border-radius:6px;padding:2px}
+  .pk-hp-v{width:100%;height:100%;border-radius:4px;background:#58d080;transition:width .6s steps(14),background .2s}
+  .pk-hp-num{font-size:12px;text-align:right;margin-top:8px}
+  .pk-texto{position:absolute;left:0;right:0;bottom:0;height:22%;background:#283048;border-top:6px solid #c84038;padding:14px;display:flex}
+  .pk-texto div{flex:1;background:#f8f8f8;border:4px solid #a0a8b8;border-radius:8px;font-size:clamp(13px,1.6vw,18px);line-height:1.9;padding:14px 22px}
+  /* vencedor */
+  .pk-vencedor{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,#2a3a6a,#0a0f24 70%)}
+  .pk-confete{position:absolute;inset:0;width:100%;height:100%}
+  .pk-v-centro{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);text-align:center;width:min(92%,900px)}
+  .pk-v-img{width:288px;height:288px;object-fit:contain;filter:drop-shadow(0 0 24px rgba(255,214,80,.6))}
+  .pk-v-faixa{font-size:clamp(18px,2.6vw,30px);line-height:1.5;color:#ffd84a;text-shadow:3px 3px 0 #7a4a00;margin-top:8px;word-break:break-word}
+  .pk-v-faixa small{display:block;font-size:12px;color:#fff;text-shadow:none;margin-top:14px;opacity:.85}
+
   /* --------------------------------------------------------- palco do sorteio */
   /* a altura é controlada em px pelo JS: só assim o easing vale a pena */
   .palco{
@@ -1379,6 +1452,7 @@
 </div>
 
 <script src="patos.js"></script>
+<script src="pokemon.js"></script>
 <script src="painel.js"></script>
 </body>
 </html>
