@@ -106,9 +106,58 @@ async function abrirPainel() {
   }
 }
 
+// ---------------------------------------------------------------- atualização
+// O navegador só confere a Web Store de tempos em tempos (~5 h). Aqui dá para
+// pedir a conferência na hora (popup) e aplicar a versão nova quando ela já
+// baixou (popup ou painel). Aplicar recarrega a extensão: a janela do painel
+// fecha e as abas da Jamble ficam com a versão velha, então elas são anotadas
+// antes e recarregadas quando a versão nova sobe (sem permissão nova: só
+// recarregar pelo id da aba).
+let versaoBaixada = null;   // versão nova já baixada, esperando aplicar
+chrome.runtime.onUpdateAvailable.addListener((d) => {
+  versaoBaixada = (d && d.version) || '?';
+  try { chrome.storage.session.set({ versaoBaixada }); } catch {}
+  paraOPainel({ tipo: 'painel-atualizacao', payload: { versao: versaoBaixada } });
+});
+try { chrome.storage.session.get('versaoBaixada', (r) => { if (!versaoBaixada && r && r.versaoBaixada) versaoBaixada = r.versaoBaixada; }); } catch {}
+
+async function procurarAtualizacao() {
+  const atual = chrome.runtime.getManifest().version;
+  try {
+    const r = await chrome.runtime.requestUpdateCheck();
+    const status = (r && r.status) || 'erro';
+    if (status === 'update_available' && r.version) versaoBaixada = r.version;
+    return { status, versao: (r && r.version) || versaoBaixada, atual };
+  } catch (e) {
+    return { status: versaoBaixada ? 'update_available' : 'erro', versao: versaoBaixada, atual, erro: String((e && e.message) || e) };
+  }
+}
+async function aplicarAtualizacao() {
+  // anota as abas da Jamble que estão em uso para recarregar depois
+  let abas = [];
+  try {
+    const r = await chrome.storage.session.get({ abasNaLive: [], abaDeOrigem: null });
+    abas = [...new Set([].concat(r.abasNaLive || [], r.abaDeOrigem != null ? [r.abaDeOrigem] : [], abaDeOrigem != null ? [abaDeOrigem] : []))];
+  } catch {}
+  try { await chrome.storage.local.set({ bjRecarregarAbas: abas }); } catch {}
+  chrome.runtime.reload();
+}
+chrome.runtime.onInstalled.addListener((d) => {
+  if (!d || d.reason !== 'update') return;
+  chrome.storage.local.get({ bjRecarregarAbas: [] }, (r) => {
+    (r.bjRecarregarAbas || []).forEach((id) => { try { chrome.tabs.reload(id, () => void chrome.runtime.lastError); } catch {} });
+    chrome.storage.local.remove('bjRecarregarAbas');
+  });
+});
+
 // ---------------------------------------------------------------- mensagens da página
 chrome.runtime.onMessage.addListener((msg, sender, responder) => {
   if (!msg) return;
+
+  // atualização (popup e painel)
+  if (msg.type === 'bj-procurar-atualizacao') { procurarAtualizacao().then(responder); return true; }
+  if (msg.type === 'bj-estado-atualizacao') { responder({ versao: versaoBaixada, atual: chrome.runtime.getManifest().version }); return; }
+  if (msg.type === 'bj-aplicar-atualizacao') { aplicarAtualizacao(); responder({ ok: true }); return; }
 
   // Atalho antigo: abrir uma página da extensão numa aba.
   if (msg.type === 'open-page' && typeof msg.page === 'string' && /^[a-z-]+\.html$/.test(msg.page)) {

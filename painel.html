@@ -108,6 +108,8 @@
   .btn-claro{background:var(--bj-claro);color:var(--bj-sobreClaro);border-color:transparent;font-weight:600}
   .btn-claro:hover{background:#fff;color:var(--bj-sobreClaro)}
   .btn:disabled,.btn-claro:disabled{opacity:.4;cursor:default;transform:none}
+  .btn-atualizar{background:var(--bj-positivo);color:#000;border-color:transparent;font-weight:600}
+  .btn-atualizar:hover{background:#56d08c}
   .btn-fantasma{
     height:32px;background:transparent;border:1px solid var(--bj-borda3);color:var(--bj-texto2);
     padding:0 12px;border-radius:999px;font-size:12.5px;font-weight:500;
@@ -1216,6 +1218,8 @@
     <button class="aba" id="aba-lives" role="tab" data-tela="lives" aria-selected="false"><span class="rot">Resumo das Lives</span></button>
   </nav>
   <div class="topo-dir">
+  <!-- versão nova já baixada da Web Store: aplica na hora (recarrega a extensão) -->
+  <button class="btn btn-atualizar" id="btnAtualizar" type="button" hidden title="A janela do BetterJamble fecha e as abas da Jamble recarregam com a versão nova">&#11014; Atualizar</button>
   <!-- auto resgate da "Recompensa por assistir" (resgate.js na aba da live) -->
   <div class="menu-csv">
     <button class="btn chip-resgate" id="btnResgate" type="button" aria-haspopup="true" aria-expanded="false" title="Auto resgate da recompensa por assistir">

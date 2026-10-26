@@ -144,7 +144,25 @@
   // Fora dela (harness local, sem chrome.*): mensagens pelo window, para teste.
   let mandar = () => {};
 
+  // Versão nova já baixada da Web Store: o botão "Atualizar" aparece no topo e
+  // aplica na hora (a extensão recarrega; as abas da Jamble recarregam sozinhas).
+  function mostrarAtualizacao(versao) {
+    const b = $('btnAtualizar');
+    if (!b || !versao) return;
+    b.textContent = '⬆ Atualizar' + (versao !== '?' ? ' para ' + versao : '');
+    b.hidden = false;
+  }
+  function ligarAtualizacao() {
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+    $('btnAtualizar').onclick = () => {
+      $('btnAtualizar').disabled = true;
+      chrome.runtime.sendMessage({ type: 'bj-aplicar-atualizacao' }, () => void chrome.runtime.lastError);
+    };
+    chrome.runtime.sendMessage({ type: 'bj-estado-atualizacao' }, (r) => { void chrome.runtime.lastError; if (r && r.versao) mostrarAtualizacao(r.versao); });
+  }
+
   function ligar() {
+    ligarAtualizacao();
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.connect) {
       const porta = chrome.runtime.connect({ name: 'bj-painel' });
       mandar = (tipo, payload) => { try { porta.postMessage({ tipo, payload }); } catch {} };
@@ -210,6 +228,9 @@
       case 'painel-pulso':
         ultimoPulso = Date.now();
         marcarConexao('ligado');
+        break;
+      case 'painel-atualizacao':
+        mostrarAtualizacao(payload && payload.versao);
         break;
       case 'painel-reatar':
         dados = null;

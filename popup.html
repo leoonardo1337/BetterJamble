@@ -19,6 +19,15 @@
   button.primary{background:#fff;color:#000;font-weight:600}
   button.primary:hover{background:#fff}
   .ico{font-size:14px;width:18px;text-align:center}
+  /* atualização: versão atual e o resultado da conferência */
+  .atual{border-top:1px solid #1f1f1f;padding:12px 12px 14px;display:flex;flex-direction:column;gap:8px}
+  .atual-linha{display:flex;align-items:center;justify-content:space-between;color:#949494;font-size:12px;padding:0 4px}
+  .atual-linha b{color:#fff;font-weight:600}
+  #statusAtualizacao{color:#b4b4b4;font-size:12px;padding:0 4px;min-height:1em}
+  #statusAtualizacao.ok{color:#3fc07a}
+  #aplicar{background:#3fc07a;color:#000;font-weight:600}
+  #aplicar:hover{background:#56d08c}
+  button:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
@@ -29,6 +38,12 @@
   <div class="acts">
     <button class="primary" id="compras"><span class="ico">📦</span> Minhas compras salvas</button>
     <button id="exportar"><span class="ico">⬇</span> Exportar novas compras</button>
+  </div>
+  <div class="atual">
+    <div class="atual-linha"><span>Versão instalada</span><b id="versao">—</b></div>
+    <button id="procurar"><span class="ico">⟳</span> Procurar atualização</button>
+    <button id="aplicar" hidden><span class="ico">⬆</span> <span id="aplicarTxt">Atualizar agora</span></button>
+    <div id="statusAtualizacao"></div>
   </div>
   <script src="popup.js"></script>
 </body>
