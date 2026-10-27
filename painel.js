@@ -3077,14 +3077,24 @@
       } else fim();
       p.fecha = setTimeout(() => { if (palco === p) pararPalco(); }, 420);
     }
-    // Vida proporcional (sorteio por quantidade): piso de 100 HP e sobe com a
-    // fatia da urna, comparada com a pessoa do meio (mediana) — cada vez mais
-    // devagar, até 250. Na mediana ~150; 3x a mediana ~200; 8x ou mais, 250.
-    // Em "1 por pessoa", todo mundo com 100. Não muda quem ganha (já sorteado).
+    // Vida (sorteio por quantidade). Não muda quem ganha (já sorteado).
+    //   Gemas: a cada 1.000 gemas no total a vida sobe, cada vez mais devagar
+    //   (logaritmo, sem teto): abaixo de 1.000 é o piso de 100; 1.000 = 150,
+    //   2.000 = 179, 3.000 = 200, 7.000 = 250, 15.000 = 300, 31.000 = 350.
+    //   Compradores: sobe com a fatia da urna comparada com a pessoa do meio
+    //   (mediana), até 250. Na mediana ~150; 3x ~200; 8x ou mais, 250.
+    // Em "1 por pessoa", todo mundo com 100.
     const bilhetes = lista.map((x) => Number(x.bilhetes) || 1).sort((a, b) => a - b);
     const mediana = bilhetes.length ? bilhetes[Math.floor((bilhetes.length - 1) / 2)] : 1;
-    const vidaDe = op.vida || ((x) => (sorteio.modo !== 'peso' ? 100
-      : Math.round(Math.min(250, 100 + 50 * Math.log2(1 + (Number(x.bilhetes) || 1) / Math.max(1, mediana))))));
+    const GEMAS_POR_DEGRAU = 1000;
+    const vidaDe = op.vida || ((x) => {
+      if (sorteio.modo !== 'peso') return 100;
+      if (sorteio.tipo !== 'compradores') {
+        const degraus = Math.floor((Number(x.gemas != null ? x.gemas : x.bilhetes) || 0) / GEMAS_POR_DEGRAU);
+        return Math.round(100 + 50 * Math.log2(1 + degraus));
+      }
+      return Math.round(Math.min(250, 100 + 50 * Math.log2(1 + (Number(x.bilhetes) || 1) / Math.max(1, mediana))));
+    });
     const ctrl = BJPokemon.batalhar({
       camada,
       participantes: lista.map((x) => ({ id: x.id, usuario: x.usuario || '?', dex: escolhaPokemon(x.id, x.usuario), vida: vidaDe(x) })),
