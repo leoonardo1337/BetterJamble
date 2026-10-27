@@ -830,9 +830,9 @@
   .pk-hp{position:absolute;filter:drop-shadow(0 calc(var(--u) * .5) 0 #3a3a3a) drop-shadow(calc(var(--u) * .3) 0 0 #4a4a4a) drop-shadow(0 calc(var(--u) * -.3) 0 #4a4a4a)}
   .pk-hp-caixa{background:linear-gradient(#fbfbfb 0,#ececec 55%,#d6d6d6 100%);box-sizing:border-box;height:100%;
     display:flex;flex-direction:column;justify-content:center;gap:calc(var(--u) * .9)}
-  .pk-hp-op{left:calc(50cqw - var(--u) * 50);top:calc(var(--u) * 8);width:calc(var(--u) * 47);height:calc(var(--u) * 10.5)}
+  .pk-hp-op{left:calc(50cqw - var(--u) * 50);top:calc(var(--u) * 8);width:calc(var(--u) * 47);height:calc(var(--u) * 13.5)}
   .pk-hp-op .pk-hp-caixa{clip-path:polygon(0 0,92% 0,100% 100%,0 100%);padding:0 calc(var(--u) * 6) 0 calc(var(--u) * 2.2)}
-  .pk-hp-eu{right:calc(50cqw - var(--u) * 50);top:calc(var(--u) * 41);width:calc(var(--u) * 47);height:calc(var(--u) * 10.5)}
+  .pk-hp-eu{right:calc(50cqw - var(--u) * 50);top:calc(var(--u) * 39);width:calc(var(--u) * 47);height:calc(var(--u) * 13.5)}
   .pk-hp-eu .pk-hp-caixa{clip-path:polygon(8% 0,100% 0,100% 100%,0 100%);padding:0 calc(var(--u) * 2.2) 0 calc(var(--u) * 6)}
   .pk-hp-l{display:flex;justify-content:space-between;align-items:baseline;gap:calc(var(--u) * 2);
     font-size:calc(var(--u) * 2.5);line-height:1;color:#404040;text-shadow:calc(var(--u) * .2) calc(var(--u) * .2) 0 #b8b8b8}
@@ -841,6 +841,19 @@
   .pk-hp-b{display:flex;align-items:center;gap:calc(var(--u) * .6);margin-left:auto;width:calc(var(--u) * 26);
     background:#505050;border-radius:calc(var(--u) * .5);padding:calc(var(--u) * .35) calc(var(--u) * .5)}
   .pk-hp-b b{font:400 calc(var(--u) * 1.5)/1 "Press Start 2P",monospace;color:#f8b800}
+  /* dano do duelo: o número sobe e some em cima de quem apanhou (verde na cura) */
+  .pk-dano{position:absolute;z-index:3;pointer-events:none;font:400 calc(var(--u) * 3.4)/1 "Press Start 2P",monospace;color:#fff;
+    text-shadow:calc(var(--u) * .35) 0 0 #202020,calc(var(--u) * -.35) 0 0 #202020,0 calc(var(--u) * .35) 0 #202020,0 calc(var(--u) * -.35) 0 #202020;
+    animation:pkDano 1.05s cubic-bezier(.2,.7,.3,1) forwards}
+  .pk-dano.cura{color:#7ad151}
+  @keyframes pkDano{0%{opacity:0;transform:translate(-50%,calc(var(--u) * 3)) scale(.6)}
+    14%{opacity:1;transform:translate(-50%,0) scale(1.18)}
+    28%{transform:translate(-50%,calc(var(--u) * -1.5)) scale(1)}
+    75%{opacity:1}
+    100%{opacity:0;transform:translate(-50%,calc(var(--u) * -9))}}
+  @media (prefers-reduced-motion:reduce){.pk-dano{animation-duration:.01s;animation-iteration-count:1;opacity:1}}
+  /* HP em números embaixo da barra, alinhado à direita (como no Diamond/Pearl) */
+  .pk-hp-num{align-self:flex-end;font-size:calc(var(--u) * 2.3);line-height:1;color:#404040;text-shadow:calc(var(--u) * .2) calc(var(--u) * .2) 0 #b8b8b8;font-variant-numeric:tabular-nums}
   .pk-hp-t{flex:1;height:calc(var(--u) * 1.3);background:#203820;border-radius:calc(var(--u) * .35);padding:calc(var(--u) * .15)}
   .pk-hp-v{width:100%;height:100%;border-radius:calc(var(--u) * .25);background:#48e048;box-shadow:inset 0 calc(var(--u) * -.4) 0 rgba(0,0,0,.18);transition:width .6s steps(14),background .2s}
   .pk-texto{position:absolute;left:0;right:0;bottom:0;height:22%;background:#283048;border-top:6px solid #c84038;padding:14px;display:flex}
@@ -873,6 +886,21 @@
   .palco .resultado{margin-top:0}
   .palco .vazio{padding:0}
   .palco .vazio-p{border:0}
+
+  /* ---- aba Batalha: urna escrita à mão */
+  .bt-grade{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;margin-top:6px}
+  @media (max-width:760px){.bt-grade{grid-template-columns:1fr}}
+  .bt-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .bt-nomes{width:100%;min-height:220px;resize:vertical;box-sizing:border-box;padding:12px 14px;border-radius:12px;
+    border:1px solid var(--bj-borda3);background:var(--bj-fundo2);color:var(--bj-texto);
+    font:500 14px/1.55 var(--bj-ui);outline:none}
+  .bt-nomes:focus{border-color:var(--bj-texto3)}
+  .bt-nomes::placeholder{color:var(--bj-texto3)}
+  .bt-resumo{font-size:12.5px;color:var(--bj-texto2)}
+  .bt-anims{display:flex;flex-direction:column;gap:8px}
+  .bt-anims .op{flex:none;text-align:left}
+  .bt-limpar{align-self:center}
+  .bt-palco{display:grid;place-items:center;margin-top:16px;padding:20px;border-radius:16px;background:#0b0b0b}
 
   .botao-sortear{
     width:100%;padding:16px;border-radius:12px;border:0;
@@ -1280,6 +1308,7 @@
             <span class="navc-fundo" id="menuFundo" aria-hidden="true"></span>
             <button class="navc-i" type="button" role="tab" data-pane="ranking" aria-selected="true">Ranking</button>
             <button class="navc-i" type="button" role="tab" data-pane="sorteio" aria-selected="false">Sorteio</button>
+            <button class="navc-i" type="button" role="tab" data-pane="batalha" aria-selected="false">Batalha</button>
             <button class="navc-i" type="button" role="tab" data-pane="insights" aria-selected="false">Insights</button>
             <span class="tag navc-tag" id="tagRanking" hidden></span>
             <!-- modo privado: borra o card e troca os números por asteriscos -->
@@ -1443,6 +1472,38 @@
             <div class="urna" id="urna"></div>
             <p class="nota" id="notaConcentracao" hidden><span class="emj">&#9888;</span><span id="textoConcentracao"></span></p>
           </div>
+          </div>
+
+          <!-- ............................................... BATALHA -->
+          <!-- igual ao sorteio, mas a urna é uma lista escrita à mão: cada linha
+               é uma entrada (repetir o nome dá mais chances) -->
+          <div class="pane" id="pane-batalha" role="tabpanel" hidden>
+            <div class="bt-grade">
+              <div class="bt-col">
+                <div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>Nomes na urna</div>
+                <textarea class="bt-nomes" id="btNomes" spellcheck="false" placeholder="Um nome por linha&#10;&#10;leozin&#10;maria&#10;leozin&#10;&#10;Repetir o nome dá mais chances (no exemplo, leozin tem 2)."></textarea>
+                <div class="bt-resumo" id="btResumo"></div>
+              </div>
+              <div class="bt-col">
+                <div class="sel-rot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.5l1.6 4.4L16 9.5l-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6z"/><path d="M17.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>Animação</div>
+                <div class="bt-anims" role="radiogroup" aria-label="Animação da batalha">
+                  <button class="op sel" type="button" role="radio" data-btanim="pokemon" aria-checked="true">
+                    <span class="txt"><span class="rot">Batalha Pokémon</span><small>Cada pessoa é um Pokémon; cada linha com o nome dela vale 100 de HP</small></span>
+                    <span class="marca-radio"></span>
+                  </button>
+                  <button class="op sel" type="button" role="radio" data-btanim="patos" aria-checked="false">
+                    <span class="txt"><span class="rot">Corrida de patos</span><small>Cada linha é um pato: 2 linhas com o seu nome, 2 patos seus na água</small></span>
+                    <span class="marca-radio"></span>
+                  </button>
+                </div>
+                <button class="botao-sortear" id="btComecar" type="button">Começar</button>
+                <button class="btn btn-fantasma bt-limpar" id="btLimpar" type="button">limpar a lista</button>
+              </div>
+            </div>
+            <div class="bt-palco" id="btPalco" hidden></div>
+            <div class="regua"></div>
+            <h2>Na urna <span class="tag" id="btTag"></span></h2>
+            <div class="urna" id="btUrna"></div>
           </div>
 
           <!-- ............................................... INSIGHTS -->

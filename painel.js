@@ -1916,7 +1916,17 @@
     const pronto = () => { pintarResultado(ultimoResultado); desenharSorteio(); };
     if (sorteio.anim === 'feixes') girar(r.participantes || [], r.vencedor, pronto);
     else if (sorteio.anim === 'patos') correrPatos(r.participantes || [], r.vencedor, pronto);
-    else if (sorteio.anim === 'pokemon') batalharPokemon(r.participantes || [], r.vencedor, pronto);
+    else if (sorteio.anim === 'pokemon') {
+      batalharPokemon(r.participantes || [], r.vencedor, pronto, {
+        cancelar: () => {
+          ultimoResultado = null;
+          presenca = null;
+          limpar($('resultado'));
+          if (entrada && entrada.id === r.vencedor.id) removerGanhador(entrada);
+          else desenharSorteio();
+        },
+      });
+    }
     else girarSubida(r.participantes || [], r.vencedor, pronto);
   }
 
@@ -2442,7 +2452,8 @@
     };
   }
 
-  function correrPatos(participantes, vencedor, pronto) {
+  // op.manual: veio da aba Batalha (não mexe no palco do sorteio)
+  function correrPatos(participantes, vencedor, pronto, op = {}) {
     const fim = () => {
       girando = false;
       $('btnSortear').classList.remove('girando');
@@ -2450,7 +2461,7 @@
     };
     if (!participantes.length || !vencedor || !window.BJPatos) { pararPalco(); fim(); return; }
     pararPalco();
-    limpar($('resultado'));
+    if (!op.manual) limpar($('resultado'));
 
     const camada = el('div', 'corrida');
     camada.setAttribute('role', 'dialog');
@@ -3034,7 +3045,9 @@
 
   // Igual à corrida de patos: a batalha toma a janela inteira. Antes dela, o
   // saguão mostra cada participante com o seu Pokémon e o botão Iniciar.
-  function batalharPokemon(participantes, vencedor, pronto) {
+  // op.manual: veio da aba Batalha; op.vida(x): HP de cada um (senão, a regra do sorteio);
+  // op.cancelar(): Esc antes do fim — a batalha não conta (quem chamou desfaz o sorteio)
+  function batalharPokemon(participantes, vencedor, pronto, op = {}) {
     const fim = () => {
       girando = false;
       $('btnSortear').classList.remove('girando');
@@ -3042,7 +3055,7 @@
     };
     if (!participantes.length || !vencedor || !window.BJPokemon) { pararPalco(); fim(); return; }
     pararPalco();
-    limpar($('resultado'));
+    if (!op.manual) limpar($('resultado'));
     const camada = el('div', 'pk-camada');
     camada.setAttribute('role', 'dialog');
     camada.setAttribute('aria-label', 'Batalha Pokémon');
@@ -3053,25 +3066,31 @@
     embaralhar(lista);
     const p = { overlay: camada, pecas: [], acabou: false, fecha: 0, rede: 0, raf: 0 };
     palco = p;
+    function sair(cancelou) {
+      if (p.acabou) return;
+      p.acabou = true;
+      camada.classList.add('saindo');
+      if (cancelou) {
+        girando = false;
+        $('btnSortear').classList.remove('girando');
+        if (op.cancelar) op.cancelar();
+      } else fim();
+      p.fecha = setTimeout(() => { if (palco === p) pararPalco(); }, 420);
+    }
     // Vida proporcional (sorteio por quantidade): piso de 100 HP e sobe com a
     // fatia da urna, comparada com a pessoa do meio (mediana) — cada vez mais
     // devagar, até 250. Na mediana ~150; 3x a mediana ~200; 8x ou mais, 250.
     // Em "1 por pessoa", todo mundo com 100. Não muda quem ganha (já sorteado).
     const bilhetes = lista.map((x) => Number(x.bilhetes) || 1).sort((a, b) => a - b);
     const mediana = bilhetes.length ? bilhetes[Math.floor((bilhetes.length - 1) / 2)] : 1;
-    const vidaDe = (x) => (sorteio.modo !== 'peso' ? 100
-      : Math.round(Math.min(250, 100 + 50 * Math.log2(1 + (Number(x.bilhetes) || 1) / Math.max(1, mediana)))));
+    const vidaDe = op.vida || ((x) => (sorteio.modo !== 'peso' ? 100
+      : Math.round(Math.min(250, 100 + 50 * Math.log2(1 + (Number(x.bilhetes) || 1) / Math.max(1, mediana))))));
     const ctrl = BJPokemon.batalhar({
       camada,
       participantes: lista.map((x) => ({ id: x.id, usuario: x.usuario || '?', dex: escolhaPokemon(x.id, x.usuario), vida: vidaDe(x) })),
       vencedorId: vencedor.id,
-      aoFim: () => {
-        if (p.acabou) return;
-        p.acabou = true;
-        camada.classList.add('saindo');
-        fim();
-        p.fecha = setTimeout(() => { if (palco === p) pararPalco(); }, 420);
-      },
+      aoFim: () => sair(false),
+      aoCancelar: () => sair(true),
     });
     batalhaAtiva = ctrl;
     p.soltar = () => { ctrl.parar(); if (batalhaAtiva === ctrl) batalhaAtiva = null; };
@@ -3419,7 +3438,7 @@
     verso.innerHTML = SVG_GEMA;
     const frente = el('div', 'tcg-face tcg-frente');
     const miolo = el('div', 'tcg-miolo');
-    miolo.appendChild(el('div', 'tcg-estagio', 'VENCEDOR DO SORTEIO'));
+    miolo.appendChild(el('div', 'tcg-estagio', res.estagio || 'VENCEDOR DO SORTEIO'));
     const cab = el('div', 'tcg-cab');
     cab.appendChild(el('div', 'tcg-nome', '@' + v.usuario));
     cab.appendChild(el('div', 'tcg-hp', '1º'));
@@ -3439,8 +3458,8 @@
     }
     miolo.appendChild(arte);   // a foto fica limpa: sem foil nem glitter por cima
     const comp = sorteio.tipo === 'compradores';
-    miolo.appendChild(el('div', 'tcg-faixa', (comp ? 'Sorteio de compradores' : 'Sorteio de gemas') + ' · '
-      + (sorteio.escopo === 'vendedor' ? 'Todas as lives' : 'Nesta live')));
+    miolo.appendChild(el('div', 'tcg-faixa', res.faixa || ((comp ? 'Sorteio de compradores' : 'Sorteio de gemas') + ' · '
+      + (sorteio.escopo === 'vendedor' ? 'Todas as lives' : 'Nesta live'))));
     const ataques = el('div', 'tcg-ataques');
     const ataque = (custo, nome, desc, valor) => {
       const a = el('div', 'tcg-atq');
@@ -3459,8 +3478,8 @@
     ataques.appendChild(ataque(['ouro', 'ouro'], 'Golpe de Sorte', 'A chance que tinha de ganhar este sorteio.',
       ch ? (ch < 1 ? ch.toFixed(1).replace('.', ',') : Math.round(ch)) + '%' : '—'));
     miolo.appendChild(ataques);
-    miolo.appendChild(el('div', 'tcg-sabor', (n ? 'Venceu entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') : 'Venceu o sorteio')
-      + ' na live de ' + vendedorArroba() + ' em ' + new Date().toLocaleDateString('pt-BR') + '.'));
+    miolo.appendChild(el('div', 'tcg-sabor', res.sabor || ((n ? 'Venceu entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') : 'Venceu o sorteio')
+      + ' na live de ' + vendedorArroba() + ' em ' + new Date().toLocaleDateString('pt-BR') + '.')));
     const rod = el('div', 'tcg-rodape');
     rod.append(el('span', null, 'Ilus. BetterJamble'), el('span', 'tcg-raro', n ? '★ 1/' + nf(n) : '★'));
     miolo.appendChild(rod);
@@ -3761,21 +3780,22 @@
     document.querySelectorAll('.navc-i').forEach((b) => {
       b.setAttribute('aria-selected', b.dataset.pane === nome ? 'true' : 'false');
     });
-    ['ranking', 'sorteio', 'insights'].forEach((n) => {
+    ['ranking', 'sorteio', 'batalha', 'insights'].forEach((n) => {
       const p = $('pane-' + n);
       if (p) p.hidden = n !== nome;
     });
-    $('btnPrivado').hidden = nome === 'ranking';
+    $('btnPrivado').hidden = nome === 'ranking' || nome === 'batalha';
     atualizarOlhoDoMenu();   // cada aba tem o seu estado de modo privado
     moverFundoDoMenu(true);
     // O sorteio precisa de largura (palco, urna, dois grupos de opções lado a
     // lado); o feed cede espaço enquanto essa aba estiver aberta.
     const duas = document.querySelector('#tela-vivo .duas');
-    if (duas) duas.classList.toggle('sorteio', nome === 'sorteio');
+    if (duas) duas.classList.toggle('sorteio', nome === 'sorteio' || nome === 'batalha');
     if (nome !== 'sorteio') pararPalco();
     if (nome === 'insights') { desenharLances(); desenharAudiencia(); }
     modoFeedViewers(nome === 'insights');
     if (nome === 'sorteio') desenharSorteio();
+    if (nome === 'batalha') desenharBatalha();
   }
 
   document.querySelectorAll('.navc-i').forEach((b) => {
@@ -4059,6 +4079,123 @@
   $('maisRanking').onclick = () => { limiteRanking += PASSO_RANKING; desenharRanking(); };
   $('btnCopiarNomes').onclick = copiarNomes;
   $('limparHistorico').onclick = () => { historico = []; motivosMarcados.clear(); confirmadosMarcados.clear(); ultimoResultado = null; presenca = null; mandar('limpar-historico'); desenharSorteio(); };
+
+  // ------------------------------------------------------------- batalha (urna manual)
+  // Igual ao sorteio, mas a urna é o que a pessoa escreve: cada linha é uma
+  // entrada. O mesmo nome em várias linhas (sem diferença de maiúscula, espaço
+  // ou @) é a mesma pessoa com mais entradas. O vencedor sai por entrada
+  // (chance = linhas dele / total), com o gerador criptográfico, antes da
+  // animação — a animação só encena o resultado, como no sorteio.
+  //   Corrida de patos: um pato por linha.
+  //   Batalha Pokémon: um Pokémon por pessoa, 100 de HP por linha, sem teto.
+  const LS_BATALHA = 'bj-batalha-nomes';
+  let btAnim = lerLS('bj-batalha-anim', ['pokemon', 'patos'], 'pokemon');
+  let btResultado = null;
+  try { $('btNomes').value = localStorage.getItem(LS_BATALHA) || ''; } catch {}
+
+  const chaveNome = (s) => s.toLowerCase().normalize('NFC').replace(/\s+/g, ' ');
+  function urnaManual() {
+    const linhas = $('btNomes').value.split(/\r?\n/)
+      .map((s) => s.replace(/^\s*@+/, '').trim().replace(/\s+/g, ' ')).filter(Boolean)
+      .map((s) => s.slice(0, 40));
+    const pessoas = new Map();   // chave -> {id, usuario, bilhetes}
+    linhas.forEach((nome) => {
+      const k = chaveNome(nome);
+      const p = pessoas.get(k) || { id: 'm:' + k, usuario: nome, bilhetes: 0, avatar: '' };
+      p.bilhetes++;
+      pessoas.set(k, p);
+    });
+    return { linhas, pessoas: [...pessoas.values()].sort((a, b) => b.bilhetes - a.bilhetes || a.usuario.localeCompare(b.usuario)) };
+  }
+  // mesma regra do gems-core: sorteio uniforme sem viés (rejeição)
+  function inteiroAleatorio(max) {
+    max = Math.floor(max);
+    if (max <= 1) return 0;
+    const teto = Math.floor(0x100000000 / max) * max;
+    const buf = new Uint32Array(1);
+    do crypto.getRandomValues(buf); while (buf[0] >= teto);
+    return buf[0] % max;
+  }
+
+  function desenharBatalha() {
+    const u = urnaManual();
+    const total = u.linhas.length;
+    document.querySelectorAll('[data-btanim]').forEach((b) => b.setAttribute('aria-checked', b.dataset.btanim === btAnim ? 'true' : 'false'));
+    $('btResumo').textContent = total
+      ? nf(total) + ' ' + plural(total, 'entrada', 'entradas') + ' · ' + nf(u.pessoas.length) + ' ' + plural(u.pessoas.length, 'pessoa', 'pessoas')
+        + (btAnim === 'patos' ? ' · ' + nf(total) + ' ' + plural(total, 'pato', 'patos') + ' na água' : '')
+      : 'Escreva um nome por linha.';
+    $('btComecar').disabled = girando || u.pessoas.length < 2;
+    $('btComecar').title = u.pessoas.length < 2 ? 'Precisa de pelo menos 2 pessoas diferentes' : '';
+    $('btTag').textContent = total ? nf(total) : '';
+    const caixa = limpar($('btUrna'));
+    if (!total) { caixa.appendChild(vazioSimples('A urna está vazia. Os nomes que você escrever aparecem aqui com a chance de cada um.')); }
+    u.pessoas.slice(0, 200).forEach((p, i) => {
+      const pct = (p.bilhetes / total) * 100;
+      const det = nf(p.bilhetes) + ' ' + plural(p.bilhetes, 'entrada', 'entradas')
+        + (btAnim === 'pokemon' ? ' · ' + nf(p.bilhetes * 100) + ' HP' : '');
+      caixa.appendChild(linhaPessoa(i + 1, p, det, (pct < 1 ? pct.toFixed(1).replace('.', ',') : Math.round(pct)) + '%', ''));
+    });
+    if (u.pessoas.length > 200) caixa.appendChild(el('p', 'nota', '+ ' + nf(u.pessoas.length - 200) + ' pessoas'));
+    const pal = $('btPalco');
+    pal.hidden = !btResultado;
+    if (btResultado && !pal.firstChild) pal.appendChild(cardTcg(btResultado));
+  }
+
+  function comecarBatalha() {
+    if (girando) return;
+    const u = urnaManual();
+    if (u.pessoas.length < 2) return;
+    // sorteia a linha: quem tem mais linhas tem mais chance
+    const linha = u.linhas[inteiroAleatorio(u.linhas.length)];
+    const vencedor = u.pessoas.find((p) => p.id === 'm:' + chaveNome(linha));
+    girando = true;
+    $('btComecar').disabled = true;
+    btResultado = null;
+    limpar($('btPalco'));
+    $('btPalco').hidden = true;
+    const total = u.linhas.length;
+    const res = {
+      vencedor, chance: (vencedor.bilhetes / total) * 100, participantes: u.pessoas.length, bilhetes: total,
+      estagio: 'VENCEDOR DA BATALHA',
+      faixa: (btAnim === 'patos' ? 'Corrida de patos' : 'Batalha Pokémon') + ' · lista manual',
+      sabor: 'Venceu entre ' + nf(u.pessoas.length) + ' ' + plural(u.pessoas.length, 'pessoa', 'pessoas') + ' (' + nf(total) + ' '
+        + plural(total, 'entrada', 'entradas') + ') na live de ' + vendedorArroba() + ' em ' + new Date().toLocaleDateString('pt-BR') + '.',
+    };
+    const pronto = () => {
+      btResultado = res;
+      desenharBatalha();
+      $('btPalco').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    if (btAnim === 'patos') {
+      // um pato por linha; o pato que ganha é um dos do vencedor
+      const patos = [];
+      u.pessoas.forEach((p) => { for (let k = 0; k < p.bilhetes; k++) patos.push({ id: p.id + '#' + k, usuario: p.usuario }); });
+      const doVencedor = patos.filter((x) => x.id.indexOf(vencedor.id + '#') === 0);
+      const pato = doVencedor[inteiroAleatorio(doVencedor.length)];
+      correrPatos(patos, pato, pronto, { manual: true });
+    } else {
+      batalharPokemon(u.pessoas, vencedor, pronto, { manual: true, vida: (x) => 100 * (x.bilhetes || 1), cancelar: () => desenharBatalha() });
+    }
+  }
+
+  $('btNomes').addEventListener('input', () => {
+    try { localStorage.setItem(LS_BATALHA, $('btNomes').value); } catch {}
+    desenharBatalha();
+  });
+  // atalhos do painel (M, Shift+D...) não valem enquanto escreve
+  $('btNomes').addEventListener('keydown', (e) => e.stopPropagation());
+  document.querySelectorAll('[data-btanim]').forEach((b) => {
+    b.onclick = () => { btAnim = b.dataset.btanim; salvarLS('bj-batalha-anim', btAnim); desenharBatalha(); };
+  });
+  $('btComecar').onclick = comecarBatalha;
+  $('btLimpar').onclick = () => {
+    if ($('btNomes').value && !confirm('Apagar todos os nomes da lista?')) return;
+    $('btNomes').value = '';
+    try { localStorage.removeItem(LS_BATALHA); } catch {}
+    btResultado = null;
+    desenharBatalha();
+  };
 
   $('btnSortear').onclick = () => {
     if (girando) return;

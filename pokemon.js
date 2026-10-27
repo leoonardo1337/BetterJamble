@@ -380,7 +380,7 @@
   function batalhar(op) {
     const camada = op.camada;
     let fase = 'saguao', parado = false;
-    // vida: HP máximo de cada um (100 a 250, vem do painel pela fatia da urna)
+    // vida: HP máximo de cada um (vem do painel pela fatia da urna; sem teto)
     const pessoas = op.participantes.map((p) => ({ ...p, escolheu: !!p.dex, dex: p.dex || dexDoId(p.id), vida: Math.max(1, Math.round(p.vida || 100)) }));
     const vencedor = pessoas.find((p) => p.id === op.vencedorId) || pessoas[0];
     const timers = new Set();
@@ -527,8 +527,12 @@
       const A = arena();
       // com muita gente os Pokémon diminuem (mas não somem)
       const tam = Math.max(0.5, Math.min(1, Math.sqrt(50 / Math.max(1, pessoas.length))));
-      // o dano acompanha a vida média: a briga dura o mesmo, quem tem mais vida aguenta mais
-      const vidaMedia = pessoas.reduce((a, p) => a + p.vida, 0) / Math.max(1, pessoas.length);
+      // o dano acompanha a vida de quem está no meio (mediana): a briga dura o
+      // mesmo e quem tem muito mais vida (32 entradas, por exemplo) aguenta
+      // muito mais golpes. Com a média, um só com vida enorme fazia todo mundo
+      // cair em poucos golpes.
+      const vidas = pessoas.map((p) => p.vida).sort((a, b) => a - b);
+      const vidaMedia = vidas.length ? vidas[Math.floor((vidas.length - 1) / 2)] : 100;
       estado = {
         t0: performance.now(), ultimo: performance.now(), log: [], faiscas: [], numeros: [], especial: null, tam, escalaDano: vidaMedia / 100,
         vivos: pessoas.map((p) => ({
@@ -659,12 +663,16 @@
           if (agora > p.recarga) {
             p.investida = agora;
             p.recarga = agora + alea(700, 1300) * (1 - 0.08 * bonus(p));
-            ferir(q, alea(0.1, 0.2) * e.escalaDano * furia * (1 + 0.1 * bonus(p)) * (q.ganha ? 0.6 : 1), agora, p);
-            ferir(p, alea(0.02, 0.05) * e.escalaDano * furia * (p.ganha ? 0.6 : 1), agora, null);
+            // Um alvo por vez: só quem ataca dá dano. Quem apanha não devolve
+            // nada nesse golpe (não tinha escolhido brigar com quem bateu).
+            ferir(q, alea(0.12, 0.24) * e.escalaDano * furia * (1 + 0.1 * bonus(p)) * (q.ganha ? 0.6 : 1), agora, p);
             q.vx += (dx / d) * 260; q.vy += (dy / d) * 260;
             e.faiscas.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - 30 * e.tam, ini: agora, cor: escolherDe(CORES) });
             if (Math.random() < 0.3) narrar('@' + p.usuario + ' ' + escolherDe(GOLPES) + '!');
-            if (!q.caindo && Math.random() < 0.6) { q.alvo = p; q.trocaAlvo = agora + alea(2000, 3500); }
+            // Quem apanhou só vira contra quem bateu se estava livre (sem alvo ou
+            // com o alvo longe); se já estava brigando com outro, continua nele.
+            const ocupado = q.alvo && !q.alvo.caindo && !q.alvo.morto && Math.hypot(q.alvo.x - q.x, q.alvo.y - q.y) < encosta * 2;
+            if (!q.caindo && !ocupado && Math.random() < 0.6) { q.alvo = p; q.trocaAlvo = agora + alea(2000, 3500); }
           }
         }
         if (Math.abs(p.vx) > 8) p.olha = p.vx > 0 ? 1 : -1;
@@ -990,8 +998,8 @@
       d.innerHTML = '<div class="pk-cena"><div class="pk-ceu"></div>'
         + '<div class="pk-plat pk-plat-op"></div><div class="pk-plat pk-plat-eu"></div>'
         + '<img class="pk-spr pk-spr-op" alt=""><img class="pk-spr pk-spr-eu" alt="">'
-        + '<div class="pk-hp pk-hp-op"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
-        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div></div></div>'
+        + '<div class="pk-hp pk-hp-op"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div></div>'
+        + '<div class="pk-hp pk-hp-eu"><div class="pk-hp-caixa"><div class="pk-hp-l"><span class="n"></span><span class="nv">Nv50</span></div><div class="pk-hp-b"><b>HP</b><div class="pk-hp-t"><div class="pk-hp-v"></div></div></div><div class="pk-hp-num"></div></div></div>'
         + '</div><div class="pk-texto"><div></div></div>';
       camada.appendChild(d);
       if (cv) { cv.classList.add('saindo'); depois(400, () => cv && cv.remove()); }
@@ -1005,9 +1013,41 @@
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
       sprOp.src = animado(quemNo.op.dex, false); sprOp.onerror = () => { sprOp.src = estatico(quemNo.op.dex); };
       sprEu.src = animado(quemNo.eu.dex, true); sprEu.onerror = () => { sprEu.src = estatico(quemNo.eu.dex); sprEu.classList.add('sem-costas'); };
-      // os dois entram iguais: mesmo nível (Nv50) e HP cheio
-      ['op', 'eu'].forEach((l) => { $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario; });
-      const vida = (lado, v) => { const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838'; };
+      // os dois entram iguais: mesmo nível (Nv50) e HP cheio. O HP em números
+      // usa a mesma vida máxima para os dois (a menor das duas): o duelo é igual.
+      const HP_MAX = Math.max(1, Math.min(vencedor.vida || 100, outro.vida || 100));
+      const hpAgora = { op: HP_MAX, eu: HP_MAX };
+      const pintarNum = (lado, n) => { $('.pk-hp-' + lado + ' .pk-hp-num').textContent = n + '/' + HP_MAX; };
+      ['op', 'eu'].forEach((l) => { $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario; pintarNum(l, HP_MAX); });
+      // o número corre junto com a barra (~0,6 s), como no jogo
+      function contarHp(lado, alvo) {
+        const de = hpAgora[lado], ini = performance.now();
+        hpAgora[lado] = alvo;
+        const passo = (t) => {
+          if (parado) return;
+          const k = Math.min(1, (t - ini) / 600);
+          pintarNum(lado, Math.round(de + (alvo - de) * k));
+          if (k < 1 && hpAgora[lado] === alvo) requestAnimationFrame(passo);
+        };
+        requestAnimationFrame(passo);
+      }
+      // HP de um passo do roteiro (em %) na conta de números
+      const hpDe = (v) => (v <= 0 ? 0 : Math.max(1, Math.round((v / 100) * HP_MAX)));
+      // número subindo em cima do Pokémon, como no campo: "-23" no golpe, "+12" na cura
+      function numeroNoSprite(lado, txt, cura) {
+        const spr = lado === 'op' ? sprOp : sprEu, cena = $('.pk-cena');
+        const rs = spr.getBoundingClientRect(), rc = cena.getBoundingClientRect();
+        const n = el('div', 'pk-dano' + (cura ? ' cura' : ''), txt);
+        n.style.left = (rs.left - rc.left + rs.width / 2) + 'px';
+        n.style.top = (rs.top - rc.top + rs.height * 0.18) + 'px';
+        cena.appendChild(n);
+        depois(1100, () => n.remove());
+      }
+      const vida = (lado, v) => {
+        const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838';
+        // com HP sobrando a conta não pode mostrar 0 (só o golpe final zera)
+        contarHp(lado, hpDe(v));
+      };
       const nomeNo = (l) => nomeDe(quemNo[l].dex) + ' de @' + quemNo[l].usuario;
       // Roteiro de ~20 s: 8 ações alternadas (quem perde começa) e o golpe
       // final é sempre do vencedor, esteja ele em cima ou embaixo. Quem está
@@ -1064,7 +1104,11 @@
           // uma animação por vez em cada sprite (duas classes juntas, só uma tocava)
           const limpa = (x) => { x.classList.remove('golpeia', 'golpeia-op', 'apanha'); void x.offsetWidth; };
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
-          depois(450, () => { limpa(alvo); alvo.classList.add('apanha'); if (som) som.golpe(s.alvo === 'op' ? 0.4 : -0.4); });
+          depois(450, () => {
+            limpa(alvo); alvo.classList.add('apanha'); if (som) som.golpe(s.alvo === 'op' ? 0.4 : -0.4);
+            const dano = hpAgora[s.alvo] - hpDe(s[s.alvo]);
+            if (s[s.alvo] != null && dano > 0) numeroNoSprite(s.alvo, '-' + dano);
+          });
           depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); });
         }
         if (s.cura) {
@@ -1079,6 +1123,8 @@
           spr.classList.add('curando');
           if (som) som.cura(s.cura === 'op' ? 0.4 : -0.4);
           depois(700, () => {
+            const ganho = hpDe(s[s.cura]) - hpAgora[s.cura];
+            if (s[s.cura] != null && ganho > 0) numeroNoSprite(s.cura, '+' + ganho, true);
             if (s.eu != null) vida('eu', s.eu);
             if (s.op != null) vida('op', s.op);
           });
@@ -1125,7 +1171,9 @@
     // ---------------------------------------------------------- teclas
     const tecla = (ev) => {
       if (parado) return;
-      if (ev.key === 'Escape') { ev.preventDefault(); op.aoFim && op.aoFim(); }
+      // Esc antes de o vencedor aparecer cancela a batalha (quem chamou desfaz
+      // o sorteio); depois dele, só fecha
+      if (ev.key === 'Escape') { ev.preventDefault(); if (fase !== 'vencedor' && op.aoCancelar) op.aoCancelar(); else if (op.aoFim) op.aoFim(); }
       else if ((ev.key === 'm' || ev.key === 'M') && som) som.alternar();
       else if (fase === 'saguao' && (ev.key === 'Enter' || ev.key === ' ') && document.activeElement !== btn) { ev.preventDefault(); comecarCampo(); }
     };
