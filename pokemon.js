@@ -1050,29 +1050,39 @@
       };
       const nomeNo = (l) => nomeDe(quemNo[l].dex) + ' de @' + quemNo[l].usuario;
       // Roteiro de ~20 s: 8 ações alternadas (quem perde começa) e o golpe
-      // final é sempre do vencedor, esteja ele em cima ou embaixo. Quem está
-      // abaixo da metade pode se curar (uma vez por lado, 25% de chance a cada
-      // vez); quem perde nunca cai antes do fim e o vencedor nunca chega a zero.
+      // final é sempre do vencedor, esteja ele em cima ou embaixo; quem perde
+      // nunca cai antes do fim e o vencedor nunca chega a zero.
       // Duelo igual para os dois: mesma vida (barra cheia), mesmo dano por
-      // golpe (22 a 35%), mesmo piso (8%) e mesma chance de cura (12%, abaixo
-      // da metade, uma vez por lado). O golpe final também é um golpe normal:
+      // golpe (22 a 35%), mesmo piso (8%) e a mesma chance de cura: cada lado
+      // decide sozinho se vai curar (35%) e em qual das próprias vezes (2ª, 3ª
+      // ou 4ª, nunca a primeira). Se nessa vez ainda não perdeu vida (até 80%)
+      // ou o outro acabou de curar, deixa para a vez seguinte. Antes a cura
+      // dependia de estar abaixo da metade e, como o dano é igual, os dois
+      // passavam da metade juntos e curavam um atrás do outro.
+      // O golpe final também é um golpe normal:
       // ele só sai quando quem perde está ao alcance dele. Até lá os dois seguem
       // trocando golpes (8 a 10 ações de 1,8 s: ~20 s).
       const ACOES = 8, MAX_ACOES = 12, DANO_MIN = 22, DANO_MAX = 35;
       const roteiro = () => {
-        const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false };
+        const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false }, vez = { eu: 0, op: 0 };
+        const quando = {};
+        ['eu', 'op'].forEach((l) => { quando[l] = Math.random() < 0.35 ? 1 + Math.floor(Math.random() * 3) : Infinity; });
+        let curouAntes = false;
         const lista = [{ txt: 'Restam 2! O duelo final vai começar!' }];
         for (let k = 0; k < MAX_ACOES; k++) {
           const quem = k % 2 === 0 ? ladoPerde : ladoGanha, outro = quem === 'op' ? 'eu' : 'op', nome = nomeNo(quem);
+          const minhaVez = vez[quem]++;
           // golpe final: a vez do vencedor, já passou do mínimo de ações e
           // quem perde está ao alcance de um golpe normal
           const final = quem === ladoGanha && k >= ACOES - 1 && hp[ladoPerde] <= DANO_MAX;
-          if (!final && k < ACOES && !curou[quem] && hp[quem] < 50 && Math.random() < 0.12) {
+          if (!final && k < ACOES && !curou[quem] && minhaVez >= quando[quem] && hp[quem] <= 80 && !curouAntes) {
             curou[quem] = true;
+            curouAntes = true;
             hp[quem] = Math.min(100, hp[quem] + Math.round(alea(30, 45)));
             lista.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
             continue;
           }
+          curouAntes = false;
           if (final) hp[ladoPerde] = 0;
           else hp[outro] = Math.max(8, hp[outro] - Math.round(alea(DANO_MIN, DANO_MAX)));
           // no duelo não tem especial: os dois só usam golpes normais, até o último
