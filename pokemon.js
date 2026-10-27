@@ -546,10 +546,15 @@
       requestAnimationFrame(quadro);
     }
 
+    // O vencedor sorteado não desce de PISO_GANHA no campo (ele tem que chegar
+    // ao duelo). Parado no piso, ninguém mira nele: antes os golpes nele
+    // mostravam "-1" e a vida não descia.
+    const PISO_GANHA = 0.22;
+    const noPiso = (q) => q.ganha && q.hp <= PISO_GANHA + 0.005;
     function escolherAlvo(p, vivos, agora) {
       let melhor = null, nota = Infinity;
       for (const q of vivos) {
-        if (q === p || q.caindo) continue;
+        if (q === p || q.caindo || noPiso(q)) continue;
         const d = Math.hypot(q.x - p.x, q.y - p.y) * alea(0.6, 1.4);
         if (d < nota) { nota = d; melhor = q; }
       }
@@ -566,10 +571,11 @@
       const antes = p.hp;
       // o vencedor sorteado nunca desmaia; e com 2 de pé ninguém mais cai no
       // campo: os dois últimos se resolvem no duelo final
-      const piso = p.ganha ? 0.22 : emPe() <= 2 ? 0.05 : 0;
+      const piso = p.ganha ? PISO_GANHA : emPe() <= 2 ? 0.05 : 0;
       // o dano vem em pontos de uma vida de 100: quem tem mais vida perde
       // uma fatia menor da barra com o mesmo golpe
       p.hp = Math.max(piso, p.hp - dano * 100 / p.vida);
+      if (p.hp >= antes) return;   // já estava no piso: nada de número sem perder vida
       p.treme = agora;
       if (atacante) { estado.numeros.push({ x: p.x, y: p.y - 70 * estado.tam, ini: agora, txt: '-' + Math.max(1, Math.round((antes - p.hp) * p.vida)) }); if (som) som.golpe(lado(p)); }
       if (p.hp <= 0) derrubar(p, agora, atacante);
@@ -647,7 +653,7 @@
       const encosta = 46 * e.tam + 6;
       for (const p of ativos) {
         if (noEspecial(p)) { p.vx *= 0.8; p.vy *= 0.8; continue; }
-        if (!p.alvo || p.alvo.caindo || p.alvo.morto || noEspecial(p.alvo) || agora > p.trocaAlvo) escolherAlvo(p, ativos.filter((x) => !noEspecial(x)), agora);
+        if (!p.alvo || p.alvo.caindo || p.alvo.morto || noEspecial(p.alvo) || noPiso(p.alvo) || agora > p.trocaAlvo) escolherAlvo(p, ativos.filter((x) => !noEspecial(x)), agora);
         const q = p.alvo;
         if (!q) continue;
         const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1;
@@ -1083,7 +1089,10 @@
       const piso = (l) => Math.max(1, Math.ceil(MAX[l] * 0.08));
       const superEfetivo = MAX[ladoPerde] >= U * 1.5;
       const pesos = (n) => { const w = Array.from({ length: n }, () => alea(0.7, 1.3)); const t = w.reduce((x, y) => x + y, 0); return w.map((x) => x / t); };
-      const roteiro = () => {
+      // querCura: quem vai curar neste duelo, sorteado UMA vez fora do roteiro.
+      // Se fosse sorteado dentro, os roteiros que não cabem (e são sorteados de
+      // novo) mudavam a conta: o vencedor acabava curando mais que quem perde.
+      const roteiro = (querCura, querEsp) => {
         const R = Math.random() < 0.6 ? 4 : 5;   // rodadas: ~8 ou ~10 ações
         const G = ladoGanha, P = ladoPerde;
         // quem começa é sorteado; se o vencedor começa, o golpe final abre a
@@ -1091,8 +1100,8 @@
         const ordem = Math.random() < 0.5 ? [P, G] : [G, P];
         const vezesP = ordem[0] === G ? R - 1 : R;
         // vez em que cada um cura (nunca a primeira; o vencedor nunca na do final), ou -1
-        const curaP = vezesP > 1 && Math.random() < 0.35 ? 1 + Math.floor(Math.random() * Math.min(3, vezesP - 1)) : -1;
-        const curaG = R > 2 && Math.random() < 0.35 ? 1 + Math.floor(Math.random() * Math.min(3, R - 2)) : -1;
+        const curaP = vezesP > 1 && querCura.P ? 1 + Math.floor(Math.random() * Math.min(3, vezesP - 1)) : -1;
+        const curaG = R > 2 && querCura.G ? 1 + Math.floor(Math.random() * Math.min(3, R - 2)) : -1;
         const golpesG = R - (curaG >= 0 ? 1 : 0);   // o último é o final
         const golpesP = vezesP - (curaP >= 0 ? 1 : 0);
         const ganhoP = curaP >= 0 ? Math.round(MAX[P] * alea(0.3, 0.45)) : 0;
@@ -1107,11 +1116,13 @@
         let danoP = Array.from({ length: golpesP }, () => Math.max(1, Math.round(U * porGolpe * alea(0.7, 1.3))));
         const cabe = MAX[G] + ganhoG - piso(G) - Math.ceil(MAX[G] * alea(0.02, 0.2));
         // especial: quem usa e em qual dos próprios golpes normais (nunca o primeiro)
+        // (quem usa e qual especial vêm sorteados de fora, como a cura)
         let esp = null;
-        if (Math.random() < 0.3) {
-          const quem = Math.random() < 0.5 ? G : P;
+        if (querEsp) {
+          const quem = querEsp.ganha ? G : P;
           const normais = quem === G ? golpesG - 1 : golpesP;
-          if (normais >= 2) esp = { quem, idx: 1 + Math.floor(Math.random() * (normais - 1)), aguentou: false, ...(() => { const [nome, cor] = escolherDe(ESPECIAIS); return { nome, cor }; })() };
+          if (normais < 2) return null;
+          esp = { quem, idx: 1 + Math.floor(Math.random() * (normais - 1)), aguentou: false, nome: querEsp.nome, cor: querEsp.cor };
         }
         // encaixa o especial na lista de golpes de quem usa: ele pesa 40 a 55%
         // da vida do alvo e os outros golpes dividem o que sobra
@@ -1180,7 +1191,18 @@
         return null;
       };
       let passos = null;
-      for (let tentativa = 0; !passos && tentativa < 500; tentativa++) passos = roteiro();
+      // Quem cura e quem usa especial são sorteados UMA vez, fora do roteiro:
+      // se fossem sorteados dentro, os roteiros que não cabem (e são refeitos)
+      // mudavam a conta — o vencedor curava mais que quem perde e, com vidas
+      // muito diferentes, o especial aparecia em metade dos duelos.
+      const querCura = { P: Math.random() < 0.35, G: Math.random() < 0.35 };
+      const querEsp = Math.random() < 0.3 ? (() => { const [nome, cor] = escolherDe(ESPECIAIS); return { ganha: Math.random() < 0.5, nome, cor }; })() : null;
+      // Se a cura sorteada não couber (quem tem muito mais vida quase não perde
+      // nada e nunca chega a 80%), ele fica sem curar; se nem assim, sem especial.
+      for (const [cura, e] of [[querCura, querEsp], [{ P: querCura.P, G: false }, querEsp], [{ P: false, G: querCura.G }, querEsp], [{ P: false, G: false }, querEsp], [{ P: false, G: false }, null]]) {
+        for (let tentativa = 0; !passos && tentativa < 150; tentativa++) passos = roteiro(cura, e);
+        if (passos) break;
+      }
       if (!passos) {
         // quase impossível (500 planos seguidos sem servir): só o golpe final
         passos = [{ txt: 'Restam 2! O duelo final vai começar!' },
