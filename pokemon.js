@@ -902,7 +902,7 @@
         ctx.fillStyle = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838';
         ctx.fillRect(bx + 19, by + 1, Math.max(0, (bw - 20) * p.hp), 4);
         ctx.fillStyle = '#383838'; ctx.font = '8px "Press Start 2P",monospace'; ctx.textAlign = 'right';
-        ctx.fillText(Math.max(1, Math.round(p.hp * 100)) + '%', x0 + rw - 14, by + 4);   // HP em porcentagem
+        ctx.fillText(String(Math.max(1, Math.round(p.hp * p.vida))), x0 + rw - 14, by + 4);   // HP em pontos
         ctx.textAlign = 'left';
       });
       if (vivos.length > mostra) {
@@ -1013,12 +1013,12 @@
       const sprOp = $('.pk-spr-op'), sprEu = $('.pk-spr-eu');
       sprOp.src = animado(quemNo.op.dex, false); sprOp.onerror = () => { sprOp.src = estatico(quemNo.op.dex); };
       sprEu.src = animado(quemNo.eu.dex, true); sprEu.onerror = () => { sprEu.src = estatico(quemNo.eu.dex); sprEu.classList.add('sem-costas'); };
-      // os dois entram iguais: mesmo nível (Nv50) e HP cheio. O HP em números
-      // usa a mesma vida máxima para os dois (a menor das duas): o duelo é igual.
-      const HP_MAX = Math.max(1, Math.min(vencedor.vida || 100, outro.vida || 100));
-      const hpAgora = { op: HP_MAX, eu: HP_MAX };
-      const pintarNum = (lado, n) => { $('.pk-hp-' + lado + ' .pk-hp-num').textContent = n + '/' + HP_MAX; };
-      ['op', 'eu'].forEach((l) => { $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario; pintarNum(l, HP_MAX); });
+      // Cada um entra com a vida dele (a mesma do campo: mais entradas, mais HP)
+      // e a barra cheia. Os números e a barra andam em pontos de vida de verdade.
+      const MAX = { [ladoGanha]: Math.max(1, Math.round(vencedor.vida || 100)), [ladoPerde]: Math.max(1, Math.round(outro.vida || 100)) };
+      const hpAgora = { op: MAX.op, eu: MAX.eu };
+      const pintarNum = (lado, n) => { $('.pk-hp-' + lado + ' .pk-hp-num').textContent = n + '/' + MAX[lado]; };
+      ['op', 'eu'].forEach((l) => { $('.pk-hp-' + l + ' .n').textContent = '@' + quemNo[l].usuario; pintarNum(l, MAX[l]); });
       // o número corre junto com a barra (~0,6 s), como no jogo
       function contarHp(lado, alvo) {
         const de = hpAgora[lado], ini = performance.now();
@@ -1031,73 +1031,108 @@
         };
         requestAnimationFrame(passo);
       }
-      // HP de um passo do roteiro (em %) na conta de números
-      const hpDe = (v) => (v <= 0 ? 0 : Math.max(1, Math.round((v / 100) * HP_MAX)));
       // número subindo em cima do Pokémon, como no campo: "-23" no golpe, "+12" na cura
-      function numeroNoSprite(lado, txt, cura) {
+      function numeroNoSprite(lado, txt, tipo) {
         const spr = lado === 'op' ? sprOp : sprEu, cena = $('.pk-cena');
         const rs = spr.getBoundingClientRect(), rc = cena.getBoundingClientRect();
-        const n = el('div', 'pk-dano' + (cura ? ' cura' : ''), txt);
+        const n = el('div', 'pk-dano' + (tipo ? ' ' + tipo : ''), txt);
         n.style.left = (rs.left - rc.left + rs.width / 2) + 'px';
         n.style.top = (rs.top - rc.top + rs.height * 0.18) + 'px';
         cena.appendChild(n);
         depois(1100, () => n.remove());
       }
       const vida = (lado, v) => {
-        const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = v + '%'; b.style.background = v > 50 ? '#58d080' : v > 20 ? '#f8c030' : '#f05838';
-        // com HP sobrando a conta não pode mostrar 0 (só o golpe final zera)
-        contarHp(lado, hpDe(v));
+        const pct = (v / MAX[lado]) * 100;
+        const b = $('.pk-hp-' + lado + ' .pk-hp-v'); b.style.width = pct + '%'; b.style.background = pct > 50 ? '#58d080' : pct > 20 ? '#f8c030' : '#f05838';
+        contarHp(lado, v);
       };
       const nomeNo = (l) => nomeDe(quemNo[l].dex) + ' de @' + quemNo[l].usuario;
-      // Roteiro de ~20 s: 8 ações alternadas (quem perde começa) e o golpe
-      // final é sempre do vencedor, esteja ele em cima ou embaixo; quem perde
-      // nunca cai antes do fim e o vencedor nunca chega a zero.
-      // Duelo igual para os dois: mesma vida (barra cheia), mesmo dano por
-      // golpe (22 a 35%), mesmo piso (8%) e a mesma chance de cura: cada lado
-      // decide sozinho se vai curar (35%) e em qual das próprias vezes (2ª, 3ª
-      // ou 4ª, nunca a primeira). Se nessa vez ainda não perdeu vida (até 80%)
-      // ou o outro acabou de curar, deixa para a vez seguinte. Antes a cura
-      // dependia de estar abaixo da metade e, como o dano é igual, os dois
-      // passavam da metade juntos e curavam um atrás do outro.
-      // O golpe final também é um golpe normal:
-      // ele só sai quando quem perde está ao alcance dele. Até lá os dois seguem
-      // trocando golpes (8 a 10 ações de 1,8 s: ~20 s).
-      const ACOES = 8, MAX_ACOES = 12, DANO_MIN = 22, DANO_MAX = 35;
+      // Roteiro de ~20 s: rodadas de duas ações (quem começa é sorteado) e o
+      // golpe final é sempre do vencedor, esteja ele em cima ou embaixo; quem
+      // perde nunca cai antes do fim e o vencedor nunca chega a zero.
+      //
+      // A vida conta: cada um tem a vida dele e o dano é em pontos.
+      //   - quem perde bate em pedaços da MENOR vida dos dois, do mesmo tamanho
+      //     que os golpes de quem ganha teriam com vidas iguais: em quem tem
+      //     muito mais vida a barra quase não mexe;
+      //   - os golpes de quem ganha levam quem perde do cheio até o alcance do
+      //     golpe final: se quem perde tem bem mais vida, cada golpe é enorme
+      //     ("É super efetivo!") — é assim que o azarão derruba o favorito.
+      // Com vidas iguais os dois perdem mais ou menos o mesmo por golpe.
+      //
+      // O roteiro é planejado antes (quantas rodadas, quem cura e quando) e o
+      // dano é dividido para caber: todo golpe tira vida de verdade e ninguém
+      // fica parado no piso (antes, quem estava no piso "tomava" o golpe sem
+      // perder nada). Sortear golpes ao acaso e descartar os roteiros que não
+      // cabiam favorecia, sem querer, os roteiros com cura.
+      //
+      // Cura: cada lado decide sozinho se vai curar (35%) e em qual das próprias
+      // vezes (nunca a primeira, e o vencedor nunca na do golpe final). Não cura
+      // com a vida acima de 80% nem logo depois de o outro curar.
+      const U = Math.min(MAX.eu, MAX.op);
+      const piso = (l) => Math.max(1, Math.ceil(MAX[l] * 0.08));
+      const superEfetivo = MAX[ladoPerde] >= U * 1.5;
+      const pesos = (n) => { const w = Array.from({ length: n }, () => alea(0.7, 1.3)); const t = w.reduce((x, y) => x + y, 0); return w.map((x) => x / t); };
       const roteiro = () => {
-        const hp = { eu: 100, op: 100 }, curou = { eu: false, op: false }, vez = { eu: 0, op: 0 };
-        const quando = {};
-        ['eu', 'op'].forEach((l) => { quando[l] = Math.random() < 0.35 ? 1 + Math.floor(Math.random() * 3) : Infinity; });
-        let curouAntes = false;
+        const R = Math.random() < 0.6 ? 4 : 5;   // rodadas: ~8 ou ~10 ações
+        const G = ladoGanha, P = ladoPerde;
+        // quem começa é sorteado; se o vencedor começa, o golpe final abre a
+        // última rodada e quem perde age uma vez a menos
+        const ordem = Math.random() < 0.5 ? [P, G] : [G, P];
+        const vezesP = ordem[0] === G ? R - 1 : R;
+        // vez em que cada um cura (nunca a primeira; o vencedor nunca na do final), ou -1
+        const curaP = vezesP > 1 && Math.random() < 0.35 ? 1 + Math.floor(Math.random() * Math.min(3, vezesP - 1)) : -1;
+        const curaG = R > 2 && Math.random() < 0.35 ? 1 + Math.floor(Math.random() * Math.min(3, R - 2)) : -1;
+        const golpesG = R - (curaG >= 0 ? 1 : 0);   // o último é o final
+        const golpesP = vezesP - (curaP >= 0 ? 1 : 0);
+        const ganhoP = curaP >= 0 ? Math.round(MAX[P] * alea(0.3, 0.45)) : 0;
+        const ganhoG = curaG >= 0 ? Math.round(MAX[G] * alea(0.3, 0.45)) : 0;
+        // quem perde: dos golpes normais do vencedor, sai do cheio (+ cura) e
+        // termina ao alcance do golpe final (18 a 34% da vida)
+        const fimP = Math.max(piso(P) + 1, Math.round(MAX[P] * alea(0.18, 0.34)));
+        const danoG = pesos(golpesG - 1).map((w) => Math.max(1, Math.round(w * (MAX[P] + ganhoP - fimP))));
+        // o vencedor: golpes do tamanho dos de quem ganha (com vidas iguais),
+        // em pedaços da menor vida, encolhidos se não couberem
+        const porGolpe = (1 - alea(0.18, 0.34)) / Math.max(1, R - 1);
+        let danoP = Array.from({ length: golpesP }, () => Math.max(1, Math.round(U * porGolpe * alea(0.7, 1.3))));
+        const cabe = MAX[G] + ganhoG - piso(G) - Math.ceil(MAX[G] * alea(0.02, 0.2));
+        const soma = danoP.reduce((x, y) => x + y, 0);
+        if (soma > cabe) danoP = danoP.map((d) => Math.max(1, Math.floor(d * Math.max(1, cabe) / soma)));
+        const hp = { [G]: MAX[G], [P]: MAX[P] };
         const lista = [{ txt: 'Restam 2! O duelo final vai começar!' }];
-        for (let k = 0; k < MAX_ACOES; k++) {
-          const quem = k % 2 === 0 ? ladoPerde : ladoGanha, outro = quem === 'op' ? 'eu' : 'op', nome = nomeNo(quem);
-          const minhaVez = vez[quem]++;
-          // golpe final: a vez do vencedor, já passou do mínimo de ações e
-          // quem perde está ao alcance de um golpe normal
-          const final = quem === ladoGanha && k >= ACOES - 1 && hp[ladoPerde] <= DANO_MAX;
-          if (!final && k < ACOES && !curou[quem] && minhaVez >= quando[quem] && hp[quem] <= 80 && !curouAntes) {
-            curou[quem] = true;
-            curouAntes = true;
-            hp[quem] = Math.min(100, hp[quem] + Math.round(alea(30, 45)));
-            lista.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
-            continue;
-          }
-          curouAntes = false;
-          if (final) hp[ladoPerde] = 0;
-          else hp[outro] = Math.max(8, hp[outro] - Math.round(alea(DANO_MIN, DANO_MAX)));
-          // no duelo não tem especial: os dois só usam golpes normais, até o último
-          lista.push({ txt: nome + ' ' + escolherDe(GOLPES) + '!', alvo: outro, [outro]: hp[outro] });
-          if (final) {
-            lista.push({ txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true });
-            return lista;
+        let iG = 0, iP = 0, curouAntes = false;
+        for (let r = 0; r < R; r++) {
+          for (const quem of ordem) {
+            const outro = quem === P ? G : P, nome = nomeNo(quem);
+            const final = quem === G && r === R - 1;
+            if (!final && r === (quem === P ? curaP : curaG)) {
+              // curar com a vida quase cheia ou logo depois do outro não serve
+              if (hp[quem] > MAX[quem] * 0.8 || curouAntes) return null;
+              curouAntes = true;
+              hp[quem] = Math.min(MAX[quem], hp[quem] + (quem === P ? ganhoP : ganhoG));
+              lista.push({ txt: nome + ' usou ' + escolherDe(['RECUPERAR', 'DESCANSO', 'BROTO DE VIDA']) + '!', cura: quem, [quem]: hp[quem] });
+              continue;
+            }
+            curouAntes = false;
+            const golpe = nome + ' ' + escolherDe(GOLPES) + '!';
+            if (final) {
+              lista.push({ txt: golpe, alvo: outro, [outro]: 0 });
+              lista.push({ txt: nomeNo(P) + ' desmaiou!', desmaia: true });
+              return lista;
+            }
+            // no duelo não tem especial: os dois só usam golpes normais, até o último
+            const dano = quem === G ? danoG[iG++] : danoP[iP++];
+            if (!(dano >= 1) || hp[outro] - dano < piso(outro)) return null;
+            hp[outro] -= dano;
+            lista.push({ txt: quem === G && superEfetivo ? golpe + ' É super efetivo!' : golpe, alvo: outro, [outro]: hp[outro] });
           }
         }
-        return null;   // não fechou dentro do limite de ações: sorteia outro
+        return null;
       };
       let passos = null;
       for (let tentativa = 0; !passos && tentativa < 500; tentativa++) passos = roteiro();
       if (!passos) {
-        // quase impossível (500 roteiros seguidos sem servir): vai um sem a regra do último golpe
+        // quase impossível (500 planos seguidos sem servir): só o golpe final
         passos = [{ txt: 'Restam 2! O duelo final vai começar!' },
           { txt: nomeNo(ladoGanha) + ' ' + escolherDe(GOLPES) + '!', alvo: ladoPerde, [ladoPerde]: 0 },
           { txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true }];
@@ -1116,7 +1151,7 @@
           limpa(atk); atk.classList.add(s.alvo === 'op' ? 'golpeia' : 'golpeia-op');
           depois(450, () => {
             limpa(alvo); alvo.classList.add('apanha'); if (som) som.golpe(s.alvo === 'op' ? 0.4 : -0.4);
-            const dano = hpAgora[s.alvo] - hpDe(s[s.alvo]);
+            const dano = hpAgora[s.alvo] - s[s.alvo];
             if (s[s.alvo] != null && dano > 0) numeroNoSprite(s.alvo, '-' + dano);
           });
           depois(800, () => { if (s.eu != null) vida('eu', s.eu); if (s.op != null) vida('op', s.op); });
@@ -1133,8 +1168,8 @@
           spr.classList.add('curando');
           if (som) som.cura(s.cura === 'op' ? 0.4 : -0.4);
           depois(700, () => {
-            const ganho = hpDe(s[s.cura]) - hpAgora[s.cura];
-            if (s[s.cura] != null && ganho > 0) numeroNoSprite(s.cura, '+' + ganho, true);
+            const ganho = s[s.cura] - hpAgora[s.cura];
+            if (s[s.cura] != null && ganho > 0) numeroNoSprite(s.cura, '+' + ganho, 'cura');
             if (s.eu != null) vida('eu', s.eu);
             if (s.op != null) vida('op', s.op);
           });
