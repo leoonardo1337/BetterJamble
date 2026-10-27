@@ -807,6 +807,7 @@
   .pk-spr-op{width:calc(var(--u) * 22);height:calc(var(--u) * 22);right:calc(50cqw - var(--u) * 36);top:calc(var(--u) * 15)}
   .pk-spr-eu{width:calc(var(--u) * 34);height:calc(var(--u) * 34);left:calc(50cqw - var(--u) * 43);bottom:calc(var(--u) * 1)}
   .pk-spr-eu.sem-costas{transform:scaleX(-1)}
+  .pk-spr-eu.sem-costas.carregando{transform:scaleX(-1) scale(1.25)}
   .pk-spr.golpeia{animation:pk-golpe-eu .45s ease}
   .pk-spr.golpeia-op{animation:pk-golpe-op .45s ease}
   @keyframes pk-golpe-eu{50%{translate:calc(var(--u) * 5) calc(var(--u) * -3)}}
@@ -846,6 +847,11 @@
     text-shadow:calc(var(--u) * .35) 0 0 #202020,calc(var(--u) * -.35) 0 0 #202020,0 calc(var(--u) * .35) 0 #202020,0 calc(var(--u) * -.35) 0 #202020;
     animation:pkDano 1.05s cubic-bezier(.2,.7,.3,1) forwards}
   .pk-dano.cura{color:#7ad151}
+  .pk-dano.forte{color:#ffd84a;font-size:calc(var(--u) * 4.4)}
+  .pk-dano.aguentou{color:#ffd84a;font-size:calc(var(--u) * 3)}
+  /* especial no duelo: o canvas do efeito por cima da cena e quem carrega cresce */
+  .pk-fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+  .pk-spr.carregando{transition:transform .85s ease-in,filter .85s;transform:scale(1.25);filter:brightness(1.35) drop-shadow(0 0 calc(var(--u) * 2) #fff)}
   @keyframes pkDano{0%{opacity:0;transform:translate(-50%,calc(var(--u) * 3)) scale(.6)}
     14%{opacity:1;transform:translate(-50%,0) scale(1.18)}
     28%{transform:translate(-50%,calc(var(--u) * -1.5)) scale(1)}

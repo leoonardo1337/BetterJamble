@@ -762,10 +762,11 @@
       ctx.beginPath(); ctx.arc(x, y, r, 0, 6.29); ctx.fill();
       ctx.globalAlpha = 1;
     }
-    function desenharEspecial(agora) {
-      const s = estado.especial;
+    // s: {de:{x,y}, para:{x,y}, ini, nome, cor}; k0: escala dos Pokémon. O
+    // duelo chama com o canvas dele no lugar de ctx (ver especialNoDuelo).
+    function desenharEspecial(agora, s = estado && estado.especial, k0 = estado ? estado.tam : 1) {
       if (!s) return;
-      const t = agora - s.ini, ti = t - CARGA_MS, kc = Math.min(1, t / CARGA_MS), k0 = estado.tam;
+      const t = agora - s.ini, ti = t - CARGA_MS, kc = Math.min(1, t / CARGA_MS);
       const de = s.de, para = s.para;
       const ax = de.x, ay = de.y - 40 * k0, bx = para.x, by = para.y - 40 * k0;
       const sai = Math.max(0, (t - CARGA_MS - IMPACTO_MS + 250) / 250);
@@ -1069,6 +1070,13 @@
       // Cura: cada lado decide sozinho se vai curar (35%) e em qual das próprias
       // vezes (nunca a primeira, e o vencedor nunca na do golpe final). Não cura
       // com a vida acima de 80% nem logo depois de o outro curar.
+      //
+      // Especial: em 30% dos duelos, um dos dois (sorteado) usa um especial no
+      // meio do duelo, com a mesma animação do campo. Tira 40 a 55% da vida do
+      // outro, nunca na primeira vez de quem usa nem no golpe final. Ninguém cai
+      // com ele: se passaria do piso, o alvo "AGUENTOU!" com um fio de vida.
+      // É um dos golpes do plano: os outros golpes de quem usou encolhem para o
+      // total continuar cabendo.
       const U = Math.min(MAX.eu, MAX.op);
       const piso = (l) => Math.max(1, Math.ceil(MAX[l] * 0.08));
       const superEfetivo = MAX[ladoPerde] >= U * 1.5;
@@ -1096,8 +1104,41 @@
         const porGolpe = (1 - alea(0.18, 0.34)) / Math.max(1, R - 1);
         let danoP = Array.from({ length: golpesP }, () => Math.max(1, Math.round(U * porGolpe * alea(0.7, 1.3))));
         const cabe = MAX[G] + ganhoG - piso(G) - Math.ceil(MAX[G] * alea(0.02, 0.2));
-        const soma = danoP.reduce((x, y) => x + y, 0);
+        // especial: quem usa e em qual dos próprios golpes normais (nunca o primeiro)
+        let esp = null;
+        if (Math.random() < 0.3) {
+          const quem = Math.random() < 0.5 ? G : P;
+          const normais = quem === G ? golpesG - 1 : golpesP;
+          if (normais >= 2) esp = { quem, idx: 1 + Math.floor(Math.random() * (normais - 1)), aguentou: false, ...(() => { const [nome, cor] = escolherDe(ESPECIAIS); return { nome, cor }; })() };
+        }
+        // encaixa o especial na lista de golpes de quem usa: ele pesa 40 a 55%
+        // da vida do alvo e os outros golpes dividem o que sobra
+        const encaixar = (lista, total, idx, forte) => {
+          const outros = lista.length - 1;
+          let grande = Math.min(forte, total - outros);
+          if (grande < 1 || outros < 0) return null;
+          const resto = total - grande, somaOutros = lista.reduce((x, y, j) => (j === idx ? x : x + y), 0) || 1;
+          const nova = lista.map((d, j) => (j === idx ? grande : Math.max(1, Math.floor(d * resto / somaOutros))));
+          return { nova, cortado: grande < forte };
+        };
+        if (esp && esp.quem === G) {
+          const total = MAX[P] + ganhoP - fimP;
+          const r = encaixar(danoG, total, esp.idx, Math.round(MAX[P] * alea(0.4, 0.55)));
+          if (!r) return null;
+          danoG.splice(0, danoG.length, ...r.nova);
+        }
+        let soma = danoP.reduce((x, y) => x + y, 0);
         if (soma > cabe) danoP = danoP.map((d) => Math.max(1, Math.floor(d * Math.max(1, cabe) / soma)));
+        if (esp && esp.quem === P) {
+          soma = danoP.reduce((x, y) => x + y, 0);
+          const forte = Math.round(MAX[G] * alea(0.4, 0.55));
+          // cabe inteiro? senão os outros golpes dele encolhem; se nem assim,
+          // o vencedor aguenta com o que sobrar acima do piso
+          const r = encaixar(danoP, Math.max(soma - danoP[esp.idx] + forte > cabe ? cabe : soma - danoP[esp.idx] + forte, danoP.length), esp.idx, forte);
+          if (!r) return null;
+          danoP = r.nova;
+          esp.aguentou = r.cortado;
+        }
         const hp = { [G]: MAX[G], [P]: MAX[P] };
         const lista = [{ txt: 'Restam 2! O duelo final vai começar!' }];
         let iG = 0, iP = 0, curouAntes = false;
@@ -1120,10 +1161,17 @@
               lista.push({ txt: nomeNo(P) + ' desmaiou!', desmaia: true });
               return lista;
             }
-            // no duelo não tem especial: os dois só usam golpes normais, até o último
-            const dano = quem === G ? danoG[iG++] : danoP[iP++];
+            const idx = quem === G ? iG++ : iP++;
+            const dano = quem === G ? danoG[idx] : danoP[idx];
             if (!(dano >= 1) || hp[outro] - dano < piso(outro)) return null;
             hp[outro] -= dano;
+            if (esp && esp.quem === quem && esp.idx === idx) {
+              // o especial "cortado" deixa o alvo com pouca vida: ele aguentou
+              const aguentou = esp.aguentou || hp[outro] - piso(outro) < MAX[outro] * 0.05;
+              lista.push({ txt: nome + ' usou ' + esp.nome + '!' + (aguentou ? ' @' + quemNo[outro].usuario + ' aguentou!' : ''),
+                alvo: outro, [outro]: hp[outro], especial: esp, aguentou });
+              continue;
+            }
             lista.push({ txt: quem === G && superEfetivo ? golpe + ' É super efetivo!' : golpe, alvo: outro, [outro]: hp[outro] });
           }
         }
@@ -1137,6 +1185,47 @@
           { txt: nomeNo(ladoGanha) + ' ' + escolherDe(GOLPES) + '!', alvo: ladoPerde, [ladoPerde]: 0 },
           { txt: nomeNo(ladoPerde) + ' desmaiou!', desmaia: true }];
       }
+      // O especial no duelo: o mesmo desenho do campo num canvas por cima da
+      // cena. Durante a carga quem usa cresce com a aura; no impacto o alvo
+      // pisca, a vida desce e o número sobe.
+      function especialNoDuelo(s) {
+        const atkLado = s.alvo === 'op' ? 'eu' : 'op';
+        const atk = atkLado === 'op' ? sprOp : sprEu, alvoSpr = s.alvo === 'op' ? sprOp : sprEu;
+        const cena = $('.pk-cena');
+        const fx = el('canvas', 'pk-fx');
+        cena.appendChild(fx);
+        const rc = cena.getBoundingClientRect();
+        fx.width = Math.max(1, Math.round(rc.width)); fx.height = Math.max(1, Math.round(rc.height));
+        const fctx = fx.getContext('2d');
+        // o desenho mira 40*k0 acima do ponto: passa o pé do sprite + 40*k0
+        const k0 = Math.max(0.6, Math.min(1.6, rc.height / 420));
+        const ponto = (spr) => { const r = spr.getBoundingClientRect(); return { x: r.left - rc.left + r.width / 2, y: r.top - rc.top + r.height * 0.55 + 40 * k0 }; };
+        const esp = { de: ponto(atk), para: ponto(alvoSpr), ini: performance.now(), nome: s.especial.nome, cor: s.especial.cor };
+        atk.classList.add('carregando');
+        if (som) som.carga(atkLado === 'op' ? 0.4 : -0.4);
+        let bateu = false;
+        const quadroFx = (agora) => {
+          if (parado) return;
+          fctx.clearRect(0, 0, fx.width, fx.height);
+          const antes = ctx; ctx = fctx;
+          try { desenharEspecial(agora, esp, k0); } finally { ctx = antes; }
+          const t = agora - esp.ini;
+          if (!bateu && t >= CARGA_MS) {
+            bateu = true;
+            atk.classList.remove('carregando');
+            alvoSpr.classList.remove('golpeia', 'golpeia-op', 'apanha'); void alvoSpr.offsetWidth; alvoSpr.classList.add('apanha');
+            if (som) som.impacto(s.alvo === 'op' ? 0.4 : -0.4);
+            const dano = hpAgora[s.alvo] - s[s.alvo];
+            if (dano > 0) numeroNoSprite(s.alvo, '-' + dano, 'forte');
+            if (s.aguentou) depois(350, () => numeroNoSprite(s.alvo, 'AGUENTOU!', 'aguentou'));
+            vida(s.alvo, s[s.alvo]);
+          }
+          if (t < CARGA_MS + IMPACTO_MS) requestAnimationFrame(quadroFx);
+          else fx.remove();
+        };
+        requestAnimationFrame(quadroFx);
+      }
+
       let i = 0;
       const tocar = () => {
         if (parado) return;
@@ -1144,7 +1233,8 @@
         const caixa = $('.pk-texto div');
         let n = 0; caixa.textContent = '';
         const letra = setInterval(() => { if (parado) return clearInterval(letra); caixa.textContent = s.txt.slice(0, ++n); if (n >= s.txt.length) clearInterval(letra); }, 26);
-        if (s.alvo) {
+        if (s.especial) especialNoDuelo(s);
+        else if (s.alvo) {
           const atk = s.alvo === 'op' ? sprEu : sprOp, alvo = s.alvo === 'op' ? sprOp : sprEu;
           // uma animação por vez em cada sprite (duas classes juntas, só uma tocava)
           const limpa = (x) => { x.classList.remove('golpeia', 'golpeia-op', 'apanha'); void x.offsetWidth; };
@@ -1177,7 +1267,7 @@
         }
         if (s.desmaia) { (ladoPerde === 'op' ? sprOp : sprEu).classList.add('desmaia'); if (som) som.nocaute(ladoPerde === 'op' ? 0.4 : -0.4); }
         i++;
-        if (i < passos.length) depois(s.desmaia ? 1600 : 1800, tocar);
+        if (i < passos.length) depois(s.desmaia ? 1600 : s.especial ? 2700 : 1800, tocar);
         else depois(1700, mostrarVencedor);
       };
       depois(450, tocar);
