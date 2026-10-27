@@ -183,6 +183,12 @@
       case 'resolver-avatar':
         if (api && p.userId) api.resolverAvatar(p.userId);
         break;
+      // aba Batalha: foto de quem está na lista, pelo @
+      case 'fotos-por-nome':
+        if (api && api.fotosPorNome && Array.isArray(p.nomes)) {
+          api.fotosPorNome(p.nomes).then((fotos) => enviar('painel-fotos-nome', { fotos })).catch(() => {});
+        }
+        break;
       default:
         break;
     }

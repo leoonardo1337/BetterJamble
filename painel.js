@@ -208,6 +208,9 @@
         if (payload && payload.pendentes) { pokemonPendentes.push(...(payload.mensagens || [])); aplicarPokemonPendentes(); }
         else receberChat(payload && payload.mensagens);
         break;
+      case 'painel-fotos-nome':
+        receberFotosNome(payload && payload.fotos);
+        break;
       case 'painel-urna':
         if (payload && payload.escopo) {
           const tipo = payload.tipo || 'gemas';
@@ -403,7 +406,8 @@
   }
 
   function pedirAvatar(userId) {
-    if (!userId || avatarPedidos.has(userId)) return;
+    // "m:..." = nome escrito na aba Batalha: não tem id da Jamble para buscar
+    if (!userId || String(userId).indexOf('m:') === 0 || avatarPedidos.has(userId)) return;
     avatarPedidos.add(userId);
     mandar('resolver-avatar', { userId });
   }
@@ -4103,6 +4107,35 @@
   const LS_BATALHA = 'bj-batalha-nomes';
   let btAnim = lerLS('bj-batalha-anim', ['pokemon', 'patos'], 'pokemon');
   let btResultado = null;
+  // Foto de cada nome, buscada na aba da live pelo @ (ver fotosPorNome no
+  // gems-core). Sem foto, ficam as iniciais.
+  const fotosNome = new Map();   // nome em minúsculas -> url ('' = sem foto)
+  const pedidasNome = new Set();
+  let timerFotosNome = 0;
+  function pedirFotosNome(pessoas) {
+    const novos = pessoas.map((p) => p.usuario.toLowerCase()).filter((k) => !fotosNome.has(k) && !pedidasNome.has(k));
+    if (!novos.length) return;
+    clearTimeout(timerFotosNome);
+    // espera parar de digitar
+    timerFotosNome = setTimeout(() => {
+      const lista = urnaManual().pessoas.map((p) => p.usuario.toLowerCase()).filter((k) => !fotosNome.has(k) && !pedidasNome.has(k));
+      if (!lista.length) return;
+      lista.forEach((k) => pedidasNome.add(k));
+      mandar('fotos-por-nome', { nomes: lista });
+      // sem resposta (aba fechada): libera para pedir de novo depois
+      setTimeout(() => lista.forEach((k) => { if (!fotosNome.has(k)) pedidasNome.delete(k); }), 60000);
+    }, 900);
+  }
+  function receberFotosNome(fotos) {
+    if (!fotos || typeof fotos !== 'object') return;
+    Object.entries(fotos).forEach(([k, url]) => { fotosNome.set(k, url || ''); pedidasNome.delete(k); });
+    // o card do vencedor ganha a foto se ela chegou depois
+    if (btResultado && !btResultado.vencedor.avatar) {
+      const f = fotosNome.get(btResultado.vencedor.usuario.toLowerCase());
+      if (f) { btResultado = { ...btResultado, vencedor: { ...btResultado.vencedor, avatar: f } }; limpar($('btPalco')); }
+    }
+    if (paneAtivo === 'batalha') desenharBatalha();
+  }
   try { $('btNomes').value = localStorage.getItem(LS_BATALHA) || ''; } catch {}
 
   const chaveNome = (s) => s.toLowerCase().normalize('NFC').replace(/\s+/g, ' ');
@@ -4113,7 +4146,7 @@
     const pessoas = new Map();   // chave -> {id, usuario, bilhetes}
     linhas.forEach((nome) => {
       const k = chaveNome(nome);
-      const p = pessoas.get(k) || { id: 'm:' + k, usuario: nome, bilhetes: 0, avatar: '' };
+      const p = pessoas.get(k) || { id: 'm:' + k, usuario: nome, bilhetes: 0, avatar: fotosNome.get(nome.toLowerCase()) || '' };
       p.bilhetes++;
       pessoas.set(k, p);
     });
@@ -4140,6 +4173,7 @@
     $('btComecar').disabled = girando || u.pessoas.length < 2;
     $('btComecar').title = u.pessoas.length < 2 ? 'Precisa de pelo menos 2 pessoas diferentes' : '';
     $('btTag').textContent = total ? nf(total) : '';
+    pedirFotosNome(u.pessoas);
     const caixa = limpar($('btUrna'));
     if (!total) { caixa.appendChild(vazioSimples('A urna está vazia. Os nomes que você escrever aparecem aqui com a chance de cada um.')); }
     u.pessoas.slice(0, 200).forEach((p, i) => {

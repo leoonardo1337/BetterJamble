@@ -352,6 +352,69 @@
     bombearAvatares();
   }
 
+  // ---------------------------------------------------------------- foto pelo @
+  // A aba Batalha do painel só tem o nome que a pessoa escreveu. Se for o @ do
+  // perfil, a foto aparece: primeiro procuramos entre quem já mandou gema ou
+  // comprou (sem consulta nenhuma) e depois no perfil da Jamble pelo @
+  // (/api/profile/full?username=, a mesma chamada do site, com os cabeçalhos
+  // dele). Nome de exibição não serve, só o @. O resultado fica guardado
+  // (achou: 12 h; não achou: 1 h) e as consultas vão 3 por vez, com folga.
+  const LS_FOTO_NOME = 'jamble:gems:fotos-nome:v1';
+  let fotosNome = {};   // @ em minúsculas -> {url, em}
+  try { fotosNome = JSON.parse(localStorage.getItem(LS_FOTO_NOME) || '{}') || {}; } catch {}
+  const salvarFotosNome = () => {
+    const ch = Object.keys(fotosNome);
+    if (ch.length > 2000) ch.sort((a, b) => fotosNome[a].em - fotosNome[b].em).slice(0, ch.length - 2000).forEach((k) => delete fotosNome[k]);
+    try { localStorage.setItem(LS_FOTO_NOME, JSON.stringify(fotosNome)); } catch {}
+  };
+  const ARROBA_OK = /^[a-z0-9._]{2,40}$/;
+  function fotoConhecida(k) {
+    for (const s of Object.values(db.shows)) {
+      for (const [uid, u] of Object.entries(s.users || {})) if (String(u.u || '').toLowerCase() === k) { const f = avatares[uid] || u.a; if (f) return foto(f); }
+      for (const [uid, c] of Object.entries(s.buyers || {})) if (String(c.u || '').toLowerCase() === k) { const f = avatares[uid] || c.a; if (f) return foto(f); }
+    }
+    const c = compradores().find((x) => String(x.usuario || '').toLowerCase() === k);
+    return c && c.avatar ? foto(c.avatar) : '';
+  }
+  async function buscarFotoNome(k) {
+    const cab = cabecalhos();
+    if (!cab) return null;   // sem os cabeçalhos do site não dá: tenta de novo depois
+    try {
+      const r = await fetchOriginal('/api/profile/full?username=' + encodeURIComponent(k), { headers: cab, credentials: 'include' });
+      if (r.status === 403) { cabecalhosDoSite = null; return null; }
+      if (r.status === 404 || r.status === 400) return '';
+      if (!r.ok) return null;
+      const j = await r.json();
+      const u = j && j.user;
+      if (u && u.id && u.avatarUrl) fotoNova(u.id, u.avatarUrl);
+      return (u && u.avatarUrl) || '';
+    } catch { return null; }
+  }
+  // nomes -> {nome em minúsculas: url ('' = sem foto)}
+  async function fotosPorNome(nomes) {
+    const agora = Date.now(), res = {}, falta = [];
+    [...new Set((nomes || []).map((n) => String(n || '').replace(/^@+/, '').trim().toLowerCase()))].slice(0, 300).forEach((k) => {
+      if (!k) return;
+      const c = fotosNome[k];
+      if (c && agora - c.em < (c.url ? 12 : 1) * 3600000) { res[k] = c.url; return; }
+      const f = fotoConhecida(k);
+      if (f) { res[k] = f; fotosNome[k] = { url: f, em: agora }; return; }
+      if (ARROBA_OK.test(k)) falta.push(k); else res[k] = '';
+    });
+    let i = 0;
+    const trabalhar = async () => {
+      while (i < falta.length) {
+        const k = falta[i++];
+        const url = await buscarFotoNome(k);
+        if (url !== null) { fotosNome[k] = { url, em: Date.now() }; res[k] = url; }
+        await new Promise((r) => relogio.setTimeout(r, 250));
+      }
+    };
+    await Promise.all([trabalhar(), trabalhar(), trabalhar()]);
+    salvarFotosNome();
+    return res;
+  }
+
   function esquecerAvatar(userId, url) {
     if (userId && avatares[userId] === url) { delete avatares[userId]; salvarAvatares(); }
     resolverAvatar(userId);
@@ -1141,6 +1204,7 @@
 
     // fotos
     avatarDe: (userId) => avatares[userId] || '',
+    fotosPorNome,               // (nomes) -> Promise<{nome: url}> (aba Batalha)
     resolverAvatar,
     esquecerAvatar,
 
