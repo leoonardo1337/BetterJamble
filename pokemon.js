@@ -376,7 +376,8 @@
   const alea = (a, b) => a + Math.random() * (b - a);
   const escolherDe = (v) => v[(Math.random() * v.length) | 0];
 
-  // opcoes: {camada, participantes:[{id, usuario, dex}], vencedorId, aoFim()}
+  // opcoes: {camada, participantes:[{id, usuario, dex, vida}], vencedorId, aoFim(), aoCancelar(),
+  //          lateralHp: true = a barra lateral mostra o HP em pontos (senão, em %)}
   function batalhar(op) {
     const camada = op.camada;
     let fase = 'saguao', parado = false;
@@ -903,7 +904,8 @@
         ctx.fillStyle = p.hp > 0.5 ? '#58d080' : p.hp > 0.2 ? '#f8c030' : '#f05838';
         ctx.fillRect(bx + 19, by + 1, Math.max(0, (bw - 20) * p.hp), 4);
         ctx.fillStyle = '#383838'; ctx.font = '8px "Press Start 2P",monospace'; ctx.textAlign = 'right';
-        ctx.fillText(String(Math.max(1, Math.round(p.hp * p.vida))), x0 + rw - 14, by + 4);   // HP em pontos
+        // HP em pontos (aba Batalha) ou em porcentagem (sorteio)
+        ctx.fillText(op.lateralHp ? String(Math.max(1, Math.round(p.hp * p.vida))) : Math.max(1, Math.round(p.hp * 100)) + '%', x0 + rw - 14, by + 4);
         ctx.textAlign = 'left';
       });
       if (vivos.length > mostra) {

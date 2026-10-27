@@ -3089,6 +3089,8 @@
       camada,
       participantes: lista.map((x) => ({ id: x.id, usuario: x.usuario || '?', dex: escolhaPokemon(x.id, x.usuario), vida: vidaDe(x) })),
       vencedorId: vencedor.id,
+      // barra lateral: HP em pontos na aba Batalha, porcentagem no sorteio
+      lateralHp: !!op.manual,
       aoFim: () => sair(false),
       aoCancelar: () => sair(true),
     });
