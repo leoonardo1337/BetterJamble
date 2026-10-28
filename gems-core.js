@@ -6,7 +6,10 @@
 // pública `window.BetterJamble` e escuta o evento `bj:atualizou`.
 //
 // De onde vêm os dados:
-//   - gemas: hook no WebSocket wss://ws.jamble.com (eventos event_type "LIKE");
+//   - gemas: hook no WebSocket da Jamble (eventos event_type "LIKE"). Desde
+//     2026-10-28 são vários sockets no próprio site
+//     (wss://www.jamble.com/api/realtime/websocket/{show,show_user,group_message}/...);
+//     antes era um só em wss://ws.jamble.com. Os dois endereços valem;
 //   - preço/nome de cada gema: catálogo /api/live/emojis (hook no fetch + busca
 //     própria quando o site não pede);
 //   - compradores da live: publicados por live.js em window.__jambleCompradores;
@@ -35,6 +38,7 @@
   // ---------------------------------------------------------------- estado
   const precos = new Map();   // iconId -> {name, gemPrice, iconUrl, ordem}
   const vistos = new Set();   // ids de evento já contados
+  const repeticoes = new Map(); // id do evento -> quantas gemas dele já contamos (combo)
   let db = { shows: {} };     // showId -> {seller, sellerId, startedAt, lastAt, users, ids, feed}
   let timerSalvar = null;
   let seq = 0;                // contador monotônico de envios (memória, não persiste)
@@ -437,10 +441,12 @@
   }
 
   // ---------------------------------------------------------------- captura (WebSocket)
+  // o antigo (ws.jamble.com) e os novos do próprio site (/api/realtime/websocket/)
+  const ehSocketDaJamble = (url) => /ws\.jamble\.com|jamble\.com\/api\/realtime\/websocket\//.test(String(url));
   const WSOriginal = window.WebSocket;
   function WSComHook(url, protocolos) {
     const sock = protocolos ? new WSOriginal(url, protocolos) : new WSOriginal(url);
-    if (String(url).includes('ws.jamble.com')) {
+    if (ehSocketDaJamble(url)) {
       sock.addEventListener('message', (ev) => {
         if (typeof ev.data !== 'string') return;
         const temGema = ev.data.indexOf('"LIKE"') >= 0;
@@ -547,9 +553,33 @@
       if (!show.sellerId && ev.seller_id) show.sellerId = ev.seller_id;
       show.lastAt = Math.max(show.lastAt || 0, quando);
 
+      // Um envio pode valer várias gemas iguais de uma vez (like_icon_repeat_count,
+      // o "x3" do chat). Se o mesmo evento voltar com a contagem maior, entra só
+      // a diferença.
+      const rep = Math.max(1, Math.floor(Number(ev.like_icon_repeat_count) || 1));
+      if (ev.id && vistos.has(ev.id)) {
+        // depois de recarregar a aba só sobra o que ficou no feed: sem ele, não
+        // dá para saber a diferença e o evento é ignorado como antes
+        const e = (show.feed || []).find((x) => x.i === ev.id);
+        const antes = repeticoes.get(ev.id) || (e ? e.x || 1 : rep);
+        if (rep <= antes) continue;
+        repeticoes.set(ev.id, rep);
+        const u = show.users[userId];
+        if (u) {
+          const mais = rep - antes;
+          u.n += mais; u.g += valor * mais;
+          u.icons[icone] = (u.icons[icone] || 0) + mais;
+          u.last = Math.max(u.last, quando);
+          if (e) { e.p = valor * rep; e.x = rep; }
+          if (atual && atual.showId === showId) gemasDesdeSync += valor * mais;
+          entraram++;
+        }
+        continue;
+      }
       if (ev.id) {
-        if (vistos.has(ev.id)) continue;
         vistos.add(ev.id);
+        repeticoes.set(ev.id, rep);
+        if (repeticoes.size > MAX_SEEN) repeticoes.delete(repeticoes.keys().next().value);
         if (vistos.size > MAX_SEEN) vistos.delete(vistos.values().next().value);
         (show.ids || (show.ids = [])).push(ev.id);
         if (show.ids.length > MAX_IDS_POR_SHOW) show.ids.splice(0, show.ids.length - MAX_IDS_POR_SHOW);
@@ -559,23 +589,23 @@
       if (p.username) u.u = p.username;
       const av = avatarDoEvento(p, userId);
       if (av) { u.a = av; fotoNova(userId, av); }
-      u.n++;
-      u.g += valor;
-      u.icons[icone] = (u.icons[icone] || 0) + 1;
+      u.n += rep;
+      u.g += valor * rep;
+      u.icons[icone] = (u.icons[icone] || 0) + rep;
       u.last = Math.max(u.last, quando);
 
       const cat = precos.get(icone) || {};
       const envio = {
         i: ev.id || `${userId}-${quando}`, s: ++seq, t: quando,
         u: userId, n: u.u, a: av || u.a || '',
-        ic: icone, nm: cat.name || icone, p: valor,
+        ic: icone, nm: cat.name || icone, p: valor * rep, ...(rep > 1 ? { x: rep } : {}),
         url: ev.like_icon_url || cat.iconUrl || '',
       };
       (show.feed || (show.feed = [])).push(envio);
       if (show.feed.length > MAX_FEED_POR_SHOW) show.feed.splice(0, show.feed.length - MAX_FEED_POR_SHOW);
       novosDesdeOAviso.push(normalizarEnvio(envio, showId, show.seller));
       // pontuação da loja: soma na hora, até a próxima consulta oficial
-      if (atual && atual.showId === showId) gemasDesdeSync += valor;
+      if (atual && atual.showId === showId) gemasDesdeSync += valor * rep;
       entraram++;
     }
     if (entraram) { salvar(); avisar('dados'); }

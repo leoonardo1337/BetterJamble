@@ -121,7 +121,8 @@
   const WSAntes = window.WebSocket;
   function WSComAudiencia(url, protocolos) {
     const sock = protocolos ? new WSAntes(url, protocolos) : new WSAntes(url);
-    if (String(url).includes('ws.jamble.com')) {
+    // o antigo ws.jamble.com e os novos /api/realtime/websocket/ do site
+    if (/ws\.jamble\.com|jamble\.com\/api\/realtime\/websocket\//.test(String(url))) {
       sock.addEventListener('message', (ev) => {
         if (typeof ev.data !== 'string') return;
         const d = ev.data;
