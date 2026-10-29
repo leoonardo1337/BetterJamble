@@ -38,7 +38,6 @@
   // ---------------------------------------------------------------- estado
   const precos = new Map();   // iconId -> {name, gemPrice, iconUrl, ordem}
   const vistos = new Set();   // ids de evento já contados
-  const repeticoes = new Map(); // id do evento -> quantas gemas dele já contamos (combo)
   let db = { shows: {} };     // showId -> {seller, sellerId, startedAt, lastAt, users, ids, feed}
   let timerSalvar = null;
   let seq = 0;                // contador monotônico de envios (memória, não persiste)
@@ -60,6 +59,44 @@
 
   try { db = JSON.parse(localStorage.getItem(LS_DADOS) || '') || { shows: {} }; } catch { db = { shows: {} }; }
   if (!db.shows) db.shows = {};
+
+  // Correção única: até a 3.26.9 o like_icon_repeat_count do evento era lido
+  // como "quantas gemas foram enviadas". Não é: é quantas cópias a animação
+  // desenha (o repeatCount do catálogo; a Carpa Zika é 3), e cada envio é um
+  // evento de UMA gema. Tira o que foi contado a mais, nos dois formatos que
+  // existiram: um item com x = 3 e p = 3 × preço, ou itens extras "<id>#2", "#3".
+  // Só dá para corrigir o que ainda está no feed (as últimas lives).
+  const LS_CORRIGIU_REPETICAO = 'jamble:gems:corrigiu-repeticao:v1';
+  try {
+    if (!localStorage.getItem(LS_CORRIGIU_REPETICAO)) {
+      let mexeu = 0;
+      Object.values(db.shows).forEach((s) => {
+        if (!Array.isArray(s.feed)) return;
+        const tirar = (e, qtd, gemas) => {
+          const u = s.users && s.users[e.u];
+          if (!u) return;
+          u.n = Math.max(0, (u.n || 0) - qtd);
+          u.g = Math.max(0, (u.g || 0) - gemas);
+          if (u.icons && u.icons[e.ic]) u.icons[e.ic] = Math.max(0, u.icons[e.ic] - qtd);
+          mexeu += qtd;
+        };
+        s.feed = s.feed.filter((e) => {
+          if (/#\d+$/.test(String(e.i))) { tirar(e, 1, Number(e.p) || 0); return false; }
+          const x = Math.floor(Number(e.x) || 1);
+          if (x > 1) {
+            const um = Math.round((Number(e.p) || 0) / x);
+            tirar(e, x - 1, (Number(e.p) || 0) - um);
+            e.p = um;
+            delete e.x;
+          }
+          return true;
+        });
+      });
+      if (mexeu) localStorage.setItem(LS_DADOS, JSON.stringify(db));
+      localStorage.setItem(LS_CORRIGIU_REPETICAO, String(mexeu));
+    }
+  } catch {}
+
   Object.values(db.shows).forEach((s) => (s.ids || []).forEach((id) => vistos.add(id)));
 
   // Os envios que vieram do localStorage não têm seq (ele é de memória).
@@ -553,60 +590,40 @@
       if (!show.sellerId && ev.seller_id) show.sellerId = ev.seller_id;
       show.lastAt = Math.max(show.lastAt || 0, quando);
 
-      // Um envio pode valer várias gemas iguais de uma vez (like_icon_repeat_count,
-      // o "x3" do chat). Cada gema vira um item no feed (3 carpas = 3 linhas de
-      // 500, não 1 de 1.500); o 2º em diante tem o id "<evento>#2", "#3"...
-      // Se o mesmo evento voltar com a contagem maior, entram só as que faltam.
-      const rep = Math.max(1, Math.min(500, Math.floor(Number(ev.like_icon_repeat_count) || 1)));
-      let antes = 0;
-      if (ev.id && vistos.has(ev.id)) {
-        // depois de recarregar a aba a contagem sai do feed (o maior "#n");
-        // sem o evento no feed não dá para saber a diferença e ele é ignorado
-        antes = repeticoes.get(ev.id) || 0;
-        if (!antes) {
-          for (const x of show.feed || []) {
-            if (x.i === ev.id) antes = Math.max(antes, 1);
-            else if (String(x.i).startsWith(ev.id + '#')) antes = Math.max(antes, Number(String(x.i).slice(ev.id.length + 1)) || 0);
-          }
-          if (!antes) antes = rep;
-        }
-        if (rep <= antes) continue;
-        repeticoes.set(ev.id, rep);
-      } else if (ev.id) {
+      // Um evento = UMA gema enviada. O like_icon_repeat_count NÃO é quantidade:
+      // é quantas cópias a animação desenha (o repeatCount do catálogo; a Carpa
+      // Zika vem com 3 e mostra 3 carpas, mas custou 500, não 1.500). Quem envia
+      // várias seguidas gera um evento para cada, com ids diferentes.
+      if (ev.id) {
+        if (vistos.has(ev.id)) continue;
         vistos.add(ev.id);
-        repeticoes.set(ev.id, rep);
-        if (repeticoes.size > MAX_SEEN) repeticoes.delete(repeticoes.keys().next().value);
         if (vistos.size > MAX_SEEN) vistos.delete(vistos.values().next().value);
         (show.ids || (show.ids = [])).push(ev.id);
         if (show.ids.length > MAX_IDS_POR_SHOW) show.ids.splice(0, show.ids.length - MAX_IDS_POR_SHOW);
       }
-      const mais = rep - antes;
 
       const u = show.users[userId] || (show.users[userId] = { u: p.username || userId, n: 0, g: 0, icons: {}, last: 0 });
       if (p.username) u.u = p.username;
       const av = avatarDoEvento(p, userId);
       if (av) { u.a = av; fotoNova(userId, av); }
-      u.n += mais;
-      u.g += valor * mais;
-      u.icons[icone] = (u.icons[icone] || 0) + mais;
+      u.n += 1;
+      u.g += valor;
+      u.icons[icone] = (u.icons[icone] || 0) + 1;
       u.last = Math.max(u.last, quando);
 
       const cat = precos.get(icone) || {};
-      const base = ev.id || `${userId}-${quando}`;
-      for (let k = antes + 1; k <= rep; k++) {
-        const envio = {
-          i: k === 1 ? base : `${base}#${k}`, s: ++seq, t: quando,
-          u: userId, n: u.u, a: av || u.a || '',
-          ic: icone, nm: cat.name || icone, p: valor,
-          url: ev.like_icon_url || cat.iconUrl || '',
-        };
-        (show.feed || (show.feed = [])).push(envio);
-        novosDesdeOAviso.push(normalizarEnvio(envio, showId, show.seller));
-      }
+      const envio = {
+        i: ev.id || `${userId}-${quando}`, s: ++seq, t: quando,
+        u: userId, n: u.u, a: av || u.a || '',
+        ic: icone, nm: cat.name || icone, p: valor,
+        url: ev.like_icon_url || cat.iconUrl || '',
+      };
+      (show.feed || (show.feed = [])).push(envio);
+      novosDesdeOAviso.push(normalizarEnvio(envio, showId, show.seller));
       if (show.feed.length > MAX_FEED_POR_SHOW) show.feed.splice(0, show.feed.length - MAX_FEED_POR_SHOW);
       // pontuação da loja: soma na hora, até a próxima consulta oficial
-      if (atual && atual.showId === showId) gemasDesdeSync += valor * mais;
-      entraram += mais;
+      if (atual && atual.showId === showId) gemasDesdeSync += valor;
+      entraram += 1;
     }
     if (entraram) { salvar(); avisar('dados'); }
     return entraram;
