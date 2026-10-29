@@ -22,23 +22,24 @@ const mostrarAplicar = (versao) => {
   $('aplicar').hidden = false;
 };
 $('versao').textContent = chrome.runtime.getManifest().version;
-chrome.runtime.sendMessage({ type: 'bj-estado-atualizacao' }, (r) => {
-  void chrome.runtime.lastError;
-  if (r && r.versao) { status('Versão ' + r.versao + ' já baixada, esperando para entrar.', true); mostrarAplicar(r.versao); }
-});
-$('procurar').onclick = () => {
+// Ao abrir o popup já procura sozinho e, se tiver versão nova, ela entra assim
+// que terminar de baixar (não precisa clicar em nada).
+const procurar = () => {
   $('procurar').disabled = true;
   status('Procurando na Web Store…');
-  chrome.runtime.sendMessage({ type: 'bj-procurar-atualizacao' }, (r) => {
+  chrome.runtime.sendMessage({ type: 'bj-procurar-atualizacao', aplicar: true }, (r) => {
     void chrome.runtime.lastError;
     $('procurar').disabled = false;
     if (!r) { status('Não deu para falar com a extensão. Tente de novo.'); return; }
-    if (r.status === 'update_available') { status('Tem versão nova' + (r.versao ? ' (' + r.versao + ')' : '') + '. Ela está baixando.', true); mostrarAplicar(r.versao); }
+    if (r.status === 'aplicando') { status('Atualizando para ' + r.versao + '… a janela do BetterJamble vai fechar e as abas da Jamble vão recarregar.', true); return; }
+    if (r.status === 'update_available') { status('Tem versão nova' + (r.versao ? ' (' + r.versao + ')' : '') + '. Ela está baixando e entra sozinha em seguida.', true); mostrarAplicar(r.versao); }
     else if (r.status === 'no_update') status('Você já está na versão mais nova (' + r.atual + ').', true);
-    else if (r.status === 'throttled') status('O navegador pediu um tempo entre as consultas. Tente de novo em alguns minutos.');
+    else if (r.status === 'throttled') status('A loja já foi consultada há pouco. Você está na ' + r.atual + '; dá para procurar de novo em alguns minutos.');
     else status('Não deu para consultar a loja' + (r.erro ? ': ' + r.erro : '') + '. Se a extensão não veio da Web Store, ela não atualiza por aqui.');
   });
 };
+$('procurar').onclick = procurar;
+procurar();
 $('aplicar').onclick = () => {
   $('aplicar').disabled = true;
   status('Atualizando… a janela do BetterJamble vai fechar e as abas da Jamble vão recarregar.');

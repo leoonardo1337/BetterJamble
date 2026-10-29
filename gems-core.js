@@ -554,29 +554,25 @@
       show.lastAt = Math.max(show.lastAt || 0, quando);
 
       // Um envio pode valer várias gemas iguais de uma vez (like_icon_repeat_count,
-      // o "x3" do chat). Se o mesmo evento voltar com a contagem maior, entra só
-      // a diferença.
-      const rep = Math.max(1, Math.floor(Number(ev.like_icon_repeat_count) || 1));
+      // o "x3" do chat). Cada gema vira um item no feed (3 carpas = 3 linhas de
+      // 500, não 1 de 1.500); o 2º em diante tem o id "<evento>#2", "#3"...
+      // Se o mesmo evento voltar com a contagem maior, entram só as que faltam.
+      const rep = Math.max(1, Math.min(500, Math.floor(Number(ev.like_icon_repeat_count) || 1)));
+      let antes = 0;
       if (ev.id && vistos.has(ev.id)) {
-        // depois de recarregar a aba só sobra o que ficou no feed: sem ele, não
-        // dá para saber a diferença e o evento é ignorado como antes
-        const e = (show.feed || []).find((x) => x.i === ev.id);
-        const antes = repeticoes.get(ev.id) || (e ? e.x || 1 : rep);
+        // depois de recarregar a aba a contagem sai do feed (o maior "#n");
+        // sem o evento no feed não dá para saber a diferença e ele é ignorado
+        antes = repeticoes.get(ev.id) || 0;
+        if (!antes) {
+          for (const x of show.feed || []) {
+            if (x.i === ev.id) antes = Math.max(antes, 1);
+            else if (String(x.i).startsWith(ev.id + '#')) antes = Math.max(antes, Number(String(x.i).slice(ev.id.length + 1)) || 0);
+          }
+          if (!antes) antes = rep;
+        }
         if (rep <= antes) continue;
         repeticoes.set(ev.id, rep);
-        const u = show.users[userId];
-        if (u) {
-          const mais = rep - antes;
-          u.n += mais; u.g += valor * mais;
-          u.icons[icone] = (u.icons[icone] || 0) + mais;
-          u.last = Math.max(u.last, quando);
-          if (e) { e.p = valor * rep; e.x = rep; }
-          if (atual && atual.showId === showId) gemasDesdeSync += valor * mais;
-          entraram++;
-        }
-        continue;
-      }
-      if (ev.id) {
+      } else if (ev.id) {
         vistos.add(ev.id);
         repeticoes.set(ev.id, rep);
         if (repeticoes.size > MAX_SEEN) repeticoes.delete(repeticoes.keys().next().value);
@@ -584,29 +580,33 @@
         (show.ids || (show.ids = [])).push(ev.id);
         if (show.ids.length > MAX_IDS_POR_SHOW) show.ids.splice(0, show.ids.length - MAX_IDS_POR_SHOW);
       }
+      const mais = rep - antes;
 
       const u = show.users[userId] || (show.users[userId] = { u: p.username || userId, n: 0, g: 0, icons: {}, last: 0 });
       if (p.username) u.u = p.username;
       const av = avatarDoEvento(p, userId);
       if (av) { u.a = av; fotoNova(userId, av); }
-      u.n += rep;
-      u.g += valor * rep;
-      u.icons[icone] = (u.icons[icone] || 0) + rep;
+      u.n += mais;
+      u.g += valor * mais;
+      u.icons[icone] = (u.icons[icone] || 0) + mais;
       u.last = Math.max(u.last, quando);
 
       const cat = precos.get(icone) || {};
-      const envio = {
-        i: ev.id || `${userId}-${quando}`, s: ++seq, t: quando,
-        u: userId, n: u.u, a: av || u.a || '',
-        ic: icone, nm: cat.name || icone, p: valor * rep, ...(rep > 1 ? { x: rep } : {}),
-        url: ev.like_icon_url || cat.iconUrl || '',
-      };
-      (show.feed || (show.feed = [])).push(envio);
+      const base = ev.id || `${userId}-${quando}`;
+      for (let k = antes + 1; k <= rep; k++) {
+        const envio = {
+          i: k === 1 ? base : `${base}#${k}`, s: ++seq, t: quando,
+          u: userId, n: u.u, a: av || u.a || '',
+          ic: icone, nm: cat.name || icone, p: valor,
+          url: ev.like_icon_url || cat.iconUrl || '',
+        };
+        (show.feed || (show.feed = [])).push(envio);
+        novosDesdeOAviso.push(normalizarEnvio(envio, showId, show.seller));
+      }
       if (show.feed.length > MAX_FEED_POR_SHOW) show.feed.splice(0, show.feed.length - MAX_FEED_POR_SHOW);
-      novosDesdeOAviso.push(normalizarEnvio(envio, showId, show.seller));
       // pontuação da loja: soma na hora, até a próxima consulta oficial
-      if (atual && atual.showId === showId) gemasDesdeSync += valor * rep;
-      entraram++;
+      if (atual && atual.showId === showId) gemasDesdeSync += valor * mais;
+      entraram += mais;
     }
     if (entraram) { salvar(); avisar('dados'); }
     return entraram;

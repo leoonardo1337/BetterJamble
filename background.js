@@ -114,19 +114,31 @@ async function abrirPainel() {
 // antes e recarregadas quando a versão nova sobe (sem permissão nova: só
 // recarregar pelo id da aba).
 let versaoBaixada = null;   // versão nova já baixada, esperando aplicar
+// O popup, ao abrir, procura versão nova e pede para aplicar sozinho assim que
+// ela terminar de baixar (o popup pode já ter fechado: fica anotado aqui).
+let aplicarAoBaixar = false;
 chrome.runtime.onUpdateAvailable.addListener((d) => {
   versaoBaixada = (d && d.version) || '?';
   try { chrome.storage.session.set({ versaoBaixada }); } catch {}
   paraOPainel({ tipo: 'painel-atualizacao', payload: { versao: versaoBaixada } });
+  if (aplicarAoBaixar) { aplicarAtualizacao(); return; }
+  // o service worker pode ter dormido entre a consulta e o fim do download
+  try { chrome.storage.session.get('aplicarAoBaixar', (r) => { if (r && r.aplicarAoBaixar) aplicarAtualizacao(); }); } catch {}
 });
 try { chrome.storage.session.get('versaoBaixada', (r) => { if (!versaoBaixada && r && r.versaoBaixada) versaoBaixada = r.versaoBaixada; }); } catch {}
 
-async function procurarAtualizacao() {
+async function procurarAtualizacao(aplicar) {
   const atual = chrome.runtime.getManifest().version;
+  // o service worker pode ter acabado de acordar sem ler a anotação ainda
+  if (!versaoBaixada) { try { versaoBaixada = (await chrome.storage.session.get('versaoBaixada')).versaoBaixada || null; } catch {} }
+  // já baixada: entra na hora
+  if (aplicar && versaoBaixada) { setTimeout(aplicarAtualizacao, 1500); return { status: 'aplicando', versao: versaoBaixada, atual }; }
   try {
     const r = await chrome.runtime.requestUpdateCheck();
     const status = (r && r.status) || 'erro';
-    if (status === 'update_available' && r.version) versaoBaixada = r.version;
+    // A resposta "update_available" chega antes de a versão terminar de baixar:
+    // quem aplica é o onUpdateAvailable, quando o download acaba.
+    if (status === 'update_available' && aplicar) { aplicarAoBaixar = true; try { chrome.storage.session.set({ aplicarAoBaixar: true }); } catch {} }
     return { status, versao: (r && r.version) || versaoBaixada, atual };
   } catch (e) {
     return { status: versaoBaixada ? 'update_available' : 'erro', versao: versaoBaixada, atual, erro: String((e && e.message) || e) };
@@ -155,7 +167,7 @@ chrome.runtime.onMessage.addListener((msg, sender, responder) => {
   if (!msg) return;
 
   // atualização (popup e painel)
-  if (msg.type === 'bj-procurar-atualizacao') { procurarAtualizacao().then(responder); return true; }
+  if (msg.type === 'bj-procurar-atualizacao') { procurarAtualizacao(!!msg.aplicar).then(responder); return true; }
   if (msg.type === 'bj-estado-atualizacao') { responder({ versao: versaoBaixada, atual: chrome.runtime.getManifest().version }); return; }
   if (msg.type === 'bj-aplicar-atualizacao') { aplicarAtualizacao(); responder({ ok: true }); return; }
 
