@@ -2,15 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>BetterJamble</title>
+<title>WiseLive</title>
 <style>
-  /* popup — no visual do BetterJamble Panel (true-black-flat) */
+  /* popup — no visual do WiseLive Panel (true-black-flat) */
   :root{color-scheme:dark}
   body{margin:0;width:300px;background:#000;color:#fff;font:400 13.5px/1.45 "Inter","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   header{display:flex;align-items:center;gap:10px;padding:16px 16px 12px}
-  .marca-gema{width:22px;height:22px;flex:none}
-  .marca-gema path{fill:none;stroke:#4cb3f0;stroke-width:1.4;stroke-linejoin:round}
-  h1{margin:0;font-size:15px;font-weight:600}
+  .marca-logo{display:block;height:28px;width:auto}
   .sub{color:#949494;font-size:12px;margin-top:1px}
   .acts{display:flex;flex-direction:column;gap:6px;padding:4px 12px 14px}
   button{width:100%;height:44px;padding:0 14px;border-radius:12px;border:0;background:#111;color:#fff;
@@ -28,14 +26,23 @@
   #aplicar{background:#3fc07a;color:#000;font-weight:600}
   #aplicar:hover{background:#56d08c}
   button:disabled{opacity:.5;cursor:default}
+  #erroLogin{color:#e5484d;font-size:12px;padding:0 4px}
+  .conta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px 12px;color:#949494;font-size:12px}
+  .conta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .conta a{color:#b4b4b4;cursor:pointer;text-decoration:underline;flex:none}
+  [hidden]{display:none !important}
 </style>
 </head>
 <body>
   <header>
-    <svg class="marca-gema" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h8l3.5 4.5L10 17 2.5 7.5z"/><path d="M2.5 7.5h15M7.5 3 6 7.5l4 9.5 4-9.5L12.5 3"/></svg>
-    <div><h1>BetterJamble</h1><div class="sub" id="quando">carregando…</div></div>
+    <div><img class="marca-logo" src="icons/wise-live.png" alt="WiseLive"><div class="sub" id="quando">carregando…</div></div>
   </header>
-  <div class="acts">
+  <div class="acts" id="login" hidden>
+    <button class="primary" id="entrar"><span class="ico">→</span> Entrar</button>
+    <div id="erroLogin"></div>
+  </div>
+  <div class="conta" id="conta" hidden><span id="contaNome"></span><a id="sair">Sair</a></div>
+  <div class="acts" id="menu" hidden>
     <button class="primary" id="compras"><span class="ico">📦</span> Minhas compras salvas</button>
     <button id="exportar"><span class="ico">⬇</span> Exportar novas compras</button>
   </div>

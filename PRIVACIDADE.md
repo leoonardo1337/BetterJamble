@@ -1,16 +1,17 @@
-# Política de Privacidade — BetterJamble
+# Política de Privacidade — WiseLive
 
-Última atualização: 22 de outubro de 2026
+Última atualização: 31 de outubro de 2026
 
-O BetterJamble é uma extensão para navegador, independente e não oficial, que
+O WiseLive é uma extensão para navegador, independente e não oficial, que
 funciona apenas no site da Jamble (`https://www.jamble.com`). Ela não tem
 nenhum vínculo com a Jamble ou com a equipe dela.
 
 ## Resumo
 
-**Tudo o que a extensão lê fica no seu navegador.** O BetterJamble não tem
-servidor, não envia seus dados para o desenvolvedor nem para terceiros, não usa
-ferramentas de análise ou de anúncios e não vende nem compartilha dados.
+**A maior parte do que a extensão lê fica só no seu navegador.** O que vai para
+o servidor do WiseLive é o necessário para a sua conta e os resumos das suas
+lives, descritos abaixo. O WiseLive não usa ferramentas de análise ou de anúncios
+e não vende dados.
 
 ## Quais dados a extensão acessa
 
@@ -34,17 +35,33 @@ assistir e a tabela das suas compras exportadas.
 
 ## Onde os dados ficam
 
-Os dados ficam no armazenamento local do seu navegador (`localStorage` do site
-da Jamble e `chrome.storage` da extensão). Eles saem do seu computador
+Os demais dados ficam no armazenamento local do seu navegador (`localStorage` do
+site da Jamble e `chrome.storage` da extensão). Eles saem do seu computador
 somente nas chamadas que a extensão faz à própria Jamble, iguais às que o
 site já faz.
+
+## O que vai para o servidor do WiseLive
+
+O WiseLive usa o Supabase como servidor. Ficam lá, ligados à sua conta:
+
+- **Conta:** seu e-mail e os dados de acesso (a senha é guardada pelo serviço de
+  login, de forma protegida) e um identificador do dispositivo.
+- **Resumos das lives:** ao fim de uma live acompanhada pelo painel, datas, totais
+  de audiência, gemas e vendas, a linha do tempo por minuto, os títulos dos
+  produtos com mais lances e os nomes de usuário públicos dos 10 maiores
+  compradores e dos 10 que mais mandaram gemas.
+
+Cada conta só consegue ler os próprios resumos. Mensagens do chat, endereços e
+qualquer login ou token da Jamble não são enviados. Os e-mails de recuperação de
+senha passam pelo serviço Resend.
 
 ## Como apagar
 
 Desinstalar a extensão apaga os dados guardados por ela no `chrome.storage`.
 Os dados guardados no site da Jamble podem ser apagados limpando os dados do
 site `jamble.com` nas configurações do navegador. Dentro do painel também dá
-para limpar o histórico de sorteios.
+para limpar o histórico de sorteios. Para apagar sua conta e os resumos guardados
+no servidor, peça pelo contato abaixo.
 
 ## Contato
 

@@ -1,5 +1,5 @@
 // ============================================================================
-// BetterJamble — ritmo da aba da live (world MAIN, primeiro script a carregar)
+// WiseLive — ritmo da aba da live (world MAIN, primeiro script a carregar)
 //
 // Quando a janela do navegador fica coberta (o painel em tela cheia por cima,
 // por exemplo) ou minimizada, o Chrome trata a aba como escondida:

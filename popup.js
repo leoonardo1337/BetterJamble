@@ -1,7 +1,27 @@
-// Menu da extensão: atalhos para as compras exportadas.
+// Menu da extensão: login e atalhos para as compras exportadas.
 const nf = (n) => n.toLocaleString('pt-BR');
 
-chrome.storage.local.get({ purchases: null }, ({ purchases }) => {
+// Sem acesso liberado, só o formulário de entrada aparece.
+function mostrarAcesso(r) {
+  const ok = !!(r && r.ok);
+  document.getElementById('login').hidden = ok;
+  document.getElementById('menu').hidden = !ok;
+  document.getElementById('conta').hidden = !ok;
+  if (ok) document.getElementById('contaNome').textContent = (r.email || '') + (r.semConexao ? ' · sem conexão' : '');
+  else document.getElementById('quando').textContent = 'Entre para usar';
+  document.getElementById('erroLogin').textContent = (r && r.motivo) || '';
+  if (ok) mostrarCompras();
+}
+chrome.runtime.sendMessage({ type: 'bj-acesso-conferir' }, (r) => { void chrome.runtime.lastError; mostrarAcesso(r); });
+// a tela de login fica na janela do painel
+document.getElementById('entrar').onclick = () => {
+  chrome.runtime.sendMessage({ type: 'bj-abrir-painel' }, () => { void chrome.runtime.lastError; window.close(); });
+};
+document.getElementById('sair').onclick = () => {
+  chrome.runtime.sendMessage({ type: 'bj-acesso-sair' }, () => { void chrome.runtime.lastError; mostrarAcesso({ ok: false }); });
+};
+
+const mostrarCompras = () => chrome.storage.local.get({ purchases: null }, ({ purchases }) => {
   const linhas = (purchases && purchases.rows) || [];
   const quando = (purchases && purchases.at) || 0;
   document.getElementById('quando').textContent = quando
@@ -31,7 +51,7 @@ const procurar = () => {
     void chrome.runtime.lastError;
     $('procurar').disabled = false;
     if (!r) { status('Não deu para falar com a extensão. Tente de novo.'); return; }
-    if (r.status === 'aplicando') { status('Atualizando para ' + r.versao + '… a janela do BetterJamble vai fechar e as abas da Jamble vão recarregar.', true); return; }
+    if (r.status === 'aplicando') { status('Atualizando para ' + r.versao + '… a janela do WiseLive vai fechar e as abas da Jamble vão recarregar.', true); return; }
     if (r.status === 'update_available') { status('Tem versão nova' + (r.versao ? ' (' + r.versao + ')' : '') + '. Ela está baixando e entra sozinha em seguida.', true); mostrarAplicar(r.versao); }
     else if (r.status === 'no_update') status('Você já está na versão mais nova (' + r.atual + ').', true);
     else if (r.status === 'throttled') status('A loja já foi consultada há pouco. Você está na ' + r.atual + '; dá para procurar de novo em alguns minutos.');
@@ -42,7 +62,7 @@ $('procurar').onclick = procurar;
 procurar();
 $('aplicar').onclick = () => {
   $('aplicar').disabled = true;
-  status('Atualizando… a janela do BetterJamble vai fechar e as abas da Jamble vão recarregar.');
+  status('Atualizando… a janela do WiseLive vai fechar e as abas da Jamble vão recarregar.');
   chrome.runtime.sendMessage({ type: 'bj-aplicar-atualizacao' }, () => void chrome.runtime.lastError);
 };
 

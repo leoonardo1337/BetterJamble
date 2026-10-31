@@ -1,5 +1,5 @@
 // ============================================================================
-// BetterJamble — transporte entre a camada de dados (world MAIN) e o painel
+// WiseLive — transporte entre a camada de dados (world MAIN) e o painel
 // (janela popup da extensão). Roda no world MAIN.
 //
 // Caminho completo de ida:
@@ -24,7 +24,7 @@
   const TAG_ENTRADA = 'jamble-painel'; // bridge -> nós
   const INTERVALO = 250;               // ms de coalescência das rajadas
 
-  const API = () => window.BetterJamble;
+  const API = () => window.WiseLive;
 
   let painelAberto = false;
   let ultimoSeq = 0;

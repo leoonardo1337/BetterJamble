@@ -244,7 +244,7 @@
       const aviso = failed ? ` ${failed} pedido(s) ficaram sem detalhes — recarregue a página e exporte de novo.` : '';
       showToast(`${purchases.length} pedidos exportados.${aviso}`, [['Abrir de novo', () => enviar('open-page', { page: 'compras.html' })]]);
     } catch (e) {
-      console.error('[BetterJamble]', e);
+      console.error('[WiseLive]', e);
       showToast('Erro ao exportar: ' + (e && e.message ? e.message : e));
     } finally {
       running = false;

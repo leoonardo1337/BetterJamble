@@ -1,9 +1,9 @@
 // ============================================================================
-// BetterJamble — auto resgate da "Recompensa por assistir" (world MAIN)
+// WiseLive — auto resgate da "Recompensa por assistir" (world MAIN)
 //
 // Trazido da extensão Jamble Auto Resgate (E:\projects\jamble_resgate\page.js).
 // A lógica de calibrar e clicar é a mesma; mudou só a comunicação, que agora
-// passa pelos canais do BetterJamble:
+// passa pelos canais do WiseLive:
 //   - status  -> window.postMessage({tag:'jamble-ext', type:'painel-resgate'})
 //                (o bridge leva ao painel, como as outras mensagens painel-*);
 //   - comandos <- {tag:'jamble-painel', type:'resgate-config'|'resgate-tick'|
@@ -53,7 +53,7 @@
   const attempts = new Map(); // marco (min) -> tentativas
 
   const sleep = (ms) => new Promise((r) => relogio.setTimeout(r, ms));
-  const log = (...a) => console.log('[BetterJamble resgate]', ...a);
+  const log = (...a) => console.log('[WiseLive resgate]', ...a);
   const post = (payload) => {
     try { window.postMessage({ tag: 'jamble-ext', type: 'painel-resgate', payload }, location.origin); } catch {}
   };

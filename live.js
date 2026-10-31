@@ -133,7 +133,7 @@
   const itensDaLinha = (it) => Math.max(1, Number(it && it.soldCount) || 1);
   const ehFixo = (it) => !!it && it.saleType === 'BUY_IT_NOW';
 
-  // Ranking de compradores desta live, para o card do BetterJamble desenhar.
+  // Ranking de compradores desta live, para o card do WiseLive desenhar.
   // Nada é gravado no armazenamento: vale só enquanto a aba está aberta.
   // n = itens comprados (5 no preço fixo + 1 no leilão = 6), p = compras.
   function compradoresDaLive(showId, items) {
@@ -291,7 +291,7 @@
   }
 
   // O resumo pode vir do cache sem buscar nada; mesmo assim precisamos da lista de
-  // compradores desta live para o card do BetterJamble.
+  // compradores desta live para o card do WiseLive.
   let buscandoCompradores = false;
   async function garantirCompradores() {
     const showId = showIdFromUrl();

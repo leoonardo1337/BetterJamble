@@ -1,5 +1,5 @@
 // ============================================================================
-// Painel do BetterJamble — interface.
+// Painel do WiseLive — interface.
 //
 // A camada de dados vive na aba da Jamble (gems-core.js) e manda pacotes
 // prontos por uma porta persistente. Aqui só se desenha.
@@ -195,6 +195,12 @@
         mostrarSorteio(payload);
         break;
       case 'painel-audiencia':
+        // outra live: o feed de espectadores só acrescenta, então recomeça
+        if ((audiencia && audiencia.showId) !== (payload && payload.showId)) {
+          filaViewers.limpar();
+          limpar($('feedViewers'));
+          idsViewers.clear();
+        }
         audiencia = payload || null;
         if (paneAtivo === 'insights') { desenharAudiencia(); desenharFeedViewers(); desenharLances(); }
         break;
@@ -432,59 +438,173 @@
   let tickContadores = null;
 
   // requestAnimationFrame não roda em aba oculta: a contagem usa timer.
-  function numero(alvo, valor, fmt) {
+  const facilitar = (k) => 1 - Math.pow(1 - k, 3);
+
+  function numero(alvo, valor, fmt, ms) {
     const f = fmt || nf;
     const v = Number(valor) || 0;
     const antes = alvo.dataset.v === undefined ? null : Number(alvo.dataset.v);
     alvo.dataset.v = String(v);
     if (antes === v) return;
     if (reduzido() || antes === null && v === 0) { alvo.textContent = f(v); return; }
-    contadores.set(alvo, { de: antes === null ? 0 : antes, para: v, ini: Date.now(), f });
+    // valor novo no meio de uma contagem: segue de onde o número está na tela
+    const c = contadores.get(alvo);
+    const de = c ? c.de + (c.para - c.de) * facilitar(Math.min(1, (Date.now() - c.ini) / c.ms)) : antes === null ? 0 : antes;
+    contadores.set(alvo, { de, para: v, ini: Date.now(), f, ms: ms || 420 });
     if (!tickContadores) tickContadores = setInterval(passoContadores, 28);
   }
 
   function passoContadores() {
     const agora = Date.now();
     contadores.forEach((c, alvo) => {
-      const k = Math.min(1, (agora - c.ini) / 420);
-      const e = 1 - Math.pow(1 - k, 3);
-      alvo.textContent = c.f(c.de + (c.para - c.de) * e);
+      const k = Math.min(1, (agora - c.ini) / c.ms);
+      alvo.textContent = c.f(c.de + (c.para - c.de) * facilitar(k));
       if (k >= 1) contadores.delete(alvo);
     });
     if (!contadores.size) { clearInterval(tickContadores); tickContadores = null; }
   }
+
+  // Pontos da loja na tela. Entre as consultas o número sobe por estimativa, e a
+  // consulta oficial pode chegar sem as últimas gemas e vendas: ela zera a
+  // estimativa e o número cairia para subir de novo logo depois. Por isso ele
+  // não desce na hora; só aceita um valor menor se continuar menor por um tempo
+  // (correção de verdade ou virada do mês).
+  const SEGURA_QUEDA_MS = 3 * 60 * 1000;
+  const pontosTela = { chave: null, valor: null, abaixoDesde: 0 };
+  function pontosParaTela(pl, chave) {
+    const p = pontosTela;
+    if (p.chave !== chave) { p.chave = chave; p.valor = null; p.abaixoDesde = 0; }
+    if (!pl) return p.valor;
+    if (p.valor === null || pl.points >= p.valor) {
+      p.valor = pl.points;
+      p.abaixoDesde = 0;
+    } else {
+      if (!p.abaixoDesde) p.abaixoDesde = Date.now();
+      if (Date.now() - p.abaixoDesde > SEGURA_QUEDA_MS) { p.valor = pl.points; p.abaixoDesde = 0; }
+    }
+    return p.valor;
+  }
+
+  // Meta de pontos, guardada por canal. Bateu (ou já nasceu batida): comemora e
+  // a meta sai de cena, sobra só o número.
+  const meta = { chave: null, valor: null, editando: false };
+  const chaveMeta = () => 'bj-meta-pontos:' + meta.chave;
+
+  function carregarMeta(chave) {
+    if (meta.chave === chave) return;
+    meta.chave = chave;
+    meta.valor = null;
+    meta.editando = false;
+    if (!chave) return;
+    try {
+      const m = JSON.parse(localStorage.getItem(chaveMeta()) || 'null');
+      if (m && m.valor > 0 && !m.batida) meta.valor = Number(m.valor);
+    } catch {}
+  }
+  function salvarMeta() {
+    try {
+      if (meta.valor) localStorage.setItem(chaveMeta(), JSON.stringify({ valor: meta.valor }));
+      else localStorage.removeItem(chaveMeta());
+    } catch {}
+  }
+  function desenharMeta() {
+    const botao = $('btnMeta');
+    const texto = meta.valor ? 'Remover meta' : 'Adicionar meta';
+    botao.hidden = pontosTela.valor === null || meta.editando;
+    botao.classList.toggle('remover', !!meta.valor);
+    botao.title = texto;
+    botao.setAttribute('aria-label', texto);
+    $('btnMetaTxt').textContent = texto;
+    $('metaCaixa').hidden = !meta.editando && !meta.valor;
+    $('metaInput').hidden = !meta.editando;
+    $('metaValor').hidden = meta.editando || !meta.valor;
+    if (meta.valor) $('metaValor').textContent = nf(meta.valor);
+  }
+  function editarMeta() {
+    meta.editando = true;
+    desenharMeta();
+    const i = $('metaInput');
+    i.value = meta.valor ? nf(meta.valor) : '';
+    i.focus();
+    i.select();
+  }
+  function metaBatida(espera) {
+    const alvo = meta.valor;
+    meta.valor = null;
+    salvarMeta();
+    desenharMeta();
+    setTimeout(() => {
+      if (window.comemorarMeta) window.comemorarMeta({ carpaUrl: urlDaCarpa(), texto: nf(alvo) + ' pontos' });
+    }, espera);
+  }
+  function confirmarMeta() {
+    if (!meta.editando) return;
+    meta.editando = false;
+    const v = Number($('metaInput').value.replace(/\D/g, ''));
+    meta.valor = v > 0 ? v : null;
+    salvarMeta();
+    if (meta.valor && pontosTela.valor >= meta.valor) metaBatida(0);
+    else desenharMeta();
+  }
+  function conferirMeta() {
+    if (!meta.valor || meta.editando || pontosTela.valor === null || pontosTela.valor < meta.valor) return;
+    metaBatida(1100);   // espera a contagem do número chegar lá
+  }
+  // A carpa vem do catálogo de gemas da live; o endereço fica guardado para as
+  // lives em que ela ainda não apareceu.
+  function urlDaCarpa() {
+    const LS = 'bj-carpa-url';
+    const achada = ((dados && dados.catalogo) || []).find((g) => /carpa/i.test(g.nome || '') && g.iconeUrl);
+    if (achada) {
+      try { localStorage.setItem(LS, achada.iconeUrl); } catch {}
+      return achada.iconeUrl;
+    }
+    try { return localStorage.getItem(LS) || ''; } catch { return ''; }
+  }
+  $('btnMeta').onclick = () => {
+    if (meta.valor) { meta.valor = null; salvarMeta(); desenharMeta(); } else editarMeta();
+  };
+  $('metaValor').onclick = editarMeta;
+  $('metaInput').addEventListener('input', (ev) => {
+    const n = Number(ev.target.value.replace(/\D/g, '').slice(0, 12));
+    ev.target.value = n ? nf(n) : '';
+  });
+  $('metaInput').addEventListener('blur', confirmarMeta);
+  $('metaInput').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); confirmarMeta(); }
+    if (ev.key === 'Escape') { meta.editando = false; desenharMeta(); }
+  });
 
   // ================================================================ DESENHO
   function desenhar() {
     if (!dados) return;
     const d = dados;
 
-    // cabeçalho
+    // canal, no topo do menu lateral
     const ctx = $('contexto');
     limpar(ctx);
+    $('canalNome').textContent = d.live ? vendedorArroba() : 'nenhuma live aberta';
+    desenharFotoCanal();
     if (d.live) {
       const atual = (d.livesDoVendedor || []).find((l) => l.atual);
       const est = d.live.estado;
       const inicio = (est && est.inicio) || (atual && atual.inicio);
-      ctx.appendChild(el('span', 'viva', vendedorArroba()));
-      ctx.appendChild(document.createTextNode(inicio ? ' · live de ' + quando(inicio) : ' · live aberta'));
+      ctx.appendChild(document.createTextNode(inicio ? 'live de ' + quando(inicio) : 'live aberta'));
       // no ar / encerrada (com a hora do fim e a duração, quando a extensão viu)
       if (est && est.fim) {
-        ctx.appendChild(el('span', 'ctx-encerrada', ' · encerrada ' + (est.provisorio ? 'por volta das ' : 'às ')
+        ctx.appendChild(el('span', 'ctx-encerrada', 'encerrada ' + (est.provisorio ? 'por volta das ' : 'às ')
           + horaCurta(est.fim) + (inicio ? ' (' + duracao(est.fim - inicio) + ')' : '')));
       } else if (est && est.aoVivo) {
-        ctx.appendChild(el('span', 'ctx-aovivo', ' · ao vivo' + (inicio ? ' há ' + duracao(Date.now() - inicio) : '')));
+        ctx.appendChild(el('span', 'ctx-aovivo', 'ao vivo' + (inicio ? ' há ' + duracao(Date.now() - inicio) : '')));
       }
-    } else {
-      ctx.appendChild(document.createTextNode('nenhuma live aberta'));
     }
 
-    $('aba-lives').disabled = !d.live;
     // o ponto vermelho só pisca com a live no ar; encerrada, ela não grava mais nada
     $('aba-vivo').classList.toggle('gravando', !!d.live && !(d.live.estado && d.live.estado.fim));
-    if (!d.live && tela === 'lives') trocarTela('vivo');
 
     pintarSemLive(!d.live);
+    if (capa && tela === 'lives') capa.style.display = 'none';
+    salvarResumoSeAcabou();
     atualizarMenuCsv();
 
     if (d.live) {
@@ -534,17 +654,36 @@
     // pontos da loja no ranking mensal de vendedores da Jamble: posição e
     // quanto falta para passar quem está logo acima
     const pl = d.pontosLoja;
-    if (pl) numero($('iPontosLoja'), pl.points);
-    else { $('iPontosLoja').textContent = '—'; delete $('iPontosLoja').dataset.v; }
+    const pontos = pontosParaTela(pl, d.live && (d.live.sellerId || d.live.sellerSlug));
+    ['iPontosLoja', 'iPontosFeed'].forEach((id) => {
+      const alvo = $(id);
+      if (pontos === null) {
+        contadores.delete(alvo);
+        alvo.textContent = '—';
+        delete alvo.dataset.v;
+      } else if (alvo.dataset.v === undefined) {
+        // primeira vez: já mostra o valor, sem contar desde o zero
+        alvo.dataset.v = String(pontos);
+        alvo.textContent = nf(pontos);
+      } else {
+        numero(alvo, pontos, nf, 1100);
+      }
+    });
+    carregarMeta(pontosTela.chave);
+    urlDaCarpa();
+    conferirMeta();
+    desenharMeta();
     // "+20" ao lado da posição = pontos somados na hora desde a última
     // consulta oficial (some quando a Jamble confirma)
     $('rPontosLoja').textContent = (pl && pl.rank ? 'Ranking geral #' + pl.rank : 'Ranking geral')
       + (pl && pl.estimado ? ' · +' + nf(pl.estimado) : '');
+    $('rPontosFeed').textContent = $('rPontosLoja').textContent;
     // o detalhe (quanto falta para subir, o que é estimado) fica na dica
     const dicas = [];
     if (pl && pl.acima) dicas.push('Faltam ' + nf(Math.max(0, pl.acima.points - pl.points)) + ' pontos para passar @' + pl.acima.usuario + ' (#' + pl.acima.rank + ')');
     if (pl && pl.estimado) dicas.push('+' + nf(pl.estimado) + ' somados agora com as gemas e vendas desta live; o oficial da Jamble é ' + nf(pl.oficial) + ' e chega na próxima consulta (a cada ~2 min)');
     $('cardPontosLoja').title = dicas.join('\n');
+    $('cardPontosFeed').title = dicas.join('\n');
     numero($('iCompradores'), t.compradores);
     numero($('iTicketCliente'), t.compradores ? t.vendasValor / t.compradores : 0, brl);
     numero($('iTicketVenda'), t.vendasCount ? t.vendasValor / t.vendasCount : 0, brl);
@@ -612,7 +751,7 @@
   }
 
   // ------------------------------------------------------- produtos e lances
-  // O mesmo card do BetterJamble Panel: qual produto puxou mais lances
+  // O mesmo card do WiseLive Panel: qual produto puxou mais lances
   // (somando os leilões dele) e quais leilões foram mais disputados. Vem pronto
   // do audiencia.js (audiencia.leiloes), que lê os leilões do WebSocket.
   let vistaLances = (() => { try { return localStorage.getItem('bj-lances-vista') === 'leilao' ? 'leilao' : 'produto'; } catch { return 'produto'; } })();
@@ -784,7 +923,7 @@
   // amostra até agora. Audiência = média das amostras na janela (ou o último
   // valor conhecido, se nada mudou nela); interações = soma dos minutos.
   // `desde`: começa antes se houver venda anterior à primeira amostra.
-  function janelasAudiencia(a, passoMin, desde) {
+  function janelasAudiencia(a, passoMin, desde, ultimaVenda) {
     const passo = passoMin * 60000;
     const am = a.amostras || [];
     const mins = a.minutos || [];
@@ -795,8 +934,12 @@
     // que a pessoa abra a página dias depois. Sem fim marcado mas sem nada novo
     // há mais de 30 min: termina no último dado (senão uma live de 2 h aberta
     // no dia seguinte virava uma linha reta de 16 h e o começo sumia).
-    const ultimoDado = Math.max(am.length ? am[am.length - 1][0] : 0, mins.length ? mins[mins.length - 1][0] + 60000 : 0);
-    const agora = a.encerradaEm ? Math.min(Date.now(), a.encerradaEm)
+    // O fim também pode vir só do estado da live: ela acabou sem audiência gravada,
+    // e aí o gráfico tem só as vendas.
+    const est = dados && dados.live && dados.live.estado;
+    const fimLive = a.encerradaEm || (est && est.fim) || 0;
+    const ultimoDado = Math.max(am.length ? am[am.length - 1][0] : 0, mins.length ? mins[mins.length - 1][0] + 60000 : 0, ultimaVenda || 0);
+    const agora = fimLive ? Math.min(Date.now(), fimLive)
       : ultimoDado && Date.now() - ultimoDado > 30 * 60000 ? ultimoDado : Date.now();
     const t0 = Math.floor(inicio / passo) * passo;
     const lista = [];
@@ -1055,7 +1198,7 @@
     // itens vendidos por minuto (da lista de vendidos): o gráfico começa na
     // primeira venda se ela veio antes da primeira amostra de audiência
     const vm = (dadosDaLive().totais || {}).vendasMin || [];
-    const janelas = a ? janelasAudiencia(a, janelaAud, vm.length ? vm[0][0] : 0) : [];
+    const janelas = a ? janelasAudiencia(a, janelaAud, vm.length ? vm[0][0] : 0, vm.length ? vm[vm.length - 1][0] + 60000 : 0) : [];
     const leg = limpar($('legAudiencia'));
     SERIES_AUD.forEach(([k, rot]) => {
       const b = el('button');
@@ -1419,12 +1562,79 @@
   // ---------------------------------------------------------------- feed
   // O feed é incremental: um snapshot completo reconstrói, um delta só
   // acrescenta no fim. Redesenhar tudo brigaria com a rolagem de quem lê.
+  // Os dados chegam em lotes; a fila solta uma linha por vez, como um chat.
+  function criarFilaDeEntrada(caixa, montar, depois) {
+    const fila = [];
+    let timer = 0;
+    let fimAnimacao = 0;
+    let quadro = 0;
+
+    function seguirFim(animar) {
+      ultimoAutoScroll = Date.now();
+      caixa.scrollTop = caixa.scrollHeight;
+      if (!animar || document.hidden) return;
+      // a linha nova cresce aos poucos: a lista sobe junto com ela
+      fimAnimacao = performance.now() + 320;
+      if (quadro) return;
+      const passo = (t) => {
+        quadro = 0;
+        if (caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight > 200) return;   // a pessoa subiu
+        ultimoAutoScroll = Date.now();
+        caixa.scrollTop = caixa.scrollHeight;
+        if (t < fimAnimacao) quadro = requestAnimationFrame(passo);
+      };
+      quadro = requestAnimationFrame(passo);
+    }
+
+    function entrar(item, animar) {
+      const perto = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 50;
+      const l = montar(item, animar);
+      caixa.appendChild(l);
+      depois(perto);
+      if (perto) seguirFim(animar);
+    }
+
+    function proximo() {
+      timer = 0;
+      if (!fila.length) return;
+      // janela escondida: o navegador atrasa os timers, então entra tudo de uma vez
+      if (document.hidden) { while (fila.length) entrar(fila.shift(), false); return; }
+      entrar(fila.shift(), true);
+      // mais fila, menos espera: o lote se espalha até a chegada do próximo
+      timer = setTimeout(proximo, fila.length ? Math.min(400, Math.max(70, 900 / fila.length)) : 120);
+    }
+
+    return {
+      por(itens) {
+        fila.push(...itens);
+        // atraso grande (painel recém-aberto, aba voltando): só anima o final
+        while (fila.length > 40) entrar(fila.shift(), false);
+        if (!timer) proximo();
+      },
+      limpar() { fila.length = 0; clearTimeout(timer); timer = 0; },
+      ultimo: () => fila[fila.length - 1],
+    };
+  }
+
+  const filaFeed = criarFilaDeEntrada($('feed'), (e, animar) => linhaFeed(e, animar), (perto) => {
+    const caixa = $('feed');
+    // o DOM nunca passa de 250 linhas (o mesmo corte do estado)
+    while (caixa.children.length > 250) {
+      const fora = caixa.firstElementChild;
+      if (fora && fora.dataset.id) idsNoFeed.delete(fora.dataset.id);
+      caixa.removeChild(fora);
+    }
+    if (perto) { colado = true; novasNoFeed = 0; } else { colado = false; novasNoFeed += 1; }
+    atualizarNovas();
+  });
+
   function desenharFeed() {
     const caixa = $('feed');
     const envios = dados.feed || [];
 
     if (reconstruirFeed) {
       reconstruirFeed = false;
+      filaFeed.limpar();
       limpar(caixa);
       idsNoFeed.clear();
       novasNoFeed = 0;
@@ -1442,23 +1652,12 @@
     const novos = envios.filter((e) => !idsNoFeed.has(e.id));
     if (!novos.length) return;
 
-    // A decisão de prender é tomada com a posição real, ANTES de inserir.
-    // Depender só do evento de rolagem é frágil: em janela oculta o navegador
-    // estrangula os eventos e o feed passaria a brigar com quem está lendo.
-    const estavaVazio = !idsNoFeed.size;
-    const perto = estavaVazio || caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 50;
-
-    if (estavaVazio) limpar(caixa);
-    novos.forEach((e) => { caixa.appendChild(linhaFeed(e, true)); idsNoFeed.add(e.id); });
-
-    // o DOM nunca passa de 250 linhas (o mesmo corte do estado)
-    while (caixa.children.length > 250) {
-      const fora = caixa.firstElementChild;
-      if (fora && fora.dataset.id) idsNoFeed.delete(fora.dataset.id);
-      caixa.removeChild(fora);
-    }
-
-    if (perto) { aoFim(); } else { colado = false; novasNoFeed += novos.length; atualizarNovas(); }
+    if (!idsNoFeed.size) limpar(caixa);
+    novos.forEach((e) => idsNoFeed.add(e.id));
+    // A decisão de prender é tomada na fila, com a posição real, ANTES de cada
+    // linha. Depender só do evento de rolagem é frágil: em janela oculta o
+    // navegador estrangula os eventos e o feed brigaria com quem está lendo.
+    filaFeed.por(novos);
   }
 
   function linhaFeed(e, animar) {
@@ -1654,6 +1853,12 @@
     return l;
   }
 
+  const filaViewers = criarFilaDeEntrada($('feedViewers'), (e, animar) => {
+    const l = linhaViewer(e, animar);
+    l.dataset.t = e.t;
+    return l;
+  }, () => {});
+
   function desenharFeedViewers() {
     if (!modoViewers) return;
     const caixa = $('feedViewers');
@@ -1679,19 +1884,22 @@
     const novos = eventos.filter((e) => !idsViewers.has(chaveViewer(e)));
     if (!novos.length) return;
     const primeiro = !idsViewers.size;
-    const perto = primeiro || caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 50;
     if (primeiro) limpar(caixa);
     // uma saída pode ser registrada com a hora da última vez visto, antes de
-    // linhas que já estão na tela: aí redesenha tudo em ordem
-    const ultimoNaTela = caixa.lastElementChild && Number(caixa.lastElementChild.dataset.t);
-    if (!primeiro && ultimoNaTela && novos[0].t < ultimoNaTela) {
+    // linhas que já estão na tela ou na fila: aí redesenha tudo em ordem
+    const ultimo = filaViewers.ultimo();
+    const ultimoNaTela = ultimo ? ultimo.t : caixa.lastElementChild && Number(caixa.lastElementChild.dataset.t);
+    if (primeiro || (ultimoNaTela && novos[0].t < ultimoNaTela)) {
+      const perto = primeiro || caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 50;
+      filaViewers.limpar();
       limpar(caixa);
       idsViewers.clear();
       eventos.forEach((e) => { const l = linhaViewer(e, false); l.dataset.t = e.t; caixa.appendChild(l); idsViewers.add(chaveViewer(e)); });
+      if (perto) caixa.scrollTop = caixa.scrollHeight;
     } else {
-      novos.forEach((e) => { const l = linhaViewer(e, !primeiro); l.dataset.t = e.t; caixa.appendChild(l); idsViewers.add(chaveViewer(e)); });
+      novos.forEach((e) => idsViewers.add(chaveViewer(e)));
+      filaViewers.por(novos);
     }
-    if (perto) caixa.scrollTop = caixa.scrollHeight;
   }
 
   // ============================================================ TELA SORTEIO
@@ -3497,7 +3705,7 @@
     miolo.appendChild(el('div', 'tcg-sabor', res.sabor || ((n ? 'Venceu entre ' + nf(n) + ' ' + plural(n, 'participante', 'participantes') : 'Venceu o sorteio')
       + ' na live de ' + vendedorArroba() + ' em ' + new Date().toLocaleDateString('pt-BR') + '.')));
     const rod = el('div', 'tcg-rodape');
-    rod.append(el('span', null, 'Ilus. BetterJamble'), el('span', 'tcg-raro', n ? '★ 1/' + nf(n) : '★'));
+    rod.append(el('span', null, 'Ilus. WiseLive'), el('span', 'tcg-raro', n ? '★ 1/' + nf(n) : '★'));
     miolo.appendChild(rod);
     // Foil (o arco-íris holográfico) na carta toda, menos na foto: uma camada
     // na moldura (embaixo do miolo) e outra no miolo, antes da arte, para a
@@ -3742,54 +3950,523 @@
   }
 
   // ============================================================ RESUMO DAS LIVES
-  // A tela ainda não tem conteúdo: mostra só o aviso "Em breve" do HTML.
+  // Quando a live acaba, o painel fecha um resumo e guarda na conta. Sai daqui só
+  // o agregado e os @ públicos dos rankings; nada de chat, endereço ou token.
+  const pedirExtensao = (msg) => new Promise((r) => {
+    try {
+      chrome.runtime.sendMessage(msg, (x) => { void chrome.runtime.lastError; r(x || { ok: false, motivo: 'Não deu para falar com a extensão.' }); });
+    } catch { r({ ok: false, motivo: 'Não deu para falar com a extensão.' }); }
+  });
+
+  function montarResumo(est) {
+    const a = audiencia || {};
+    const t = dadosDaLive().totais || {};
+    const am = a.amostras || [];
+    const pessoas = a.pessoas || [];
+    const vm = t.vendasMin || [];
+    // média simultânea ponderada pelo tempo em que cada número valeu
+    let somaT = 0, soma = 0;
+    am.forEach((s, i) => {
+      const fim = i + 1 < am.length ? am[i + 1][0] : est.fim;
+      const d = Math.max(0, fim - s[0]);
+      somaT += d;
+      soma += s[1] * d;
+    });
+    const pico = am.reduce((m, s) => (s[1] > m[1] ? s : m), [0, 0]);
+    const leiloes = a.leiloes || { total: 0, lances: 0, produtos: [] };
+    const vendidosLeilao = (leiloes.produtos || []).reduce((s, p) => s + (p.vendidos || 0), 0);
+    const itens = t.vendasItens || 0;
+    const compradoresN = t.compradores || 0;
+    // gráfico em até 288 pontos, para caber qualquer duração de live
+    const passoMin = Math.max(5, Math.ceil(Math.max(1, est.fim - (est.inicio || est.fim)) / 60000 / 288));
+    const janelas = janelasAudiencia(a, passoMin, vm.length ? vm[0][0] : 0, vm.length ? vm[vm.length - 1][0] + 60000 : 0);
+    return {
+      versao: 1,
+      audiencia: {
+        unicos: pessoas.length,
+        mais1min: pessoas.filter((p) => p.ms >= 60000).length,
+        mediaSimultanea: somaT ? Math.round(soma / somaT) : (am.length ? am[am.length - 1][1] : 0),
+        pico: pico[1], picoEm: pico[0] || null,
+        tempoMedioMs: pessoas.length ? Math.round(pessoas.reduce((s, p) => s + p.ms, 0) / pessoas.length) : 0,
+      },
+      performance: {
+        leiloes: leiloes.total || 0, leiloesVendidos: vendidosLeilao, itensVendidos: itens,
+        conversao: leiloes.total ? vendidosLeilao / leiloes.total : 0,
+      },
+      vendas: {
+        faturamento: t.vendasValor || 0, pedidos: t.vendasCount || 0, compradores: compradoresN, ofertas: leiloes.lances || 0,
+        ticketItem: itens ? (t.vendasValor || 0) / itens : 0,
+        ticketCliente: compradoresN ? (t.vendasValor || 0) / compradoresN : 0,
+      },
+      gemas: { total: t.gemas || 0, envios: t.envios || 0, pessoas: t.pessoas || 0 },
+      serie: {
+        passoMin,
+        pontos: janelas.map((j) => [j.t, j.media == null ? null : Math.round(j.media * 10) / 10, ...j.inter,
+          vm.reduce((s, [m, n]) => (m >= j.t && m < j.fim ? s + n : s), 0)]),
+      },
+      topCompradores: ((dados && dados.compradores) || []).slice().sort((x, y) => y.valor - x.valor).slice(0, 10)
+        .map((c) => ({ u: c.usuario, valor: c.valor, itens: c.compras })),
+      topGemas: (dadosDaLive().ranking || []).slice(0, 10).map((r) => ({ u: r.usuario, gemas: r.gemas, envios: r.envios })),
+      topProdutos: (leiloes.produtos || []).slice(0, 10).map((p) => ({ t: String(p.titulo || '').slice(0, 120), lances: p.lances, vendidos: p.vendidos })),
+    };
+  }
+
+  const salvosNestaJanela = new Map();   // showId -> peso já enviado
+  let timerResumo = 0;
+  function salvarResumoSeAcabou() {
+    const l = dados && dados.live;
+    const est = l && l.estado;
+    if (!est || !est.fim) return;
+    // espera a audiência desta live chegar (ou o aviso de que não há nenhuma)
+    if (!audiencia || audiencia.showId !== l.showId) return;
+    clearTimeout(timerResumo);
+    timerResumo = setTimeout(() => {
+      const r = montarResumo(est);
+      // quanto mais dados, maior: o servidor não troca um resumo por outro mais pobre
+      const peso = (audiencia.amostras || []).length + r.audiencia.unicos + r.gemas.envios + r.vendas.pedidos + r.performance.leiloes;
+      if (!peso || salvosNestaJanela.get(l.showId) >= peso) return;
+      salvosNestaJanela.set(l.showId, peso);
+      pedirExtensao({ type: 'bj-resumo-salvar', showId: l.showId, seller: vendedorArroba(), inicio: est.inicio, fim: est.fim, provisorio: est.provisorio, peso, resumo: r })
+        .then((x) => {
+          if (!x.ok) salvosNestaJanela.delete(l.showId);   // tenta de novo no próximo desenho
+          else if (tela === 'lives') abrirResumos();
+        });
+    }, 2500);
+  }
+
+  const dataLive = (t) => new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace(' de ', ' ').replace(' de ', ' ');
+  let resumoAberto = null;
+
+  function kpi(valor, rotulo, dica) {
+    const c = el('div', 'res-kpi');
+    c.appendChild(el('div', 'res-kpi-v', valor));
+    c.appendChild(el('div', 'res-kpi-r', rotulo));
+    if (dica) c.title = dica;
+    return c;
+  }
+  function blocoKpis(titulo, itens) {
+    const b = el('section', 'bloco res-bloco');
+    b.appendChild(el('h2', null, titulo));
+    const g = el('div', 'res-kpis');
+    itens.forEach((i) => g.appendChild(kpi(...i)));
+    b.appendChild(g);
+    return b;
+  }
+  function blocoRanking(titulo, linhas, vazio) {
+    const b = el('section', 'bloco res-bloco');
+    b.appendChild(el('h2', null, titulo));
+    if (!linhas.length) { b.appendChild(el('p', 'res-vazio', vazio)); return b; }
+    const max = Math.max(1, ...linhas.map((l) => l.n));
+    linhas.forEach((l, i) => {
+      const r = el('div', 'res-rank');
+      r.appendChild(el('span', 'res-rank-p', String(i + 1)));
+      const m = el('div', 'res-rank-m');
+      const topo = el('div', 'res-rank-t');
+      topo.appendChild(el('span', 'res-rank-nome', l.nome));
+      topo.appendChild(el('b', null, l.valor));
+      m.appendChild(topo);
+      const barra = el('div', 'res-barra');
+      const cheio = el('i');
+      cheio.style.width = Math.max(3, l.n / max * 100) + '%';
+      barra.appendChild(cheio);
+      m.appendChild(barra);
+      r.appendChild(m);
+      b.appendChild(r);
+    });
+    return b;
+  }
+
+  // Por live: uma de cada vez. Por período: soma as lives dos dias do calendário.
+  const UM_DIA = 86400000;
+  const inicioDoDia = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const fimDoDia = (t) => { const d = new Date(t); d.setHours(23, 59, 59, 999); return d.getTime(); };
+  const hoje = () => inicioDoDia(Date.now());
+  const res = {
+    modo: 'live', lives: [], canal: '',
+    de: inicioDoDia(Date.now() - 29 * UM_DIA), ate: hoje(), meioDaEscolha: false,
+    mes: new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime(),
+    metrica: 'faturamento',
+  };
+  const dataCurta = (t) => new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const livesDoCanal = () => res.lives.filter((x) => !res.canal || x.seller === res.canal);
+
+  async function abrirResumos() {
+    const lista = $('resLista');
+    limpar(lista).appendChild(el('p', 'res-vazio', 'Carregando as suas lives…'));
+    const r = await pedirExtensao({ type: 'bj-resumo-listar' });
+    limpar(lista);
+    if (!r.ok) { lista.appendChild(el('p', 'res-vazio', r.motivo)); limpar($('resDetalhe')); return; }
+    res.lives = r.dados;
+    desenharCanais();
+    desenharModoResumo();
+  }
+
+  function desenharCanais() {
+    const sel = $('resCanal');
+    const canais = [...new Set(res.lives.map((x) => x.seller).filter(Boolean))].sort();
+    if (res.canal && !canais.includes(res.canal)) res.canal = '';
+    limpar(sel);
+    sel.hidden = canais.length < 2;
+    const todos = el('option', null, 'Todos os canais');
+    todos.value = '';
+    sel.appendChild(todos);
+    canais.forEach((n) => { const o = el('option', null, n); o.value = n; sel.appendChild(o); });
+    sel.value = res.canal;
+  }
+  $('resCanal').onchange = (ev) => { res.canal = ev.target.value; desenharModoResumo(); };
+  document.querySelectorAll('[data-res-modo]').forEach((b) => {
+    b.onclick = () => { res.modo = b.dataset.resModo; desenharModoResumo(); };
+  });
+
+  function desenharModoResumo() {
+    document.querySelectorAll('[data-res-modo]').forEach((b) => b.setAttribute('aria-checked', b.dataset.resModo === res.modo ? 'true' : 'false'));
+    $('resCal').hidden = res.modo !== 'periodo';
+    if (res.modo === 'periodo') { desenharCalendario(); abrirPeriodo(); return; }
+    const vis = livesDoCanal();
+    desenharListaDeLives(vis);
+    if (!vis.length) {
+      limpar($('resDetalhe'));
+      return;
+    }
+    abrirResumo(vis.some((x) => x.show_id === resumoAberto) ? resumoAberto : vis[0].show_id);
+  }
+
+  function desenharListaDeLives(vis) {
+    const lista = limpar($('resLista'));
+    if (!vis.length) {
+      lista.appendChild(el('p', 'res-vazio', res.modo === 'periodo' ? 'Nenhuma live neste período.'
+        : 'Nenhuma live salva ainda. O resumo aparece aqui quando uma live acompanhada pelo painel terminar.'));
+      return;
+    }
+    vis.forEach((x) => {
+      const b = el('button', 'res-item');
+      b.type = 'button';
+      b.dataset.show = x.show_id;
+      b.setAttribute('aria-pressed', res.modo === 'live' && x.show_id === resumoAberto ? 'true' : 'false');
+      b.appendChild(el('span', 'res-item-canal', x.seller || 'Live'));
+      b.appendChild(el('span', 'res-item-data', dataLive(x.fim) + ' · ' + hhmm(x.inicio || x.fim)));
+      const n = el('span', 'res-item-nums');
+      n.appendChild(el('b', null, brl((x.vendas || {}).faturamento)));
+      n.appendChild(el('span', null, nf((x.audiencia || {}).unicos) + ' ' + plural((x.audiencia || {}).unicos || 0, 'espectador', 'espectadores')));
+      b.appendChild(n);
+      b.onclick = () => { res.modo = 'live'; resumoAberto = x.show_id; desenharModoResumo(); };
+      lista.appendChild(b);
+    });
+  }
+
+  function desenharCalendario() {
+    const cal = limpar($('resCal'));
+    const mes = new Date(res.mes);
+    const cab = el('div', 'cal-cab');
+    const nav = (txt, rot, passo, travado) => {
+      const b = el('button', 'cal-nav', txt);
+      b.type = 'button';
+      b.setAttribute('aria-label', rot);
+      b.disabled = travado;
+      b.onclick = () => { res.mes = new Date(mes.getFullYear(), mes.getMonth() + passo, 1).getTime(); desenharCalendario(); };
+      return b;
+    };
+    const agora = new Date();
+    cab.append(nav('‹', 'Mês anterior', -1, false),
+      el('span', null, mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })),
+      nav('›', 'Próximo mês', 1, mes.getFullYear() === agora.getFullYear() && mes.getMonth() === agora.getMonth()));
+    cal.appendChild(cab);
+    const grade = el('div', 'cal-grade');
+    ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach((d) => grade.appendChild(el('div', 'cal-sem', d)));
+    for (let i = 0; i < mes.getDay(); i++) grade.appendChild(el('span'));
+    const comLive = new Set(livesDoCanal().map((x) => inicioDoDia(x.fim)));
+    const dias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+    for (let n = 1; n <= dias; n++) {
+      const t = new Date(mes.getFullYear(), mes.getMonth(), n).getTime();
+      const b = el('button', 'cal-dia', String(n));
+      b.type = 'button';
+      b.disabled = t > hoje();
+      if (t >= res.de && t <= res.ate) b.classList.add('dentro');
+      if (t === res.de || t === res.ate) b.classList.add('ponta');
+      if (comLive.has(t)) b.classList.add('tem');
+      b.onclick = () => escolherDia(t);
+      grade.appendChild(b);
+    }
+    cal.appendChild(grade);
+    cal.appendChild(el('p', 'cal-texto', res.meioDaEscolha ? 'Agora clique no último dia.'
+      : res.de === res.ate ? dataCurta(res.de) : dataCurta(res.de) + ' a ' + dataCurta(res.ate)));
+  }
+
+  function escolherDia(t) {
+    if (!res.meioDaEscolha) {
+      res.de = res.ate = t;
+      res.meioDaEscolha = true;
+      desenharCalendario();
+      return;
+    }
+    res.de = Math.min(res.de, t);
+    res.ate = Math.max(res.ate, t);
+    res.meioDaEscolha = false;
+    desenharCalendario();
+    abrirPeriodo();
+  }
+
+  let pedidoPeriodo = 0;
+  async function abrirPeriodo() {
+    const meu = ++pedidoPeriodo;
+    const caixa = $('resDetalhe');
+    const r = await pedirExtensao({ type: 'bj-resumo-periodo', de: res.de, ate: fimDoDia(res.ate) });
+    if (meu !== pedidoPeriodo || res.modo !== 'periodo') return;
+    limpar(caixa);
+    if (!r.ok) { limpar($('resLista')); caixa.appendChild(el('p', 'res-vazio', r.motivo)); return; }
+    const linhas = r.dados.filter((x) => !res.canal || x.seller === res.canal);
+    desenharListaDeLives(linhas.slice().reverse().map((x) => ({ ...x, audiencia: x.resumo.audiencia, vendas: x.resumo.vendas })));
+    desenharPeriodo(caixa, linhas, r.dados.length >= 200);
+  }
+
+  // Somas de várias lives. Quem é a mesma pessoa em lives diferentes não dá para
+  // saber (só guardamos os totais), então espectadores e compradores são somados.
+  function desenharPeriodo(caixa, linhas, cortou) {
+    const cab = el('header', 'res-cab');
+    cab.appendChild(el('h1', null, 'Resumo do período'));
+    cab.appendChild(el('p', null, (res.de === res.ate ? dataCurta(res.de) : dataCurta(res.de) + ' a ' + dataCurta(res.ate))
+      + ' · ' + nf(linhas.length) + ' ' + plural(linhas.length, 'live', 'lives') + (res.canal ? ' · ' + res.canal : '')));
+    caixa.appendChild(cab);
+    if (!linhas.length) { caixa.appendChild(el('p', 'res-vazio', 'Nenhuma live salva nesse período. Escolha outros dias no calendário.')); return; }
+
+    const soma = (f) => linhas.reduce((t, x) => t + (Number(f(x.resumo)) || 0), 0);
+    const duracaoDe = (x) => (x.inicio ? Math.max(0, new Date(x.fim) - new Date(x.inicio)) : 0);
+    const tempoTotal = linhas.reduce((t, x) => t + duracaoDe(x), 0);
+    const faturamento = soma((z) => z.vendas && z.vendas.faturamento);
+    const itens = soma((z) => z.performance && z.performance.itensVendidos);
+    const compradoresN = soma((z) => z.vendas && z.vendas.compradores);
+    const espectadores = soma((z) => z.audiencia && z.audiencia.unicos);
+    const gemas = soma((z) => z.gemas && z.gemas.total);
+    const leiloes = soma((z) => z.performance && z.performance.leiloes);
+    const leiloesVendidos = soma((z) => z.performance && z.performance.leiloesVendidos);
+    const melhorPico = linhas.reduce((m, x) => Math.max(m, (x.resumo.audiencia || {}).pico || 0), 0);
+    const mediaPond = tempoTotal
+      ? linhas.reduce((t, x) => t + ((x.resumo.audiencia || {}).mediaSimultanea || 0) * duracaoDe(x), 0) / tempoTotal : 0;
+
+    const destaque = el('div', 'res-destaques');
+    [[brl(faturamento), 'faturamento'], [nf(linhas.length), plural(linhas.length, 'live', 'lives')], [nf(itens), 'itens vendidos'], [nf(gemas), 'gemas']].forEach(([v, rot]) => {
+      const c = el('div', 'bloco res-destaque');
+      c.appendChild(el('div', 'res-destaque-v', v));
+      c.appendChild(el('div', 'res-kpi-r', rot));
+      destaque.appendChild(c);
+    });
+    caixa.appendChild(destaque);
+
+    // barras por dia; períodos longos, por mês
+    const porMes = (res.ate - res.de) / UM_DIA > 62;
+    const baldes = new Map();
+    if (porMes) {
+      for (let d = new Date(res.de); d.getTime() <= res.ate; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+        baldes.set(new Date(d.getFullYear(), d.getMonth(), 1).getTime(), { faturamento: 0, espectadores: 0, gemas: 0, lives: 0 });
+      }
+    } else {
+      for (let d = new Date(res.de); d.getTime() <= res.ate; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+        baldes.set(d.getTime(), { faturamento: 0, espectadores: 0, gemas: 0, lives: 0 });
+      }
+    }
+    linhas.forEach((x) => {
+      const f = new Date(x.fim);
+      const b = baldes.get(porMes ? new Date(f.getFullYear(), f.getMonth(), 1).getTime() : inicioDoDia(f));
+      if (!b) return;
+      b.faturamento += (x.resumo.vendas || {}).faturamento || 0;
+      b.espectadores += (x.resumo.audiencia || {}).unicos || 0;
+      b.gemas += (x.resumo.gemas || {}).total || 0;
+      b.lives += 1;
+    });
+    const blocoG = el('section', 'bloco res-bloco');
+    const cabG = el('div', 'res-bloco-cab');
+    cabG.appendChild(el('h2', null, porMes ? 'Por mês' : 'Por dia'));
+    const seg = el('div', 'aud-janelas');
+    cabG.appendChild(seg);
+    blocoG.appendChild(cabG);
+    const barras = el('div', 'res-barras');
+    blocoG.appendChild(barras);
+    const eixo = el('div', 'res-eixo');
+    blocoG.appendChild(eixo);
+    const rotuloData = (t) => (porMes
+      ? new Date(t).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      : new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+    const METRICAS = [['faturamento', 'Faturamento', brl], ['espectadores', 'Espectadores', nf], ['gemas', 'Gemas', nf]];
+    const desenharBarras = () => {
+      limpar(seg);
+      METRICAS.forEach(([k, rot]) => {
+        const b = el('button', null, rot);
+        b.type = 'button';
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', res.metrica === k ? 'true' : 'false');
+        b.onclick = () => { res.metrica = k; desenharBarras(); };
+        seg.appendChild(b);
+      });
+      const fmt = METRICAS.find((m) => m[0] === res.metrica)[2];
+      const lista = [...baldes.entries()];
+      const max = Math.max(1, ...lista.map(([, b]) => b[res.metrica]));
+      limpar(barras);
+      lista.forEach(([t, b]) => {
+        const col = el('div', 'res-col' + (b.lives ? ' com' : ''));
+        const i = el('i');
+        i.style.height = (b.lives ? Math.max(3, b[res.metrica] / max * 100) : 1) + '%';
+        col.appendChild(i);
+        col.title = rotuloData(t) + ' · ' + fmt(b[res.metrica]) + ' · ' + nf(b.lives) + ' ' + plural(b.lives, 'live', 'lives');
+        barras.appendChild(col);
+      });
+      limpar(eixo);
+      eixo.append(el('span', null, rotuloData(lista[0][0])), el('span', null, rotuloData(lista[lista.length - 1][0])));
+    };
+    desenharBarras();
+    caixa.appendChild(blocoG);
+
+    const grade = el('div', 'res-grade');
+    grade.appendChild(blocoKpis('Audiência', [
+      [nf(espectadores), 'espectadores somados', 'Soma de cada live: quem foi a duas lives conta duas vezes.'],
+      [nf(linhas.length ? espectadores / linhas.length : 0), 'espectadores por live'],
+      [nf(mediaPond), 'média simultânea'],
+      [nf(melhorPico), 'maior pico'],
+      [tempoTotal ? duracao(tempoTotal) : '—', 'tempo no ar'],
+    ]));
+    grade.appendChild(blocoKpis('Vendas', [
+      [brl(faturamento), 'faturamento'],
+      [brl(linhas.length ? faturamento / linhas.length : 0), 'faturamento por live'],
+      [nf(compradoresN), 'compradores somados', 'Soma de cada live: quem comprou em duas lives conta duas vezes.'],
+      [brl(itens ? faturamento / itens : 0), 'ticket por item'],
+      [nf(soma((z) => z.vendas && z.vendas.ofertas)), 'ofertas'],
+      [(leiloes ? Math.round(leiloesVendidos / leiloes * 100) : 0) + '%', 'conversão dos leilões'],
+    ]));
+    const juntar = (campo, valor) => {
+      const m = new Map();
+      linhas.forEach((x) => (x.resumo[campo] || []).forEach((c) => m.set(c.u, (m.get(c.u) || 0) + (Number(c[valor]) || 0))));
+      return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    };
+    grade.appendChild(blocoRanking('Quem mais comprou', juntar('topCompradores', 'valor').map(([u, n]) => ({ nome: '@' + u, valor: brl(n), n })), 'Sem compras no período.'));
+    grade.appendChild(blocoRanking('Quem mais mandou gemas', juntar('topGemas', 'gemas').map(([u, n]) => ({ nome: '@' + u, valor: nf(n), n })), 'Sem gemas no período.'));
+    caixa.appendChild(grade);
+    caixa.appendChild(el('p', 'res-nota', 'Os rankings somam os 10 primeiros de cada live, então os valores são aproximados.'
+      + (cortou ? ' O período tem mais de 200 lives: só as 200 mais antigas entraram na conta.' : '')));
+  }
+
+  async function abrirResumo(showId) {
+    resumoAberto = showId;
+    document.querySelectorAll('.res-item').forEach((b) => b.setAttribute('aria-pressed', b.dataset.show === showId ? 'true' : 'false'));
+    const caixa = $('resDetalhe');
+    const r = await pedirExtensao({ type: 'bj-resumo-ler', showId });
+    if (resumoAberto !== showId) return;
+    limpar(caixa);
+    const x = r.ok && r.dados[0];
+    if (!x) { caixa.appendChild(el('p', 'res-vazio', r.motivo || 'Não deu para abrir este resumo.')); return; }
+    const z = x.resumo;
+    const au = z.audiencia || {}, pf = z.performance || {}, ve = z.vendas || {}, ge = z.gemas || {};
+
+    const cab = el('header', 'res-cab');
+    cab.appendChild(el('h1', null, 'Resumo de ' + (x.seller || 'Live')));
+    const ini = x.inicio && new Date(x.inicio).getTime(), fim = new Date(x.fim).getTime();
+    cab.appendChild(el('p', null, dataLive(fim) + (ini ? ' · ' + hhmm(ini) + ' às ' + hhmm(fim) + ' · ' + duracao(fim - ini) : ' · até ' + hhmm(fim))
+      + (x.provisorio ? ' · horário de fim aproximado' : '')));
+    caixa.appendChild(cab);
+
+    const destaque = el('div', 'res-destaques');
+    [[brl(ve.faturamento), 'faturamento'], [nf(au.unicos), 'espectadores únicos'], [nf(pf.itensVendidos), 'itens vendidos'], [nf(ge.total), 'gemas']].forEach(([v, rot]) => {
+      const c = el('div', 'bloco res-destaque');
+      c.appendChild(el('div', 'res-destaque-v', v));
+      c.appendChild(el('div', 'res-kpi-r', rot));
+      destaque.appendChild(c);
+    });
+    caixa.appendChild(destaque);
+
+    const grafico = el('section', 'bloco res-bloco');
+    grafico.appendChild(el('h2', null, 'Linha do tempo'));
+    const leg = el('div', 'aud-legenda');
+    grafico.appendChild(leg);
+    const g = el('div', 'aud-svg');
+    grafico.appendChild(g);
+    caixa.appendChild(grafico);
+    const pontos = (z.serie && z.serie.pontos) || [];
+    const passo = ((z.serie && z.serie.passoMin) || 5) * 60000;
+    const janelas = pontos.map((p) => ({ t: p[0], fim: p[0] + passo, media: p[1], pico: p[1], inter: p.slice(2, 6) }));
+    const desenharSerie = () => {
+      limpar(leg);
+      SERIES_AUD.forEach(([k, rot]) => {
+        const b = el('button');
+        b.type = 'button';
+        b.setAttribute('aria-pressed', seriesOcultas.has(k) ? 'false' : 'true');
+        const i = el('i');
+        i.style.background = 'var(--serie-' + k + ')';
+        b.append(i, document.createTextNode(rot));
+        b.onclick = () => { if (seriesOcultas.has(k)) seriesOcultas.delete(k); else seriesOcultas.add(k); desenharSerie(); };
+        leg.appendChild(b);
+      });
+      if (!janelas.length) { limpar(g).appendChild(el('p', 'res-vazio', 'Sem dados para o gráfico nesta live.')); return; }
+      graficoLinhas(g, janelas, SERIES_AUD.map(([k, rot], idx) => ({
+        k, rot, vals: k === 'vendas' ? pontos.map((p) => p[6]) : janelas.map((j) => (idx === 0 ? j.media : j.inter[idx - 1])),
+      })));
+    };
+    desenharSerie();
+
+    const grade = el('div', 'res-grade');
+    grade.appendChild(blocoKpis('Audiência', [
+      [nf(au.unicos), 'espectadores únicos', 'Só quem estava logado aparece na lista da Jamble.'],
+      [nf(au.mais1min), 'assistiram +1 min'],
+      [nf(au.mediaSimultanea), 'média simultânea'],
+      [nf(au.pico), au.picoEm ? 'pico · ' + hhmm(au.picoEm) : 'pico'],
+      [au.tempoMedioMs ? duracaoFina(au.tempoMedioMs) : '—', 'tempo médio assistido'],
+    ]));
+    const perf = blocoKpis('Performance', [
+      [nf(pf.leiloes), 'leilões acompanhados'],
+      [nf(pf.itensVendidos), 'itens vendidos'],
+      [Math.round((pf.conversao || 0) * 100) + '%', 'conversão dos leilões', 'Leilões vendidos sobre os leilões que a extensão viu.'],
+    ]);
+    const barra = el('div', 'res-barra res-barra-grande');
+    const cheio = el('i');
+    cheio.style.width = Math.min(100, (pf.conversao || 0) * 100) + '%';
+    barra.appendChild(cheio);
+    perf.appendChild(barra);
+    grade.appendChild(perf);
+    grade.appendChild(blocoKpis('Vendas', [
+      [brl(ve.faturamento), 'faturamento'],
+      [nf(ve.compradores), 'compradores'],
+      [brl(ve.ticketItem), 'ticket por item'],
+      [brl(ve.ticketCliente), 'ticket por cliente'],
+      [nf(ve.ofertas), 'ofertas'],
+    ]));
+    grade.appendChild(blocoKpis('Gemas', [
+      [nf(ge.total), 'gemas'],
+      [nf(ge.envios), 'envios'],
+      [nf(ge.pessoas), plural(ge.pessoas || 0, 'pessoa', 'pessoas')],
+    ]));
+    grade.appendChild(blocoRanking('Quem mais comprou', (z.topCompradores || []).map((c) => ({ nome: '@' + c.u, valor: brl(c.valor), n: c.valor })), 'Sem compras nesta live.'));
+    grade.appendChild(blocoRanking('Quem mais mandou gemas', (z.topGemas || []).map((c) => ({ nome: '@' + c.u, valor: nf(c.gemas), n: c.gemas })), 'Sem gemas nesta live.'));
+    const prod = blocoRanking('Produtos com mais lances', (z.topProdutos || []).map((c) => ({ nome: c.t || 'Produto', valor: nf(c.lances), n: c.lances })), 'Sem leilões nesta live.');
+    prod.classList.add('res-largo');
+    grade.appendChild(prod);
+    caixa.appendChild(grade);
+  }
 
   // =============================================================== navegação
   function trocarTela(nome) {
     tela = nome;
     document.querySelectorAll('[data-tela]').forEach((b) => b.setAttribute('aria-selected', b.dataset.tela === nome ? 'true' : 'false'));
-    document.querySelectorAll('.tela').forEach((t) => t.classList.toggle('ativa', !capa && t.id === 'tela-' + nome));
-    deslizarFundo($('abaFundo'), document.querySelector('.aba[data-tela="' + nome + '"]'), true);
+    // os resumos ficam na conta: a tela funciona mesmo sem live aberta
+    document.querySelectorAll('.tela').forEach((t) => t.classList.toggle('ativa', (!capa || nome === 'lives') && t.id === 'tela-' + nome));
+    if (capa) capa.style.display = nome === 'lives' ? 'none' : '';
+    if (nome === 'lives') abrirResumos();
+    abrirSubitens(nome === 'vivo');
     if (nome === 'vivo') aoFim();
   }
 
+  function abrirSubitens(abrir) {
+    $('subVivo').classList.toggle('aberto', abrir);
+    $('aba-vivo').setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  }
+
   document.querySelectorAll('[data-tela]').forEach((b) => {
-    b.onclick = () => { if (!b.disabled) trocarTela(b.dataset.tela); };
+    b.onclick = () => {
+      if (b.disabled) return;
+      // Ao vivo já aberto: o clique só recolhe ou abre os subitens
+      if (b.id === 'aba-vivo' && tela === 'vivo') abrirSubitens(b.getAttribute('aria-expanded') !== 'true');
+      else trocarTela(b.dataset.tela);
+    };
   });
 
-  // ---------------------------------------------- menu de dentro do card
-  // O fundo claro é um elemento só: medimos o botão escolhido e deslizamos o
-  // fundo até ele. Por isso a posição é recalculada quando a janela muda de
-  // tamanho — texto e largura dos botões mudam junto.
+  // ---------------------------------------------- subitens do Ao vivo
   let paneAtivo = 'ranking';
-
-  // Um fundo claro só, que desliza até o item escolhido. Serve os dois menus:
-  // as abas do cabeçalho e o menu de dentro do card.
-  function deslizarFundo(fundo, alvo, animar) {
-    if (!fundo || !alvo || !alvo.offsetWidth) return;
-    // Só a colocação inicial e o redimensionamento são secos; o clique desliza
-    // sempre, inclusive com o sistema pedindo menos movimento (ver painel.html).
-    if (!animar) fundo.classList.add('sem-transicao');
-    // Copia a caixa inteira do botão (altura e topo também, senão o fundo não
-    // fica centralizado no texto quando o botão tem margem). Medimos pelo
-    // retângulo real, e não por offsetLeft/offsetWidth: aqueles são inteiros e
-    // deixavam o fundo 1px fora do botão quando a largura dá fração de pixel.
-    const base = (fundo.offsetParent || fundo.parentElement).getBoundingClientRect();
-    const r = alvo.getBoundingClientRect();
-    fundo.style.width = r.width + 'px';
-    fundo.style.height = r.height + 'px';
-    fundo.style.transform = 'translate(' + (r.left - base.left) + 'px,' + (r.top - base.top) + 'px)';
-    fundo.classList.add('pronto');
-    if (!animar) {
-      // devolve a transição depois do quadro, senão o próximo clique não anima
-      setTimeout(() => fundo.classList.remove('sem-transicao'), 30);
-    }
-  }
-
-  function moverFundoDoMenu(animar) {
-    deslizarFundo($('menuFundo'), document.querySelector('.navc-i[data-pane="' + paneAtivo + '"]'), animar);
-    deslizarFundo($('abaFundo'), document.querySelector('.aba[data-tela="' + tela + '"]'), animar);
-  }
 
   function trocarPane(nome) {
     paneAtivo = nome;
@@ -3802,11 +4479,11 @@
     });
     $('btnPrivado').hidden = nome === 'ranking' || nome === 'batalha';
     atualizarOlhoDoMenu();   // cada aba tem o seu estado de modo privado
-    moverFundoDoMenu(true);
     // O sorteio precisa de largura (palco, urna, dois grupos de opções lado a
     // lado); o feed cede espaço enquanto essa aba estiver aberta.
     const duas = document.querySelector('#tela-vivo .duas');
     if (duas) duas.classList.toggle('sorteio', nome === 'sorteio' || nome === 'batalha');
+    $('cardPontosFeed').hidden = nome !== 'ranking' && nome !== 'sorteio';
     if (nome !== 'sorteio') pararPalco();
     if (nome === 'insights') { desenharLances(); desenharAudiencia(); }
     modoFeedViewers(nome === 'insights');
@@ -3817,20 +4494,6 @@
   document.querySelectorAll('.navc-i').forEach((b) => {
     b.onclick = () => trocarPane(b.dataset.pane);
   });
-  window.addEventListener('resize', () => moverFundoDoMenu(false));
-  // A fonte chega depois do primeiro desenho e muda a largura dos botões.
-  setTimeout(() => moverFundoDoMenu(false), 0);
-  setTimeout(() => moverFundoDoMenu(false), 250);
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(() => moverFundoDoMenu(false)).catch(() => {});
-  }
-  // Rede de segurança: se a largura de um botão mudar por qualquer motivo (fonte
-  // que chega, texto que o CSS esconde em janela estreita), o fundo se recoloca.
-  // Sem isto, uma medida tirada antes de a barra assentar ficava errada para sempre.
-  if (window.ResizeObserver) {
-    const ro = new ResizeObserver(() => moverFundoDoMenu(false));
-    document.querySelectorAll('.navc-i, .aba').forEach((b) => ro.observe(b));
-  }
 
   // =============================================================== controles
   document.querySelectorAll('[data-escopo]').forEach((b) => {
@@ -4126,9 +4789,32 @@
       setTimeout(() => lista.forEach((k) => { if (!fotosNome.has(k)) pedidasNome.delete(k); }), 60000);
     }, 900);
   }
+  // Foto do canal: o mesmo caminho, pelo @ do vendedor.
+  function desenharFotoCanal() {
+    const k = vendedorArroba().replace(/^@/, '').toLowerCase();
+    const caixa = $('canalFoto');
+    const tem = dados && dados.live;
+    const url = tem ? fotosNome.get(k) : '';
+    if (caixa.dataset.foto === (tem ? k + '|' + (url || '') : '')) return;
+    caixa.dataset.foto = tem ? k + '|' + (url || '') : '';
+    limpar(caixa);
+    caixa.textContent = tem ? iniciais(k).slice(0, 1) : '';
+    if (url) {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.onload = () => { limpar(caixa); caixa.appendChild(img); };
+      img.src = url;
+    }
+    if (tem && !fotosNome.has(k) && !pedidasNome.has(k)) {
+      pedidasNome.add(k);
+      mandar('fotos-por-nome', { nomes: [k] });
+      setTimeout(() => { if (!fotosNome.has(k)) pedidasNome.delete(k); }, 60000);
+    }
+  }
   function receberFotosNome(fotos) {
     if (!fotos || typeof fotos !== 'object') return;
     Object.entries(fotos).forEach(([k, url]) => { fotosNome.set(k, url || ''); pedidasNome.delete(k); });
+    desenharFotoCanal();
     // o card do vencedor ganha a foto se ela chegou depois
     if (btResultado && !btResultado.vencedor.avatar) {
       const f = fotosNome.get(btResultado.vencedor.usuario.toLowerCase());
@@ -4328,7 +5014,7 @@
     const data = agora.toISOString().slice(0, 10) + '-' + String(agora.getHours()).padStart(2, '0') + String(agora.getMinutes()).padStart(2, '0');
     const escopo = qual === 'compradores' ? 'live' : (d.escopo === 'vendedor' ? 'todas-as-lives' : 'live');
     const filtro = qual === 'compradores' || !d.filtro ? '' : '-' + String(d.filtro).replace(/[^a-zA-Z0-9_-]/g, '');
-    return ['betterjamble', qual, slug, escopo + filtro, data].join('-') + '.csv';
+    return ['wiselive', qual, slug, escopo + filtro, data].join('-') + '.csv';
   }
 
   function baixar(nome, texto) {

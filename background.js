@@ -8,6 +8,8 @@
 // descartável — ela se reconstrói sozinha porque a aba manda um pulso a cada
 // poucos segundos enquanto o painel está aberto (ver gems-transporte.js).
 
+importScripts('acesso.js');
+
 const PAINEL = 'painel.html';
 const LARGURA = 1120;
 const ALTURA = 780;
@@ -237,6 +239,8 @@ chrome.runtime.onMessage.addListener((msg, sender, responder) => {
 // ---------------------------------------------------------------- porta do painel
 chrome.runtime.onConnect.addListener((porta) => {
   if (porta.name !== 'bj-painel') return;
+  // sem licença a janela não recebe dados, mesmo sem a tela de login por cima
+  licencaValida().then((ok) => { if (!ok) porta.disconnect(); });
   portaDoPainel = porta;
   if (porta.sender && porta.sender.tab && porta.sender.tab.windowId != null) {
     janelaDoPainel = porta.sender.tab.windowId;

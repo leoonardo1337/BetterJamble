@@ -1,43 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "BetterJamble",
-  "version": "3.26.10",
+  "name": "WiseLive",
+  "version": "3.27.0",
   "description": "Exporta pedidos da Jamble, mostra o total vendido nas lives e abre um painel com ranking de gemas, compradores e sorteio.",
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.jamble.com/*"
-      ],
-      "js": [
-        "ritmo.js",
-        "content.js",
-        "live.js",
-        "gems-core.js",
-        "gems-transporte.js",
-        "audiencia.js",
-        "resgate.js",
-        "gems-bar.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://www.jamble.com/*"
-      ],
-      "js": [
-        "bridge.js"
-      ],
-      "run_at": "document_start"
-    }
-  ],
   "permissions": [
     "storage",
-    "alarms"
+    "alarms",
+    "scripting"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "BetterJamble",
+    "default_title": "WiseLive",
     "default_icon": {
       "16": "icons/16.png",
       "32": "icons/32.png",
@@ -53,5 +26,8 @@
     "32": "icons/32.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
-  }
+  },
+  "host_permissions": [
+    "https://www.jamble.com/*"
+  ]
 }

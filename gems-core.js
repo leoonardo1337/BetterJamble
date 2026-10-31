@@ -1,9 +1,9 @@
 // ============================================================================
-// BetterJamble — camada de dados das gemas (world MAIN)
+// WiseLive — camada de dados das gemas (world MAIN)
 //
 // Responsabilidade ÚNICA deste arquivo: capturar, guardar e agregar dados.
 // Ele não desenha nada e não conhece o painel. Quem desenha consome a API
-// pública `window.BetterJamble` e escuta o evento `bj:atualizou`.
+// pública `window.WiseLive` e escuta o evento `bj:atualizou`.
 //
 // De onde vêm os dados:
 //   - gemas: hook no WebSocket da Jamble (eventos event_type "LIKE"). Desde
@@ -1198,7 +1198,7 @@
 
   // ---------------------------------------------------------------- API pública
   // Tudo que a interface precisa saber está aqui. Nada de tocar em `db` direto.
-  window.BetterJamble = {
+  window.WiseLive = {
     versao: '3.6.0',
 
     // contexto

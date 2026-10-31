@@ -1,5 +1,5 @@
 // ============================================================================
-// BetterJamble — patos da corrida do sorteio (desenhos próprios, em SVG)
+// WiseLive — patos da corrida do sorteio (desenhos próprios, em SVG)
 //
 // Estilo "pato fofo" chapado (sem contorno): cabeça grande e redonda, corpo em
 // pílula, asa/rabo num tom mais claro, olho grande sorrindo (ou aberto), bico

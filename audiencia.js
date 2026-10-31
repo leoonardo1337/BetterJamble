@@ -1,5 +1,5 @@
 // ============================================================================
-// BetterJamble — audiência da live (world MAIN)
+// WiseLive — audiência da live (world MAIN)
 //
 // Coleta o que os Insights precisam sobre quem assiste:
 //   - quantas pessoas assistem (show.audience_count, que a Jamble manda pelo
@@ -7,7 +7,7 @@
 //   - interações por minuto: mensagens no chat, entradas ("entrou 👋"), gemas
 //     e lances — tudo do mesmo WebSocket;
 //   - leilões: produto, lances, quem deu lance, preço inicial e final (card
-//     "Produtos e lances", o mesmo do BetterJamble Panel);
+//     "Produtos e lances", o mesmo do WiseLive Panel);
 //   - quem está assistindo: a lista da aba "Espectadores" (/api/live/viewers),
 //     consultada a cada ~30s. Comparando uma consulta com a anterior sabemos
 //     quando cada pessoa entrou e saiu — é daí que sai o tempo de cada uma.
@@ -60,6 +60,23 @@
     const m = location.pathname.match(/^\/live\/[^/]+\/([^/?#]+)/);
     return m ? m[1] : null;
   };
+
+  // A live da tela é a da URL. O site troca de página sem recarregar, e uma live
+  // encerrada nem abre conexão: sem isto, a live anterior continuava valendo e
+  // os dados dela apareciam na nova.
+  const idAtual = () => showIdDaUrl() || showAtual;
+  let liveDaUrl = showIdDaUrl();
+  function conferirTroca() {
+    const u = showIdDaUrl();
+    if (!u || u === liveDaUrl) return;
+    liveDaUrl = u;
+    showAtual = null;
+    sellerAtual = (db[u] && db[u].seller) || null;
+    jaConsultouNestaAba = false;
+    Object.assign(consulta, { status: 'aguardando', ultima: 0, erros: 0, rodada: 0, motivo: '' });
+    mudou = true;
+    agendar(1000);
+  }
 
   function live(id) {
     if (!id) return null;
@@ -139,6 +156,7 @@
   function ingerir(msg) {
     const d = msg && msg.data;
     if (!d) return;
+    conferirTroca();
     const agora = Date.now();
 
     // gemas: vêm em pacotes próprios, com o show_id em cada evento
@@ -155,8 +173,14 @@
     }
 
     const show = d.show;
-    const id = (show && show.id) || showAtual || showIdDaUrl();
+    const daUrl = showIdDaUrl();
+    // pacote atrasado da conexão da live anterior
+    if (show && show.id && daUrl && show.id !== daUrl) return;
+    const id = daUrl || (show && show.id) || showAtual;
     if (!id) return;
+    // live que já acabou e não foi acompanhada: nada entra nela
+    const est = !db[id] && window.WiseLive && window.WiseLive.estadoDaLive && window.WiseLive.estadoDaLive(id);
+    if (est && est.fim) return;
     const sh = live(id);
     if (show && show.id) {
       showAtual = show.id;
@@ -381,9 +405,9 @@
   // gravar, armazenamento cheio...), a live nunca fechava aqui e o gráfico
   // seguia até agora. Por isso o estado dele é conferido sempre.
   function sincronizarFim() {
-    const id = showAtual || showIdDaUrl();
+    const id = idAtual();
     const sh = id && db[id];
-    const api = window.BetterJamble;
+    const api = window.WiseLive;
     if (!sh || sh.encerradaEm || !api || !api.estadoDaLive) return;
     const est = api.estadoDaLive(id);
     if (est && est.fim) encerrarLive(id, est.fim);
@@ -404,8 +428,16 @@
     const variacao = Math.round((Math.random() * 2 - 1) * VARIACAO);
     const proxima = () => agendar(INTERVALO + variacao);
 
+    conferirTroca();
     sincronizarFim();
-    const id = showAtual || showIdDaUrl();
+    const id = idAtual();
+    // live encerrada sem nada gravado (a extensão não acompanhou): também não consulta
+    const estadoLive = id && window.WiseLive && window.WiseLive.estadoDaLive && window.WiseLive.estadoDaLive(id);
+    if (id && !db[id] && estadoLive && estadoLive.fim) {
+      if (consulta.status !== 'encerrada') { consulta.status = 'encerrada'; mudou = true; }
+      agendar(5 * 60000);
+      return;
+    }
     if (id && db[id] && db[id].encerradaEm) {
       // live fechada: nada a consultar (confere de novo de vez em quando, caso volte)
       if (consulta.status !== 'encerrada') { consulta.status = 'encerrada'; mudou = true; }
@@ -497,7 +529,7 @@
 
   // ------------------------------------------------------------ resumo para o painel
   function resumo() {
-    const id = showAtual || showIdDaUrl();
+    const id = idAtual();
     const sh = id && db[id];
     if (!sh) return { showId: id, status: consulta.status };
     const agora = Date.now();
@@ -531,6 +563,7 @@
 
   // Envio ao painel: um pacote a cada 5s, só se algo mudou e o painel está aberto.
   relogio.setInterval(() => {
+    conferirTroca();
     sincronizarFim();
     if (!painelAberto()) return;
     if (!mudou && consulta.status !== 'ok') return;

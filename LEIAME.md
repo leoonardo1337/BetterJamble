@@ -1,4 +1,4 @@
-# BetterJamble
+# WiseLive
 
 Extensão do Chrome (não oficial) para a Jamble:
 
