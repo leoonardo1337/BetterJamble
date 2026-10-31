@@ -79,6 +79,7 @@
   .canal-nome{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .contexto{font-size:12px;line-height:16px;color:var(--bj-texto2)}
   .contexto:empty{display:none}
+  .contexto .ctx-outra{display:block}
   .contexto .ctx-aovivo{display:block;color:var(--bj-positivo)}
   .contexto .ctx-encerrada{display:block;color:var(--bj-texto3)}
   .lat-nav{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}
@@ -1340,6 +1341,8 @@
   .res-rank-nome{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .res-vazio{margin:0;padding:12px 4px;color:var(--bj-texto2);font-size:13px;line-height:1.5}
   @media (max-width:1116px){
+    /* janela estreita: no meio da área ao lado do menu, senão o logo invade o menu */
+    .marca-logo{left:50%}
     .resumos{height:auto;grid-template-columns:minmax(0,1fr)}
     .res-topo{grid-column:auto}
     .res-lista{max-height:none;overflow:visible}

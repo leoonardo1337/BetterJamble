@@ -17,6 +17,9 @@ chrome.runtime.sendMessage({ type: 'bj-acesso-conferir' }, (r) => { void chrome.
 document.getElementById('entrar').onclick = () => {
   chrome.runtime.sendMessage({ type: 'bj-abrir-painel' }, () => { void chrome.runtime.lastError; window.close(); });
 };
+document.getElementById('painel').onclick = () => {
+  chrome.runtime.sendMessage({ type: 'bj-abrir-painel' }, () => { void chrome.runtime.lastError; window.close(); });
+};
 document.getElementById('sair').onclick = () => {
   chrome.runtime.sendMessage({ type: 'bj-acesso-sair' }, () => { void chrome.runtime.lastError; mostrarAcesso({ ok: false }); });
 };

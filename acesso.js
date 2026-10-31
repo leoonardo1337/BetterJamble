@@ -55,7 +55,7 @@ async function trocarScripts(liberado) {
 
 async function encerrar(motivo) {
   await chrome.storage.local.set({ bjAcesso: { ok: false, motivo: motivo || '', em: Date.now() } });
-  await chrome.storage.local.remove(['bjLicenca', 'bjSessao']);
+  await chrome.storage.local.remove(['bjLicenca', 'bjSessao', 'bjPerfil']);
   await aplicarAcesso(false);
 }
 
@@ -139,8 +139,8 @@ async function conferirAcesso() {
 const SEM_CONEXAO = { ok: false, motivo: 'Sem conexão. Tente de novo.' };
 
 // ------------------------------------------------------ resumos das lives
-// Guardados na conta (tabela resumos_live). A RLS garante que cada conta só
-// enxerga os próprios e que só quem tem acesso liberado grava.
+// Guardados na conta (tabela resumos_live). Quem decide é a RLS no servidor: cada
+// conta lê e grava só o canal dela (acessos.canal), e o admin lê todos.
 async function tokenAtual() {
   if (!(await licencaValida())) return null;
   let { bjSessao: sessao } = await chrome.storage.local.get('bjSessao');
@@ -168,11 +168,30 @@ async function pedirResumos(caminho, opcoes) {
   } catch { return SEM_CONEXAO; }
 }
 
+// Canal e papel vêm do servidor. Sem internet, vale o último que veio.
+async function lerPerfil() {
+  const r = await pedirResumos('acessos?select=canal,papel');
+  if (r.ok && r.dados[0]) {
+    const bjPerfil = { canal: r.dados[0].canal || '', admin: r.dados[0].papel === 'admin' };
+    await chrome.storage.local.set({ bjPerfil });
+    return { ok: true, ...bjPerfil };
+  }
+  const { bjPerfil } = await chrome.storage.local.get('bjPerfil');
+  return bjPerfil ? { ok: true, ...bjPerfil } : { ok: false, motivo: r.motivo };
+}
+
+function idDoToken(token) {
+  try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch { return ''; }
+}
+
 async function salvarResumo(m) {
   const id = encodeURIComponent(String(m.showId || ''));
   if (!id || !m.fim) return { ok: false };
+  const token = await tokenAtual();
+  if (!token) return { ok: false };
   // reabrir uma live com menos dados no navegador não apaga o que já foi salvo
-  const atual = await pedirResumos('resumos_live?select=peso&show_id=eq.' + id);
+  // (a linha desta conta: o admin enxerga também a de quem é dono do canal)
+  const atual = await pedirResumos('resumos_live?select=peso&show_id=eq.' + id + '&user_id=eq.' + idDoToken(token));
   if (!atual.ok) return atual;
   if (atual.dados[0] && atual.dados[0].peso > m.peso) return { ok: true, ignorado: true };
   return pedirResumos('resumos_live?on_conflict=user_id,show_id', {
@@ -186,10 +205,10 @@ async function salvarResumo(m) {
     }),
   });
 }
-const listarResumos = () => pedirResumos('resumos_live?select=show_id,seller,inicio,fim,provisorio,audiencia:resumo->audiencia,vendas:resumo->vendas&order=fim.desc&limit=200');
-const resumosDoPeriodo = (de, ate) => pedirResumos('resumos_live?select=show_id,seller,inicio,fim,provisorio,resumo&order=fim.asc&limit=200'
+const listarResumos = () => pedirResumos('resumos_live?select=show_id,seller,inicio,fim,provisorio,peso,audiencia:resumo->audiencia,vendas:resumo->vendas&order=fim.desc&limit=200');
+const resumosDoPeriodo = (de, ate) => pedirResumos('resumos_live?select=show_id,seller,inicio,fim,provisorio,peso,resumo&order=fim.asc&limit=200'
   + '&fim=gte.' + encodeURIComponent(new Date(de).toISOString()) + '&fim=lte.' + encodeURIComponent(new Date(ate).toISOString()));
-const lerResumo = (id) => pedirResumos('resumos_live?select=show_id,seller,inicio,fim,provisorio,resumo&show_id=eq.' + encodeURIComponent(String(id || '')));
+const lerResumo = (id) => pedirResumos('resumos_live?select=show_id,seller,inicio,fim,provisorio,resumo&order=peso.desc&limit=1&show_id=eq.' + encodeURIComponent(String(id || '')));
 
 async function entrar(email, senha) {
   let r;
@@ -233,7 +252,8 @@ chrome.runtime.onMessage.addListener((msg, sender, responder) => {
   if (!msg) return;
   // só as páginas da própria extensão mexem nos resumos
   if (/^bj-resumo-/.test(msg.type || '') && sender.id === chrome.runtime.id && String(sender.url || '').startsWith('chrome-extension://')) {
-    (msg.type === 'bj-resumo-salvar' ? salvarResumo(msg)
+    (msg.type === 'bj-resumo-perfil' ? lerPerfil()
+      : msg.type === 'bj-resumo-salvar' ? salvarResumo(msg)
       : msg.type === 'bj-resumo-listar' ? listarResumos()
         : msg.type === 'bj-resumo-periodo' ? resumosDoPeriodo(msg.de, msg.ate)
           : lerResumo(msg.showId)).then(responder);

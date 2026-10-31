@@ -583,9 +583,9 @@
     // canal, no topo do menu lateral
     const ctx = $('contexto');
     limpar(ctx);
-    $('canalNome').textContent = d.live ? vendedorArroba() : 'nenhuma live aberta';
-    desenharFotoCanal();
+    desenharCanalDaConta();
     if (d.live) {
+      if (perfil.canal && slugDoVendedor() !== perfil.canal) ctx.appendChild(el('span', 'ctx-outra', 'vendo ' + vendedorArroba()));
       const atual = (d.livesDoVendedor || []).find((l) => l.atual);
       const est = d.live.estado;
       const inicio = (est && est.inicio) || (atual && atual.inicio);
@@ -628,7 +628,7 @@
     }
     if (!mostrar && capa) { capa.remove(); capa = null; }
     document.querySelectorAll('.tela').forEach((t) => {
-      t.classList.toggle('ativa', !mostrar && t.id === 'tela-' + tela);
+      t.classList.toggle('ativa', (!mostrar || tela === 'lives') && t.id === 'tela-' + tela);
     });
   }
 
@@ -3949,6 +3949,28 @@
     desenharSorteio();
   }
 
+  // ==================================================== canal e papel da conta
+  // Vêm do servidor; aqui é só para desenhar. Quem barra de verdade é a RLS.
+  const perfil = { conhecido: false, canal: '', admin: false };
+  const slugDoVendedor = () => vendedorArroba().replace(/^@/, '').toLowerCase();
+  const canalDaTela = () => perfil.canal || (dados && dados.live ? slugDoVendedor() : '');
+  function desenharCanalDaConta() {
+    const k = canalDaTela();
+    $('canalNome').textContent = k ? '@' + k : (perfil.conhecido ? 'canal não definido' : 'conectando…');
+    desenharFotoCanal();
+  }
+  function lerPerfilDaConta() {
+    pedirExtensao({ type: 'bj-resumo-perfil' }).then((r) => {
+      if (!r.ok) return;
+      Object.assign(perfil, { conhecido: true, canal: r.canal || '', admin: !!r.admin });
+      desenharCanalDaConta();
+      if (dados) desenhar();
+      if (tela === 'lives') abrirResumos();
+    });
+    // sem live aberta, o painel abre nos resumos do canal
+    setTimeout(() => { if ((!dados || !dados.live) && tela === 'vivo') trocarTela('lives'); }, 1500);
+  }
+
   // ============================================================ RESUMO DAS LIVES
   // Quando a live acaba, o painel fecha um resumo e guarda na conta. Sai daqui só
   // o agregado e os @ públicos dos rankings; nada de chat, endereço ou token.
@@ -4017,6 +4039,8 @@
     const l = dados && dados.live;
     const est = l && l.estado;
     if (!est || !est.fim) return;
+    // cada conta guarda só o próprio canal (o servidor recusaria os outros)
+    if (!perfil.conhecido || (!perfil.admin && slugDoVendedor() !== perfil.canal)) return;
     // espera a audiência desta live chegar (ou o aviso de que não há nenhuma)
     if (!audiencia || audiencia.showId !== l.showId) return;
     clearTimeout(timerResumo);
@@ -4090,13 +4114,20 @@
   const dataCurta = (t) => new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const livesDoCanal = () => res.lives.filter((x) => !res.canal || x.seller === res.canal);
 
+  // o admin recebe a mesma live de mais de uma conta: fica a mais completa
+  function semRepetir(linhas) {
+    const m = new Map();
+    linhas.forEach((x) => { const a = m.get(x.show_id); if (!a || (x.peso || 0) > (a.peso || 0)) m.set(x.show_id, x); });
+    return [...m.values()];
+  }
+
   async function abrirResumos() {
     const lista = $('resLista');
     limpar(lista).appendChild(el('p', 'res-vazio', 'Carregando as suas lives…'));
     const r = await pedirExtensao({ type: 'bj-resumo-listar' });
     limpar(lista);
     if (!r.ok) { lista.appendChild(el('p', 'res-vazio', r.motivo)); limpar($('resDetalhe')); return; }
-    res.lives = r.dados;
+    res.lives = semRepetir(r.dados);
     desenharCanais();
     desenharModoResumo();
   }
@@ -4106,7 +4137,8 @@
     const canais = [...new Set(res.lives.map((x) => x.seller).filter(Boolean))].sort();
     if (res.canal && !canais.includes(res.canal)) res.canal = '';
     limpar(sel);
-    sel.hidden = canais.length < 2;
+    sel.hidden = !perfil.admin;
+    if (!perfil.admin) res.canal = '';
     const todos = el('option', null, 'Todos os canais');
     todos.value = '';
     sel.appendChild(todos);
@@ -4135,7 +4167,8 @@
     const lista = limpar($('resLista'));
     if (!vis.length) {
       lista.appendChild(el('p', 'res-vazio', res.modo === 'periodo' ? 'Nenhuma live neste período.'
-        : 'Nenhuma live salva ainda. O resumo aparece aqui quando uma live acompanhada pelo painel terminar.'));
+        : perfil.conhecido && !perfil.canal && !perfil.admin ? 'Sua conta ainda não tem um canal ligado. Fale com o suporte do WiseLive.'
+          : 'Nenhuma live salva ainda. O resumo aparece aqui quando uma live do seu canal acompanhada pelo painel terminar.'));
       return;
     }
     vis.forEach((x) => {
@@ -4214,7 +4247,7 @@
     if (meu !== pedidoPeriodo || res.modo !== 'periodo') return;
     limpar(caixa);
     if (!r.ok) { limpar($('resLista')); caixa.appendChild(el('p', 'res-vazio', r.motivo)); return; }
-    const linhas = r.dados.filter((x) => !res.canal || x.seller === res.canal);
+    const linhas = semRepetir(r.dados).filter((x) => !res.canal || x.seller === res.canal);
     desenharListaDeLives(linhas.slice().reverse().map((x) => ({ ...x, audiencia: x.resumo.audiencia, vendas: x.resumo.vendas })));
     desenharPeriodo(caixa, linhas, r.dados.length >= 200);
   }
@@ -4789,12 +4822,17 @@
       setTimeout(() => lista.forEach((k) => { if (!fotosNome.has(k)) pedidasNome.delete(k); }), 60000);
     }, 900);
   }
-  // Foto do canal: o mesmo caminho, pelo @ do vendedor.
+  // Foto do canal: o mesmo caminho, pelo @. Fica guardada para aparecer também
+  // sem live aberta, quando não há aba da Jamble para buscar.
   function desenharFotoCanal() {
-    const k = vendedorArroba().replace(/^@/, '').toLowerCase();
+    const k = canalDaTela();
     const caixa = $('canalFoto');
-    const tem = dados && dados.live;
-    const url = tem ? fotosNome.get(k) : '';
+    const tem = !!k;
+    let url = tem ? fotosNome.get(k) : '';
+    try {
+      if (url) localStorage.setItem('bj-foto-canal:' + k, url);
+      else if (tem) url = localStorage.getItem('bj-foto-canal:' + k) || '';
+    } catch {}
     if (caixa.dataset.foto === (tem ? k + '|' + (url || '') : '')) return;
     caixa.dataset.foto = tem ? k + '|' + (url || '') : '';
     limpar(caixa);
@@ -4805,7 +4843,7 @@
       img.onload = () => { limpar(caixa); caixa.appendChild(img); };
       img.src = url;
     }
-    if (tem && !fotosNome.has(k) && !pedidasNome.has(k)) {
+    if (tem && dados && dados.live && !fotosNome.has(k) && !pedidasNome.has(k)) {
       pedidasNome.add(k);
       mandar('fotos-por-nome', { nomes: [k] });
       setTimeout(() => { if (!fotosNome.has(k)) pedidasNome.delete(k); }, 60000);
@@ -5188,6 +5226,7 @@
   ligar();
   marcarConexao('esperando');
   trocarTela('vivo');
+  lerPerfilDaConta();
 
   window.__bjPainel = {
     dados: () => dados,

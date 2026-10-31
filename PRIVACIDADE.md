@@ -46,12 +46,14 @@ O WiseLive usa o Supabase como servidor. Ficam lá, ligados à sua conta:
 
 - **Conta:** seu e-mail e os dados de acesso (a senha é guardada pelo serviço de
   login, de forma protegida) e um identificador do dispositivo.
-- **Resumos das lives:** ao fim de uma live acompanhada pelo painel, datas, totais
+- **Canal:** o nome do seu canal na Jamble, informado por quem administra o WiseLive.
+- **Resumos das lives:** ao fim de uma live do seu canal acompanhada pelo painel, datas, totais
   de audiência, gemas e vendas, a linha do tempo por minuto, os títulos dos
   produtos com mais lances e os nomes de usuário públicos dos 10 maiores
   compradores e dos 10 que mais mandaram gemas.
 
-Cada conta só consegue ler os próprios resumos. Mensagens do chat, endereços e
+Cada conta só consegue ler os resumos do próprio canal. Quem administra o WiseLive
+consegue consultar os resumos de todos os canais. Mensagens do chat, endereços e
 qualquer login ou token da Jamble não são enviados. Os e-mails de recuperação de
 senha passam pelo serviço Resend.
 
